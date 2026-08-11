@@ -1,0 +1,81 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+import { ApiClientError, getHealth } from "@/lib/api/client";
+
+type HealthState =
+  | { kind: "loading"; message: string }
+  | { kind: "online"; message: string }
+  | { kind: "offline"; message: string };
+
+export function BackendHealth() {
+  const [health, setHealth] = useState<HealthState>({
+    kind: "loading",
+    message: "正在连接后端…",
+  });
+
+  const checkHealth = useCallback(async () => {
+    try {
+      const response = await getHealth();
+      setHealth({
+        kind: response.status === "ok" ? "online" : "offline",
+        message: response.status === "ok" ? "后端服务正常" : "后端返回了未知状态",
+      });
+    } catch (error) {
+      const message =
+        error instanceof ApiClientError && error.status
+          ? `后端返回 HTTP ${error.status}`
+          : "暂时无法连接后端";
+      setHealth({ kind: "offline", message });
+    }
+  }, []);
+
+  const retryHealthCheck = () => {
+    setHealth({ kind: "loading", message: "正在连接后端…" });
+    void checkHealth();
+  };
+
+  useEffect(() => {
+    let ignoreResult = false;
+
+    getHealth()
+      .then((response) => {
+        if (!ignoreResult) {
+          setHealth({
+            kind: response.status === "ok" ? "online" : "offline",
+            message: response.status === "ok" ? "后端服务正常" : "后端返回了未知状态",
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        if (!ignoreResult) {
+          const message =
+            error instanceof ApiClientError && error.status
+              ? `后端返回 HTTP ${error.status}`
+              : "暂时无法连接后端";
+          setHealth({ kind: "offline", message });
+        }
+      });
+
+    return () => {
+      ignoreResult = true;
+    };
+  }, []);
+
+  return (
+    <section className={`health-card health-${health.kind}`} aria-live="polite">
+      <div className="health-content">
+        <span className="health-indicator" aria-hidden="true" />
+        <div>
+          <span className="foundation-label">Backend health</span>
+          <strong>{health.message}</strong>
+          <code>GET /health</code>
+        </div>
+      </div>
+      <button disabled={health.kind === "loading"} onClick={retryHealthCheck} type="button">
+        {health.kind === "loading" ? "检查中" : "重新检查"}
+      </button>
+    </section>
+  );
+}
