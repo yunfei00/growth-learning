@@ -1,0 +1,125 @@
+# Growth Learning 系统架构
+
+## 1. 架构目标
+
+Phase 1 采用模块化单体：一个 Next.js 前端、一个 FastAPI 后端，以及 PostgreSQL、Redis、MinIO 三个基础服务。它为清晰边界和长期演进留出空间，但不提前承担微服务的部署与一致性成本。
+
+## 2. 系统上下文
+
+```text
+Browser
+  │
+  ├── Next.js Web ── HTTP /api/v1 ── FastAPI application
+  │                                      ├── PostgreSQL (业务事实与派生状态)
+  │                                      ├── Redis (缓存、限流、任务基础)
+  │                                      ├── MinIO (媒体与导出文件)
+  │                                      └── OpenAI-compatible provider
+  │
+  └── 家长、孩子、老师、陪伴者通过家庭权限边界访问
+```
+
+本地开发由 Docker Compose 编排；生产部署形态在数据和接口边界稳定后再决定。
+
+## 3. 后端分层
+
+```text
+app/api           HTTP 路由、请求校验、响应映射
+app/services      用例编排、权限与事务边界
+app/models        SQLAlchemy 持久化模型
+app/schemas       跨边界的 Pydantic 数据契约
+app/db            engine、session、迁移元数据
+app/integrations  Redis、MinIO、AI 等外部适配器
+app/core          配置、日志、安全等横切能力
+```
+
+依赖方向从外向内：路由调用服务；服务依赖领域接口/仓储；集成适配器实现外部接口。Phase 1 只建立必要骨架，不引入仓储基类、事件总线或复杂依赖注入框架。
+
+### 业务模块边界（规划）
+
+- `identity`：用户身份与会话
+- `families`：家庭、成员、儿童档案、授权
+- `curriculum`：学科、能力、知识点、课程和活动
+- `learning`：学习/复习/测评原始事件与掌握状态计算
+- `reading`：故事生成、规则校验、阅读会话
+- `science`：实验课程与实验会话
+- `growth`：时间线、媒体、报告和导出
+
+模块之间通过稳定的服务契约和标识符协作；在模块化单体内共享一个数据库和事务能力。
+
+## 4. 数据与一致性
+
+PostgreSQL 是业务事实的唯一权威来源。Redis 中的数据必须可丢弃并从数据库恢复；MinIO 保存媒体对象，数据库保存对象元数据和归属关系。
+
+学习数据采用两条链路：
+
+```text
+LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
+                              │
+                              └── versioned calculator
+                                      │
+                                      ▼
+                           ChildKnowledgeState (derived projection)
+```
+
+- 原始记录使用客户端或服务端幂等键，避免重试造成重复事实。
+- 派生状态带 `algorithm_version`、`evidence_through` 与 `computed_at`。
+- 更新派生状态和写入原始事件可在同一数据库事务中完成；批量重算可以异步执行。
+- 删除请求优先使用可审计的生命周期状态；法规要求的物理删除由专门流程执行并覆盖备份/对象存储。
+
+## 5. 权限模型
+
+- 每个请求先确认当前用户，再以 `family_id` 建立租户边界。
+- FamilyMember 表达用户在家庭中的角色；Child 是受保护的档案实体。
+- TeacherChildRelation 是显式授权，不从“老师角色”推导对所有孩子的访问权。
+- 授权校验同时考虑角色、资源归属、scope、action、生效/过期时间和撤销状态。
+- 服务层是强制授权边界；前端隐藏按钮只改善体验，不构成安全控制。
+
+## 6. AI 集成
+
+业务服务依赖统一的 `AIProvider` 协议，而不是供应商 SDK：
+
+- 输入采用消息、温度、最大输出和可选结构化输出约束。
+- 返回统一的文本、供应商、模型、用量和结束原因。
+- `OpenAICompatibleProvider` 通过 `base_url`、`api_key` 和 `model` 支持 OpenAI、DeepSeek、Qwen/DashScope 或本地兼容服务。
+- Phase 1 提供禁用实现和接口验证，不发送真实请求。
+- 提示模板、规则和模型版本必须可记录；面向孩子的输出需经过确定性内容规则和必要的家长确认。
+
+## 7. API 与前端
+
+- 后端业务 API 固定在 `/api/v1`，非业务探针使用 `/health`。
+- API 统一错误结构、请求 ID 和 ISO 8601 UTC 时间。
+- Next.js 使用 App Router；页面默认服务端组件，仅在需要交互时使用客户端组件。
+- 前端 API client 集中处理基础地址、超时、错误映射和未来的身份凭证。
+- 浏览器只访问公开的 `NEXT_PUBLIC_API_BASE_URL`，任何服务端密钥都不得进入前端构建产物。
+
+## 8. 缓存、任务与对象存储
+
+- Redis Phase 1 仅建立连接和健康基础；后续用于短期缓存、限流计数和任务队列后端。
+- 缓存键包含版本和家庭/资源范围；缓存失效不能影响事实正确性。
+- MinIO bucket 默认私有，通过后端产生短期签名 URL；对象键不包含儿童姓名等敏感信息。
+- 后续异步任务使用数据库事实作为输入，以幂等任务键和可观测重试保证安全执行。
+
+## 9. 配置与环境
+
+- 所有配置来自环境变量；本地 `.env` 不入库，`.env.example` 提供无敏感值模板。
+- 开发、测试、CI 使用同一组应用入口和检查命令。
+- Docker 镜像采用非 root 运行、显式依赖锁定和健康检查；Compose volume 保存本地数据。
+- 配置在进程启动时解析并快速失败，密钥永不写入日志。
+
+## 10. 可观测性与演进
+
+Phase 1 提供轻量健康检查；后续按需增加结构化日志、指标和追踪。`/health` 只表示进程存活，未来 `/ready` 可检查必需依赖，避免外部服务短暂故障导致存活探针重启风暴。
+
+只有在模块具备独立扩缩容、故障隔离或团队所有权需求，并且迁移收益超过分布式成本时，才考虑拆分服务。首先通过模块接口和数据所有权保持可拆分性。
+
+## 11. 关键架构决策
+
+| 决策 | 选择 | 原因 |
+| --- | --- | --- |
+| 部署单元 | 模块化单体 | 保持事务简单和开发速度，避免过早微服务化 |
+| 主数据库 | PostgreSQL | 强事务、关系约束、JSON 扩展与成熟运维能力 |
+| ORM/迁移 | SQLAlchemy 2 + Alembic | 显式会话与稳定迁移工具链 |
+| Web 框架 | Next.js App Router | 服务端渲染、类型安全与成熟生态 |
+| AI | OpenAI-compatible 协议 | 供应商可替换，业务层不依赖专有 SDK |
+| 学习状态 | 原始证据 + 派生投影 | 保留历史并允许算法重算和解释 |
+
