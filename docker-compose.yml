@@ -52,14 +52,12 @@ services:
       - growth_learning
 
   backend:
+    image: growth-learning-backend:latest
     restart: unless-stopped
     build:
       context: ./backend
       target: runtime
-    command:
-      - sh
-      - -c
-      - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
       DEBUG: "false"
@@ -106,6 +104,7 @@ services:
       - growth_learning
 
   frontend:
+    image: growth-learning-frontend:latest
     restart: unless-stopped
     build:
       context: ./frontend

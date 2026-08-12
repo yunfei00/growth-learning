@@ -20,6 +20,22 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:18.3-alpine
+        env:
+          POSTGRES_USER: growth_learning
+          POSTGRES_PASSWORD: ci-postgres-password
+          POSTGRES_DB: growth_learning
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U growth_learning -d growth_learning"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql+asyncpg://growth_learning:ci-postgres-password@localhost:5432/growth_learning
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -43,8 +59,30 @@ jobs:
       - name: Test
         run: python -m pytest
 
-      - name: Validate Alembic environment
-        run: python -m alembic upgrade head --sql > /tmp/growth-learning-migration.sql
+      - name: Migrate an empty PostgreSQL database
+        run: python -m alembic upgrade head && python -m alembic current
+
+      - name: Verify migrated PostgreSQL tables
+        run: |
+          python - <<'PY'
+          import asyncio
+          from sqlalchemy import inspect
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from app.core.config import get_settings
+
+          async def main():
+              engine = create_async_engine(get_settings().database_url)
+              async with engine.connect() as connection:
+                  tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+              await engine.dispose()
+              required = {"users", "families", "family_members", "children", "alembic_version"}
+              missing = required - tables
+              if missing:
+                  raise SystemExit(f"Missing migrated tables: {sorted(missing)}")
+              print(f"Verified tables: {sorted(required)}")
+
+          asyncio.run(main())
+          PY
 
   frontend:
     name: Frontend checks
@@ -100,19 +138,24 @@ jobs:
         run: cp .env.example .env && docker compose --env-file .env config --quiet
 
   deployment-image:
-    name: Publish frontend deployment image
+    name: Publish deployment images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: frontend
+    needs: [backend, frontend, infrastructure]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Build production image
+      - name: Build production images
         run: |
+          docker build \
+            --target runtime \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag growth-learning-backend:latest \
+            backend
           docker build \
             --target runtime \
             --build-arg NEXT_PUBLIC_API_BASE_URL=/growth/api \
@@ -121,8 +164,11 @@ jobs:
             --tag growth-learning-frontend:latest \
             frontend
 
-      - name: Export image
-        run: docker save growth-learning-frontend:latest | gzip -1 > growth-learning-frontend.tar.gz
+      - name: Export images
+        run: |
+          docker save \
+            growth-learning-backend:latest \
+            growth-learning-frontend:latest | gzip -1 > growth-learning-images.tar.gz
 
       - name: Publish immutable deployment asset
         env:
@@ -130,10 +176,10 @@ jobs:
         run: |
           tag="deployment-${GITHUB_SHA}"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" growth-learning-frontend.tar.gz --clobber
+            gh release upload "$tag" growth-learning-images.tar.gz --clobber
           else
-            gh release create "$tag" growth-learning-frontend.tar.gz \
+            gh release create "$tag" growth-learning-images.tar.gz \
               --title "Deployment ${GITHUB_SHA}" \
-              --notes "Automated frontend deployment image for commit ${GITHUB_SHA}." \
+              --notes "Automated backend and frontend deployment images for commit ${GITHUB_SHA}." \
               --prerelease
           fi
