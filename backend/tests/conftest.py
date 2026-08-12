@@ -5,7 +5,12 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import Settings
@@ -20,16 +25,28 @@ def anyio_backend() -> str:
 
 
 @pytest.fixture
-async def test_app() -> AsyncIterator[FastAPI]:
+async def database_engine() -> AsyncIterator[AsyncEngine]:
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+    yield engine
+    await engine.dispose()
+
+
+@pytest.fixture
+def session_factory(database_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(database_engine, expire_on_commit=False)
+
+
+@pytest.fixture
+async def test_app(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[FastAPI]:
 
     async def override_db_session() -> AsyncIterator[AsyncSession]:
         async with session_factory() as session:
@@ -43,8 +60,6 @@ async def test_app() -> AsyncIterator[FastAPI]:
     application = create_app(settings)
     application.dependency_overrides[get_db_session] = override_db_session
     yield application
-
-    await engine.dispose()
 
 
 @pytest.fixture
