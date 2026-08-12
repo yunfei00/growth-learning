@@ -1,6 +1,6 @@
 # Growth Learning
 
-Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 2 已建立真实账户、家庭、成员权限和孩子档案基础；识字、复习、AI 故事等学习功能不在本阶段范围内。
+Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 3 已建立独立系统管理员权限与通用汉字知识目录；孩子掌握度、复习算法和 AI 故事仍不在本阶段范围内。
 
 ## 当前用户流程
 
@@ -33,6 +33,7 @@ Set-Location ..
 | Frontend | <http://localhost:3000> |
 | Register | <http://localhost:3000/register> |
 | Login | <http://localhost:3000/login> |
+| Admin | <http://localhost:3000/admin> |
 | Backend health | <http://localhost:8000/health> |
 | Backend OpenAPI | <http://localhost:8000/docs> |
 
@@ -49,6 +50,23 @@ Set-Location ..
 - Backend：Ruff、格式检查、pytest、Alembic。
 - Frontend：ESLint、TypeScript、Next.js production build。
 - CI：在空 PostgreSQL 18 数据库执行 `alembic upgrade head` 并验证正式表。
+- CI 还会先停在 Phase 2 migration 插入旧用户，再升级并验证旧用户仍为普通 `user`。
+
+## 系统管理员与 Starter 数据
+
+系统管理员与家庭管理员完全独立。管理员密码不接受命令行明文参数；交互执行时由隐藏输入读取，非交互部署可通过标准输入注入运行时 secret。
+
+```bash
+docker compose exec backend python -m app.cli.admin create-admin \
+  --email admin@example.com --display-name "System Admin"
+docker compose exec backend python -m app.cli.admin promote-admin \
+  --email existing@example.com
+docker compose exec backend python -m app.cli.admin set-password \
+  --email admin@example.com
+docker compose exec backend python -m app.cli.characters import-starter
+```
+
+`create-admin` 可重复执行且不会重复创建账户；已有普通账户必须显式执行 `promote-admin`。项目自有 Starter 数据位于 `backend/data/chinese_characters_v1.json`，不宣称官方标准、教材清单或精确字频。
 
 ## 服务器部署
 
@@ -106,5 +124,7 @@ gl-update
 - 浏览器会话使用 HttpOnly Cookie；Cookie Path 按本地 `/` 与线上 `/growth/api` 分别配置。
 - 家庭与孩子权限由后端集中校验，跨家庭资源返回 `404`。
 - `admin` 可以修改家庭/孩子；`companion` 只读。
+- `system_role=admin` 只授予平台知识管理权限，不自动取得任何家庭或孩子资料。
+- 所有 `/api/v1/admin/*` 在后端统一校验系统管理员角色；普通/家庭管理员均返回 `403`。
 - 所有正式业务外键使用 `ON DELETE RESTRICT`；当前不提供孩子物理删除。
 - Teacher 将通过家庭外部授权关系访问指定孩子，不能自动成为 `FamilyMember`。

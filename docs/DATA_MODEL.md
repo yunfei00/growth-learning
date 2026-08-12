@@ -1,6 +1,6 @@
 # Growth Learning 数据模型
 
-本文记录已落地的数据模型与后续边界。Phase 2 只创建身份、家庭、成员和孩子四类正式业务实体，不提前创建学习、复习、故事或教师业务表。
+本文记录已落地的数据模型与后续边界。Phase 3 在身份/家庭基础上加入独立系统管理员权限和系统知识目录；不创建孩子掌握度、复习、故事或教师业务表。
 
 ## 通用约定
 
@@ -24,9 +24,12 @@
 | `display_name` | 用户显示名称 |
 | `password_hash` | Argon2 密码哈希；禁止 API 返回 |
 | `is_active` | 账户是否可登录 |
+| `system_role` | 平台角色：`user` 或 `admin`；注册默认 `user` |
 | `created_at` / `updated_at` | 审计时间戳 |
 
 密码、会话 token、密码哈希不得写入应用日志。数据库不保存明文密码。
+
+`system_role=admin` 是平台管理权限，与 `family_members.role=admin` 完全独立。系统管理员不因平台角色自动获得任何家庭或孩子的访问权。
 
 ### `families`
 
@@ -81,6 +84,9 @@ Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/�
 | `family_members.family_id → families.id` | `RESTRICT` | 不允许删除家庭时连带删除成员关系 |
 | `family_members.user_id → users.id` | `RESTRICT` | 不允许删除账户时破坏家庭归属和审计边界 |
 | `children.family_id → families.id` | `RESTRICT` | 不允许家庭操作级联删除多年孩子数据 |
+| `chinese_characters.knowledge_point_id → knowledge_points.id` | `RESTRICT` | 禁止删除规范知识点时静默删除汉字内容 |
+| `knowledge_relations.source_id → knowledge_points.id` | `RESTRICT` | 有关系引用时禁止删除源知识点 |
+| `knowledge_relations.target_id → knowledge_points.id` | `RESTRICT` | 有关系引用时禁止删除目标知识点 |
 
 后续若需要停用账户、家庭或孩子，优先引入显式状态和归档流程，不直接扩大级联删除范围。
 
@@ -96,6 +102,22 @@ Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/�
 
 教师是家庭外部授权角色，不能自动成为 `FamilyMember`。后续阶段使用类似 `TeacherChildRelation` 的独立关系，把指定孩子、权限范围、有效期、授权人和撤销状态绑定在一起。Phase 2 不创建 Teacher 表或教师授权接口。
 
+## 系统知识目录
+
+### `knowledge_points`
+
+所有学科共用的规范知识主表。字段包含 UUID、`type`、`status`、标题、唯一 `canonical_key`、来源类型/引用和审计时间。当前 `type` 仅启用 `chinese_character`，结构可扩展 `chinese_word`、`math_concept`、`english_word`、`science_concept`。
+
+### `chinese_characters`
+
+与 `knowledge_points` 一对一，以 `knowledge_point_id` 为主键。保存唯一汉字、拼音、可选笔画/部首/难度/频次、基础释义、例句、常用词、标签及 `is_enabled`。Starter 数据不声明官方等级、教材章节或精确字频，没有可靠来源的字段保持空值。
+
+本表严禁保存 `child_id`、`mastered`、`correct_count` 等孩子状态。系统知识和孩子学习事实必须分离。
+
+### `knowledge_relations`
+
+知识点之间的有向关系，支持 `related`、`prerequisite`、`confusing`、`derived`。唯一边约束为 `(source_id, target_id, relation_type)`，禁止自关联。
+
 ## 后续学习数据
 
-识字、复习、测评、阅读、AI 故事和科学实验属于后续阶段。学习事实将以孩子为上下文，并保留原始事实与可重算派生状态的分离；Phase 2 不创建假学习记录或统计数据。
+孩子掌握度、复习、测评、阅读、AI 故事和科学实验属于后续阶段。学习事实将以孩子为上下文，并保留原始事实与可重算派生状态的分离；Phase 3 不创建假学习记录或统计数据。

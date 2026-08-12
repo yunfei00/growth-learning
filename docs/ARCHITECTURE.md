@@ -2,7 +2,7 @@
 
 ## 1. 架构目标
 
-Phase 1 采用模块化单体：一个 Next.js 前端、一个 FastAPI 后端，以及 PostgreSQL、Redis、MinIO 三个基础服务。它为清晰边界和长期演进留出空间，但不提前承担微服务的部署与一致性成本。
+系统采用模块化单体：一个 Next.js 前端、一个 FastAPI 后端，以及 PostgreSQL、Redis、MinIO 三个基础服务。它为清晰边界和长期演进留出空间，但不提前承担微服务的部署与一致性成本。
 
 ## 2. 系统上下文
 
@@ -18,7 +18,7 @@ Browser
   └── 家长、孩子、老师、陪伴者通过家庭权限边界访问
 ```
 
-本地开发由 Docker Compose 编排；生产部署形态在数据和接口边界稳定后再决定。
+Windows 本地开发使用 Node.js 与 Python venv，不依赖 Docker。服务器完整集成环境使用 Docker Compose，数据服务不映射公网端口。
 
 ## 3. 后端分层
 
@@ -37,8 +37,10 @@ app/core          配置、日志、安全等横切能力
 ### 业务模块边界（规划）
 
 - `identity`：用户身份与会话
+- `administration`：独立系统管理员 Guard、CLI 和真实系统计数
 - `families`：家庭、成员、儿童档案、授权
-- `curriculum`：学科、能力、知识点、课程和活动
+- `knowledge`：通用知识点、汉字目录和知识关系
+- `curriculum`：未来的学科、能力、课程和活动
 - `learning`：学习/复习/测评原始事件与掌握状态计算
 - `reading`：故事生成、规则校验、阅读会话
 - `science`：实验课程与实验会话
@@ -73,6 +75,12 @@ LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
 - TeacherChildRelation 是显式授权，不从“老师角色”推导对所有孩子的访问权。
 - 授权校验同时考虑角色、资源归属、scope、action、生效/过期时间和撤销状态。
 - 服务层是强制授权边界；前端隐藏按钮只改善体验，不构成安全控制。
+- `User.system_role` 表达平台权限；`FamilyMember.role` 表达单一家庭内权限。两套权限不互相提升。
+- 系统管理员 API 只能管理系统知识与平台概览；访问家庭/孩子仍必须拥有对应 `FamilyMember`。
+
+## 5.1 系统知识与孩子状态分离
+
+`KnowledgePoint` 是跨学科规范主表，`ChineseCharacter` 是一对一的汉字属性，`KnowledgeRelation` 表达知识间关系。它们属于系统目录，不引用 Child。未来孩子掌握情况使用单独关系/事实表，通过 `child_id + knowledge_point_id` 建立上下文，避免污染共享知识。
 
 ## 6. AI 集成
 
@@ -103,7 +111,7 @@ LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
 
 - 所有配置来自环境变量；本地 `.env` 不入库，`.env.example` 提供无敏感值模板。
 - 开发、测试、CI 使用同一组应用入口和检查命令。
-- Docker 镜像采用非 root 运行、显式依赖锁定和健康检查；Compose volume 保存本地数据。
+- Docker 镜像采用非 root 运行、显式依赖锁定和健康检查；服务器 Compose named volume 保存数据。
 - 配置在进程启动时解析并快速失败，密钥永不写入日志。
 
 ## 10. 可观测性与演进
@@ -122,4 +130,3 @@ Phase 1 提供轻量健康检查；后续按需增加结构化日志、指标和
 | Web 框架 | Next.js App Router | 服务端渲染、类型安全与成熟生态 |
 | AI | OpenAI-compatible 协议 | 供应商可替换，业务层不依赖专有 SDK |
 | 学习状态 | 原始证据 + 派生投影 | 保留历史并允许算法重算和解释 |
-
