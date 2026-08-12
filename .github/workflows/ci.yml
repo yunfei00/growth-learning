@@ -62,11 +62,44 @@ jobs:
       - name: Migrate an empty PostgreSQL database
         run: python -m alembic upgrade head && python -m alembic current
 
+      - name: Verify additive migration from Phase 2 data
+        run: |
+          python -m alembic downgrade 20260812_0001
+          python - <<'PY'
+          import asyncio
+          import uuid
+          from sqlalchemy import text
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from app.core.config import get_settings
+
+          async def main():
+              engine = create_async_engine(get_settings().database_url)
+              async with engine.begin() as connection:
+                  await connection.execute(
+                      text(
+                          "INSERT INTO users "
+                          "(id, email, display_name, password_hash, is_active) "
+                          "VALUES (:id, :email, :name, :password_hash, true)"
+                      ),
+                      {
+                          "id": uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                          "email": "migration-fixture@example.com",
+                          "name": "Migration Fixture",
+                          "password_hash": "test-only-not-a-real-password-hash",
+                      },
+                  )
+              await engine.dispose()
+
+          asyncio.run(main())
+          PY
+          python -m alembic upgrade head
+          python -m alembic current
+
       - name: Verify migrated PostgreSQL tables
         run: |
           python - <<'PY'
           import asyncio
-          from sqlalchemy import inspect
+          from sqlalchemy import inspect, text
           from sqlalchemy.ext.asyncio import create_async_engine
           from app.core.config import get_settings
 
@@ -74,11 +107,20 @@ jobs:
               engine = create_async_engine(get_settings().database_url)
               async with engine.connect() as connection:
                   tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+                  legacy_role = await connection.scalar(
+                      text("SELECT system_role FROM users WHERE email = :email"),
+                      {"email": "migration-fixture@example.com"},
+                  )
               await engine.dispose()
-              required = {"users", "families", "family_members", "children", "alembic_version"}
+              required = {
+                  "users", "families", "family_members", "children", "alembic_version",
+                  "knowledge_points", "chinese_characters", "knowledge_relations",
+              }
               missing = required - tables
               if missing:
                   raise SystemExit(f"Missing migrated tables: {sorted(missing)}")
+              if legacy_role != "user":
+                  raise SystemExit(f"Existing user received unsafe role: {legacy_role!r}")
               print(f"Verified tables: {sorted(required)}")
 
           asyncio.run(main())

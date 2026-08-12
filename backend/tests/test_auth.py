@@ -26,6 +26,7 @@ async def test_registration_normalizes_email_and_never_returns_hash(
 
     assert payload["email"] == "parent@example.com"
     assert payload["display_name"] == "家长"
+    assert payload["system_role"] == "user"
     assert "password" not in payload
     assert "password_hash" not in payload
 
