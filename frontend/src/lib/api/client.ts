@@ -6,8 +6,65 @@ export type User = {
   email: string;
   display_name: string;
   is_active: boolean;
+  system_role: "user" | "admin";
   created_at: string;
   updated_at: string;
+};
+
+export type AdminOverview = {
+  users: number;
+  families: number;
+  children: number;
+  characters: number;
+};
+
+export type CharacterStatus = "active" | "archived";
+
+export type ChineseCharacter = {
+  id: string;
+  character: string;
+  pinyin: string;
+  stroke_count: number | null;
+  radical: string | null;
+  frequency_rank: number | null;
+  difficulty_level: number | null;
+  simple_meaning: string | null;
+  example_sentence: string | null;
+  common_words: string[];
+  tags: string[];
+  is_enabled: boolean;
+  status: CharacterStatus;
+  source_type: string;
+  source_reference: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CharacterPage = {
+  items: ChineseCharacter[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type CharacterInput = {
+  character: string;
+  pinyin: string;
+  stroke_count?: number | null;
+  radical?: string | null;
+  simple_meaning?: string | null;
+  example_sentence?: string | null;
+  common_words: string[];
+  tags: string[];
+  is_enabled: boolean;
+};
+
+export type ImportReport = {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
 };
 
 export type FamilyRole = "admin" | "companion";
@@ -184,5 +241,46 @@ export function createChild(
   return request<Child>(`/api/v1/families/${familyId}/children`, {
     method: "POST",
     body: jsonBody(payload),
+  });
+}
+
+export function getAdminOverview(): Promise<AdminOverview> {
+  return request<AdminOverview>("/api/v1/admin/overview");
+}
+
+export function listAdminCharacters(filters: {
+  search?: string;
+  enabled?: boolean;
+  page?: number;
+  pageSize?: number;
+}): Promise<CharacterPage> {
+  const query = new URLSearchParams();
+  if (filters.search) query.set("search", filters.search);
+  if (filters.enabled !== undefined) query.set("enabled", String(filters.enabled));
+  query.set("page", String(filters.page ?? 1));
+  query.set("page_size", String(filters.pageSize ?? 20));
+  return request<CharacterPage>(`/api/v1/admin/characters?${query.toString()}`);
+}
+
+export function createAdminCharacter(payload: CharacterInput): Promise<ChineseCharacter> {
+  return request<ChineseCharacter>("/api/v1/admin/characters", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function updateAdminCharacter(
+  id: string,
+  payload: Partial<CharacterInput> & { status?: CharacterStatus },
+): Promise<ChineseCharacter> {
+  return request<ChineseCharacter>(`/api/v1/admin/characters/${id}`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function importStarterCharacters(): Promise<ImportReport> {
+  return request<ImportReport>("/api/v1/admin/characters/import-starter", {
+    method: "POST",
   });
 }

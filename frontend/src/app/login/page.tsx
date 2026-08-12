@@ -10,7 +10,7 @@ import { ApiClientError, listFamilies } from "@/lib/api/client";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { status, login } = useAuth();
+  const { status, user, login } = useAuth();
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,9 +18,9 @@ function LoginForm() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/home");
+      router.replace(user?.system_role === "admin" ? "/admin" : "/home");
     }
-  }, [router, status]);
+  }, [router, status, user]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -28,7 +28,12 @@ function LoginForm() {
     setIsSubmitting(true);
 
     try {
-      await login(email, password);
+      const loggedInUser = await login(email, password);
+      if (loggedInUser.system_role === "admin") {
+        router.replace("/admin");
+        router.refresh();
+        return;
+      }
       const families = await listFamilies();
       router.replace(families.length === 0 ? "/onboarding" : "/home");
       router.refresh();
