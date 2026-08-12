@@ -1,5 +1,6 @@
 """System administration and canonical character catalog security tests."""
 
+import io
 import uuid
 
 import httpx
@@ -8,6 +9,7 @@ from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.cli.admin import read_password
 from app.core.security import verify_password
 from app.models import KnowledgeRelation, SystemRole, User
 from app.services.admin_provisioning import create_admin, promote_admin, set_admin_password
@@ -15,6 +17,13 @@ from app.services.admin_provisioning import create_admin, promote_admin, set_adm
 pytestmark = pytest.mark.anyio
 
 PASSWORD = "local-test-password-only"
+
+
+async def test_admin_cli_strips_windows_stdin_line_ending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("sys.stdin", io.StringIO(f"{PASSWORD}\r\n"))
+    assert read_password() == PASSWORD
 
 
 async def register_and_login(

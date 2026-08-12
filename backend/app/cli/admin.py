@@ -11,7 +11,7 @@ from app.services.admin_provisioning import create_admin, promote_admin, set_adm
 
 def read_password() -> str:
     password = (
-        getpass.getpass("Password: ") if sys.stdin.isatty() else sys.stdin.readline().rstrip("\n")
+        getpass.getpass("Password: ") if sys.stdin.isatty() else sys.stdin.readline().rstrip("\r\n")
     )
     if len(password) < 10:
         raise ValueError("Password must contain at least 10 characters")
