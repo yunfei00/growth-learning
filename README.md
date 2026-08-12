@@ -76,7 +76,7 @@ source /root/.bashrc
 bash scripts/server-deploy.sh
 ```
 
-`server-bootstrap.sh` 可重复执行：已有 `.env` 会被保留；首次运行会生成随机 PostgreSQL/MinIO 密码，并以 managed block 方式安装快捷命令。服务器 `.env` 不得提交到 Git。
+`server-bootstrap.sh` 可重复执行：已有 `.env` 会被保留；首次运行会生成随机 PostgreSQL/MinIO 密码，并以 managed block 方式安装快捷命令。服务器 `.env` 不得提交到 Git。前端生产构建固定使用单 worker、512 MB Node 堆上限和最低 CPU 调度优先级，以适配小内存服务器。
 
 部署后可使用：
 

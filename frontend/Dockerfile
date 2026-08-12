@@ -20,11 +20,11 @@ CMD ["pnpm", "dev"]
 
 FROM dependencies AS build
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-ARG NODE_OPTIONS=--max-old-space-size=768
+ARG NODE_OPTIONS=--max-old-space-size=512
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
     NODE_OPTIONS=$NODE_OPTIONS
 COPY . .
-RUN mkdir -p public && pnpm build
+RUN mkdir -p public && nice -n 19 pnpm build
 
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production \
