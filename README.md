@@ -68,13 +68,24 @@ mkdir -p /opt/apps
 git clone https://github.com/yunfei00/growth-learning.git /opt/apps/growth-learning
 cd /opt/apps/growth-learning
 
-GROWTH_LEARNING_PUBLIC_FRONTEND_ORIGIN=http://<server-ip>:3000 \
-GROWTH_LEARNING_PUBLIC_API_BASE_URL=http://<server-ip>:8000 \
+GROWTH_LEARNING_PUBLIC_FRONTEND_ORIGIN=http://<server-ip> \
+GROWTH_LEARNING_PUBLIC_API_BASE_URL=/growth/api \
+GROWTH_LEARNING_PUBLIC_APP_BASE_PATH=/growth \
+GROWTH_LEARNING_API_ROOT_PATH=/growth/api \
+GROWTH_LEARNING_BIND_ADDRESS=127.0.0.1 \
   bash scripts/server-bootstrap.sh
 
 source /root/.bashrc
 bash scripts/server-deploy.sh
 ```
+
+将 `infra/nginx/growth-learning.conf` 安装到 `/etc/nginx/snippets/growth-learning.conf`，并在当前公网 IP 对应的 Nginx `server` 块中加入：
+
+```nginx
+include /etc/nginx/snippets/growth-learning.conf;
+```
+
+执行 `nginx -t && systemctl reload nginx` 后，统一使用不带端口的地址：前端 `http://<server-ip>/growth`、状态页 `http://<server-ip>/growth/status`、API health `http://<server-ip>/growth/api/health`、API 文档 `http://<server-ip>/growth/api/docs`。容器端口 `3000/8000` 只绑定到宿主机回环地址，不直接暴露公网。
 
 `server-bootstrap.sh` 可重复执行：已有 `.env` 会被保留；首次运行会生成随机 PostgreSQL/MinIO 密码，并以 managed block 方式安装快捷命令。服务器 `.env` 不得提交到 Git。前端 Linux 生产镜像由 GitHub CI 构建并发布为与提交 SHA 绑定的公开预发布资产；服务器会校验镜像 revision，只在本机构建轻量后端，从而避免小内存服务器运行 Next.js 编译器。
 

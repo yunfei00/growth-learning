@@ -20,8 +20,10 @@ CMD ["pnpm", "dev"]
 
 FROM dependencies AS build
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+ARG NEXT_PUBLIC_APP_BASE_PATH=
 ARG NODE_OPTIONS=--max-old-space-size=512
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
+    NEXT_PUBLIC_APP_BASE_PATH=$NEXT_PUBLIC_APP_BASE_PATH \
     NODE_OPTIONS=$NODE_OPTIONS
 COPY . .
 RUN mkdir -p public && nice -n 19 pnpm build

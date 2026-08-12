@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     app_environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
+    root_path: str = ""
     cors_origins: str = "http://localhost:3000"
 
     database_url: str = "postgresql+asyncpg://localhost/growth_learning"

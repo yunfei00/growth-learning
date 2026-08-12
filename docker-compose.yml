@@ -63,6 +63,7 @@ services:
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
       DEBUG: "false"
+      ROOT_PATH: ${API_ROOT_PATH:-}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?Set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
       REDIS_URL: redis://redis:6379/0
       MINIO_ENDPOINT: minio:9000
@@ -105,10 +106,12 @@ services:
       target: runtime
       args:
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+        NEXT_PUBLIC_APP_BASE_PATH: ${PUBLIC_APP_BASE_PATH:-}
         NODE_OPTIONS: ${FRONTEND_BUILD_NODE_OPTIONS:---max-old-space-size=512}
     environment:
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
+      NEXT_PUBLIC_APP_BASE_PATH: ${PUBLIC_APP_BASE_PATH:-}
     ports:
       - "${FRONTEND_BIND_ADDRESS:-0.0.0.0}:${FRONTEND_PORT:-3000}:3000"
     depends_on:
@@ -119,7 +122,7 @@ services:
         - CMD
         - node
         - -e
-        - fetch('http://localhost:3000/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+        - fetch('http://localhost:3000${PUBLIC_APP_BASE_PATH:-}/status').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
       interval: 5s
       timeout: 5s
       retries: 12

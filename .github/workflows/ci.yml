@@ -115,7 +115,8 @@ jobs:
         run: |
           docker build \
             --target runtime \
-            --build-arg NEXT_PUBLIC_API_BASE_URL= \
+            --build-arg NEXT_PUBLIC_API_BASE_URL=/growth/api \
+            --build-arg NEXT_PUBLIC_APP_BASE_PATH=/growth \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --tag growth-learning-frontend:latest \
             frontend

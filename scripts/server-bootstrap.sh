@@ -66,6 +66,19 @@ if [[ -n "${GROWTH_LEARNING_PUBLIC_API_BASE_URL:-}" ]]; then
   set_env_value PUBLIC_API_BASE_URL "$GROWTH_LEARNING_PUBLIC_API_BASE_URL"
 fi
 
+if [[ -n "${GROWTH_LEARNING_PUBLIC_APP_BASE_PATH:-}" ]]; then
+  set_env_value PUBLIC_APP_BASE_PATH "$GROWTH_LEARNING_PUBLIC_APP_BASE_PATH"
+fi
+
+if [[ -n "${GROWTH_LEARNING_API_ROOT_PATH:-}" ]]; then
+  set_env_value API_ROOT_PATH "$GROWTH_LEARNING_API_ROOT_PATH"
+fi
+
+if [[ -n "${GROWTH_LEARNING_BIND_ADDRESS:-}" ]]; then
+  set_env_value BACKEND_BIND_ADDRESS "$GROWTH_LEARNING_BIND_ADDRESS"
+  set_env_value FRONTEND_BIND_ADDRESS "$GROWTH_LEARNING_BIND_ADDRESS"
+fi
+
 touch "$BASHRC_PATH"
 temporary_bashrc="$(mktemp)"
 trap 'rm -f "$temporary_bashrc"' EXIT
