@@ -2,13 +2,17 @@
 
 from fastapi import APIRouter
 
+from app.api.v1.admin import router as admin_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.characters import router as characters_router
 from app.api.v1.children import router as children_router
 from app.api.v1.families import router as families_router
 from app.schemas.system import ApiInfoResponse
 
 router = APIRouter(tags=["api"])
 router.include_router(auth_router)
+router.include_router(admin_router)
+router.include_router(characters_router)
 router.include_router(families_router)
 router.include_router(children_router)
 
