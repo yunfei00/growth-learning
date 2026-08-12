@@ -3,8 +3,14 @@ set -Eeuo pipefail
 
 APP_DIR="${GROWTH_LEARNING_DIR:-/opt/apps/growth-learning}"
 HEALTH_TIMEOUT_SECONDS="${DEPLOY_HEALTH_TIMEOUT_SECONDS:-240}"
-COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-1}"
 SERVICES=(postgres redis minio backend frontend)
+
+for command_name in curl docker git gzip; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    printf 'Required command is missing: %s\n' "$command_name" >&2
+    exit 1
+  fi
+done
 
 cd "$APP_DIR"
 
@@ -17,11 +23,23 @@ compose=(docker compose --env-file .env)
 
 "${compose[@]}" config --quiet
 
-# Use separate build invocations: BuildKit can still parallelize services passed
-# to one command even when Compose's parallel limit is one.
-for service in backend frontend; do
-  COMPOSE_PARALLEL_LIMIT="$COMPOSE_PARALLEL_LIMIT" "${compose[@]}" build "$service"
-done
+# The frontend production image is built on GitHub's Linux runner so this small
+# server never has to run the memory-intensive Next.js compiler.
+commit_sha="$(git rev-parse HEAD)"
+frontend_asset_url="${FRONTEND_IMAGE_URL:-https://github.com/yunfei00/growth-learning/releases/download/deployment-${commit_sha}/growth-learning-frontend.tar.gz}"
+frontend_archive="$(mktemp)"
+trap 'rm -f "$frontend_archive"' EXIT
+
+curl --fail --location --retry 3 --retry-delay 2 --output "$frontend_archive" "$frontend_asset_url"
+gzip --decompress --stdout "$frontend_archive" | docker load
+
+frontend_revision="$(docker image inspect growth-learning-frontend:latest --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+if [[ "$frontend_revision" != "$commit_sha" ]]; then
+  printf 'Frontend image revision mismatch: expected %s, got %s\n' "$commit_sha" "$frontend_revision" >&2
+  exit 1
+fi
+
+"${compose[@]}" build backend
 "${compose[@]}" up -d --no-build --remove-orphans
 
 deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS))

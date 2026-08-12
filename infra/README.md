@@ -12,7 +12,7 @@ The root `docker-compose.yml` is the source of truth for the Phase 1 Linux serve
 
 All services share the private `growth_learning` bridge network. PostgreSQL, Redis, and MinIO have no host port mappings. Only frontend and backend ports are published, with bind addresses and ports controlled by the untracked root `.env` file.
 
-The fixed deployment path is `/opt/apps/growth-learning`. Run `scripts/server-bootstrap.sh` once to create a protected `.env` with generated service credentials and install the idempotent shell command block. Run `scripts/server-deploy.sh` to validate Compose, build application images sequentially for small servers, start the stack, and wait for health checks.
+The fixed deployment path is `/opt/apps/growth-learning`. Run `scripts/server-bootstrap.sh` once to create a protected `.env` with generated service credentials and install the idempotent shell command block. GitHub CI publishes an immutable frontend Linux image archive for every `main` commit. `scripts/server-deploy.sh` validates and loads that exact revision, builds only the lightweight backend locally, starts the stack, and waits for health checks.
 
 The Phase 1 backend does not create a bucket at startup because application liveness must not mutate infrastructure. A later media-storage use case should add an idempotent bucket provisioning task with an explicit retention policy.
 

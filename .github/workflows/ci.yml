@@ -98,3 +98,41 @@ jobs:
 
       - name: Validate Docker Compose configuration
         run: cp .env.example .env && docker compose --env-file .env config --quiet
+
+  deployment-image:
+    name: Publish frontend deployment image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Build production image
+        run: |
+          docker build \
+            --target runtime \
+            --build-arg NEXT_PUBLIC_API_BASE_URL= \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag growth-learning-frontend:latest \
+            frontend
+
+      - name: Export image
+        run: docker save growth-learning-frontend:latest | gzip -1 > growth-learning-frontend.tar.gz
+
+      - name: Publish immutable deployment asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="deployment-${GITHUB_SHA}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" growth-learning-frontend.tar.gz --clobber
+          else
+            gh release create "$tag" growth-learning-frontend.tar.gz \
+              --title "Deployment ${GITHUB_SHA}" \
+              --notes "Automated frontend deployment image for commit ${GITHUB_SHA}." \
+              --prerelease
+          fi

@@ -76,7 +76,7 @@ source /root/.bashrc
 bash scripts/server-deploy.sh
 ```
 
-`server-bootstrap.sh` 可重复执行：已有 `.env` 会被保留；首次运行会生成随机 PostgreSQL/MinIO 密码，并以 managed block 方式安装快捷命令。服务器 `.env` 不得提交到 Git。前端生产构建固定使用单 worker、512 MB Node 堆上限和最低 CPU 调度优先级，以适配小内存服务器。
+`server-bootstrap.sh` 可重复执行：已有 `.env` 会被保留；首次运行会生成随机 PostgreSQL/MinIO 密码，并以 managed block 方式安装快捷命令。服务器 `.env` 不得提交到 Git。前端 Linux 生产镜像由 GitHub CI 构建并发布为与提交 SHA 绑定的公开预发布资产；服务器会校验镜像 revision，只在本机构建轻量后端，从而避免小内存服务器运行 Next.js 编译器。
 
 部署后可使用：
 
@@ -86,7 +86,7 @@ gl-stop      停止本项目并保留命名卷
 gl-restart   重启本项目
 gl-status    查看五个服务状态
 gl-logs      跟踪日志（可追加服务名）
-gl-update    fast-forward 拉取 main、顺序重建并启动
+gl-update    fast-forward 拉取 main、加载 CI 前端镜像、重建后端并启动
 ```
 
 PostgreSQL、Redis、MinIO 只在私有 Compose 网络中通信，不映射宿主机端口。只有 Frontend 和 Backend 通过 `.env` 中的绑定地址与端口发布；若默认端口冲突，修改 `FRONTEND_PORT` / `BACKEND_PORT`，不要停止无关项目抢占端口。
@@ -135,7 +135,7 @@ curl -I http://127.0.0.1:${FRONTEND_PORT:-3000}/status
 | `CORS_ORIGINS` | 逗号分隔的 Web origins | `http://localhost:3000` |
 | `BACKEND_BIND_ADDRESS` / `BACKEND_PORT` | Backend 宿主机监听 | `0.0.0.0:8000` |
 | `FRONTEND_BIND_ADDRESS` / `FRONTEND_PORT` | Frontend 宿主机监听 | `0.0.0.0:3000` |
-| `PUBLIC_API_BASE_URL` | 构建进浏览器端代码的 API 地址 | `http://localhost:8000` |
+| `PUBLIC_API_BASE_URL` | 可选的前端构建期 API 地址；为空时使用浏览器当前主机的 `:8000` | `http://localhost:8000` |
 | `AI_PROVIDER` | `disabled` 或 `openai_compatible` | `disabled` |
 | `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | OpenAI-compatible 供应商配置 | Phase 1 不调用真实模型 |
 | `NEXT_PUBLIC_API_BASE_URL` | 浏览器访问的 API 地址 | `http://localhost:8000` |

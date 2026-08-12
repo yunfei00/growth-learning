@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = "http://localhost:8000";
+const DEFAULT_API_PORT = "8000";
 const REQUEST_TIMEOUT_MS = 5_000;
 
 export type HealthResponse = {
@@ -16,7 +16,14 @@ export class ApiClientError extends Error {
 }
 
 function getApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/$/, "");
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/$/, "");
+  }
+
+  const apiUrl = new URL(window.location.origin);
+  apiUrl.port = process.env.NEXT_PUBLIC_API_PORT?.trim() || DEFAULT_API_PORT;
+  return apiUrl.origin;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -51,4 +58,3 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export function getHealth(): Promise<HealthResponse> {
   return request<HealthResponse>("/health", { cache: "no-store" });
 }
-
