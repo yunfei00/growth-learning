@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, CheckConstraint, DateTime, String, func
@@ -24,17 +25,30 @@ class TimestampMixin:
     )
 
 
+class SystemRole(StrEnum):
+    """Platform authority, deliberately independent from household roles."""
+
+    USER = "user"
+    ADMIN = "admin"
+
+
 class User(TimestampMixin, Base):
     """An authenticated adult; child profiles are deliberately separate."""
 
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("email = lower(email)", name="ck_users_email_normalized"),)
+    __table_args__ = (
+        CheckConstraint("email = lower(email)", name="ck_users_email_normalized"),
+        CheckConstraint("system_role IN ('user', 'admin')", name="ck_users_system_role"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(80), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    system_role: Mapped[str] = mapped_column(
+        String(20), default=SystemRole.USER, server_default=SystemRole.USER, nullable=False
+    )
 
     family_memberships: Mapped[list["FamilyMember"]] = relationship(
         back_populates="user", passive_deletes=True

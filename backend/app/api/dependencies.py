@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import AuthenticationTokenError, read_session_user_id
 from app.db.session import get_db_session
-from app.models import User
+from app.models import SystemRole, User
 
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 
@@ -33,3 +33,16 @@ async def get_current_user(request: Request, session: DbSession) -> User:
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def require_system_admin(current_user: CurrentUser) -> User:
+    """Permit system administration without granting household membership."""
+    if current_user.system_role != SystemRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System administrator permission required",
+        )
+    return current_user
+
+
+SystemAdmin = Annotated[User, Depends(require_system_admin)]

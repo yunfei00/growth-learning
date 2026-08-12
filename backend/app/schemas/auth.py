@@ -43,5 +43,6 @@ class UserResponse(BaseModel):
     email: EmailStr
     display_name: str
     is_active: bool
+    system_role: str
     created_at: datetime
     updated_at: datetime
