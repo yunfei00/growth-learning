@@ -20,48 +20,50 @@ export function BackendHealth() {
       const response = await getHealth();
       setHealth({
         kind: response.status === "ok" ? "online" : "offline",
-        message: response.status === "ok" ? "后端服务正常" : "后端返回了未知状态",
+        message: response.status === "ok" ? "后端服务正常" : "后端返回未知状态",
       });
     } catch (error) {
-      const message =
-        error instanceof ApiClientError && error.status
-          ? `后端返回 HTTP ${error.status}`
-          : "暂时无法连接后端";
-      setHealth({ kind: "offline", message });
+      setHealth({
+        kind: "offline",
+        message:
+          error instanceof ApiClientError && error.status
+            ? `后端返回 HTTP ${error.status}`
+            : "暂时无法连接后端",
+      });
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getHealth()
+      .then((response) => {
+        if (!cancelled) {
+          setHealth({
+            kind: response.status === "ok" ? "online" : "offline",
+            message: response.status === "ok" ? "后端服务正常" : "后端返回未知状态",
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setHealth({
+            kind: "offline",
+            message:
+              error instanceof ApiClientError && error.status
+                ? `后端返回 HTTP ${error.status}`
+                : "暂时无法连接后端",
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const retryHealthCheck = () => {
     setHealth({ kind: "loading", message: "正在连接后端…" });
     void checkHealth();
   };
-
-  useEffect(() => {
-    let ignoreResult = false;
-
-    getHealth()
-      .then((response) => {
-        if (!ignoreResult) {
-          setHealth({
-            kind: response.status === "ok" ? "online" : "offline",
-            message: response.status === "ok" ? "后端服务正常" : "后端返回了未知状态",
-          });
-        }
-      })
-      .catch((error: unknown) => {
-        if (!ignoreResult) {
-          const message =
-            error instanceof ApiClientError && error.status
-              ? `后端返回 HTTP ${error.status}`
-              : "暂时无法连接后端";
-          setHealth({ kind: "offline", message });
-        }
-      });
-
-    return () => {
-      ignoreResult = true;
-    };
-  }, []);
 
   return (
     <section className={`health-card health-${health.kind}`} aria-live="polite">

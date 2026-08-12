@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { BackendHealth } from "@/components/backend-health";
 
 export const metadata: Metadata = {
-  title: "开发状态",
+  title: "服务状态",
 };
 
 const foundations = [
@@ -18,11 +18,9 @@ export default function StatusPage() {
   return (
     <section className="status-page section-shell">
       <div className="status-intro">
-        <p className="eyebrow">Development status</p>
-        <h1>工程基础状态</h1>
-        <p>
-          这里展示真实的开发环境连接情况。基础服务标记为“已配置”不代表它们已经在当前设备启动。
-        </p>
+        <p className="eyebrow">Service status</p>
+        <h1>系统服务状态</h1>
+        <p>这里展示当前 API 的真实连通状态与已经配置的基础服务。</p>
       </div>
 
       <BackendHealth />
@@ -40,14 +38,6 @@ export default function StatusPage() {
           </div>
         ))}
       </div>
-
-      <div className="status-note">
-        <p className="eyebrow">Scope note</p>
-        <p>
-          Phase 1 不包含业务账户、学习数据或模拟仪表盘。页面会随着后续真实产品切片逐步扩展。
-        </p>
-      </div>
     </section>
   );
 }
-
