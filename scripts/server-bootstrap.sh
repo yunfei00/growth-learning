@@ -58,6 +58,10 @@ else
   printf 'Preserved existing %s/.env.\n' "$APP_DIR"
 fi
 
+if ! grep -q '^AUTH_SECRET=.' .env; then
+  set_env_value AUTH_SECRET "$(openssl rand -hex 32)"
+fi
+
 if [[ -n "${GROWTH_LEARNING_PUBLIC_FRONTEND_ORIGIN:-}" ]]; then
   set_env_value CORS_ORIGINS "$GROWTH_LEARNING_PUBLIC_FRONTEND_ORIGIN"
 fi

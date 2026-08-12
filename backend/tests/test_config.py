@@ -19,11 +19,16 @@ def test_settings_normalize_cors_origins() -> None:
 
 
 def test_secret_values_are_not_exposed_in_repr() -> None:
-    settings = Settings(ai_api_key="very-secret", minio_secret_key="storage-secret")
+    settings = Settings(
+        ai_api_key="very-secret",
+        minio_secret_key="storage-secret",
+        auth_secret="browser-session-secret",
+    )
 
     representation = repr(settings)
     assert "very-secret" not in representation
     assert "storage-secret" not in representation
+    assert "browser-session-secret" not in representation
 
 
 def test_minio_client_requires_credentials() -> None:

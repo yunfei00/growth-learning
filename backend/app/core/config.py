@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     root_path: str = ""
     cors_origins: str = "http://localhost:3000"
 
+    auth_secret: SecretStr = SecretStr("development-only-auth-secret-change-before-production")
+    auth_cookie_name: str = "growth_learning_session"
+    auth_cookie_path: str = "/"
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    auth_token_ttl_seconds: int = 60 * 60 * 24 * 7
+    auth_token_issuer: str = "growth-learning"
+
     database_url: str = "postgresql+asyncpg://localhost/growth_learning"
     redis_url: str = "redis://localhost:6379/0"
 
