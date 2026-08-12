@@ -1,14 +1,14 @@
 # Growth Learning
 
-Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 3 已建立独立系统管理员权限与通用汉字知识目录；孩子掌握度、复习算法和 AI 故事仍不在本阶段范围内。
+Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 4 已在通用汉字知识目录之上建立孩子学习证据、快速认读和可重算五级掌握状态；复习调度与 AI 故事仍不在本阶段范围内。
 
 ## 当前用户流程
 
 ```text
-注册 → 登录 → 创建家庭 → 添加第一个孩子 → 家长首页
+注册 → 登录 → 创建家庭 → 添加第一个孩子 → 家长首页 → 识字学习/快速认读
 ```
 
-再次登录后，应用通过 HttpOnly Cookie 获取当前用户，从 PostgreSQL 加载家庭和孩子。家长首页不展示任何虚构学习统计。
+再次登录后，应用通过 HttpOnly Cookie 获取当前用户，从 PostgreSQL 加载家庭和孩子。家长首页的识字数字来自真实 LearningRecord、AssessmentItem 与 ChildKnowledgeState，不展示虚构统计。
 
 ## Windows 开发
 
@@ -34,6 +34,7 @@ Set-Location ..
 | Register | <http://localhost:3000/register> |
 | Login | <http://localhost:3000/login> |
 | Admin | <http://localhost:3000/admin> |
+| Character Learning | <http://localhost:3000/learn/characters> |
 | Backend health | <http://localhost:8000/health> |
 | Backend OpenAPI | <http://localhost:8000/docs> |
 
@@ -64,6 +65,8 @@ docker compose exec backend python -m app.cli.admin promote-admin \
 docker compose exec backend python -m app.cli.admin set-password \
   --email admin@example.com
 docker compose exec backend python -m app.cli.characters import-starter
+docker compose exec backend python -m app.cli.mastery
+docker compose exec backend python -m app.cli.mastery --child-id CHILD_UUID
 ```
 
 `create-admin` 可重复执行且不会重复创建账户；已有普通账户必须显式执行 `promote-admin`。项目自有 Starter 数据位于 `backend/data/chinese_characters_v1.json`，不宣称官方标准、教材清单或精确字频。
@@ -123,7 +126,9 @@ gl-update
 - 密码只保存 Argon2 哈希，API 不返回 `password_hash`。
 - 浏览器会话使用 HttpOnly Cookie；Cookie Path 按本地 `/` 与线上 `/growth/api` 分别配置。
 - 家庭与孩子权限由后端集中校验，跨家庭资源返回 `404`。
-- `admin` 可以修改家庭/孩子；`companion` 只读。
+- `admin` 可以修改家庭/孩子核心配置；`companion` 对这些核心配置只读。
+- 家庭 `admin` 与 `companion` 都能陪孩子学习/测评；只有家庭 `admin` 能修改优先学习标记。
+- 学习与测评事实只追加；Mastery V1 可重算且不会删除原始证据。
 - `system_role=admin` 只授予平台知识管理权限，不自动取得任何家庭或孩子资料。
 - 所有 `/api/v1/admin/*` 在后端统一校验系统管理员角色；普通/家庭管理员均返回 `403`。
 - 所有正式业务外键使用 `ON DELETE RESTRICT`；当前不提供孩子物理删除。

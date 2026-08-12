@@ -115,6 +115,8 @@ jobs:
               required = {
                   "users", "families", "family_members", "children", "alembic_version",
                   "knowledge_points", "chinese_characters", "knowledge_relations",
+                  "learning_sessions", "learning_records", "assessment_sessions",
+                  "assessment_items", "child_knowledge_states",
               }
               missing = required - tables
               if missing:

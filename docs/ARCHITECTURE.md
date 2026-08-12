@@ -63,8 +63,8 @@ LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
                            ChildKnowledgeState (derived projection)
 ```
 
-- 原始记录使用客户端或服务端幂等键，避免重试造成重复事实。
-- 派生状态带 `algorithm_version`、`evidence_through` 与 `computed_at`。
+- 原始记录在单个会话内以 `(session_id, knowledge_point_id)` 唯一；批量 API 在一个事务中写入会话与全部条目。
+- 派生状态带 `algorithm_version`，以 `updated_at` 表示最近计算时间。
 - 更新派生状态和写入原始事件可在同一数据库事务中完成；批量重算可以异步执行。
 - 删除请求优先使用可审计的生命周期状态；法规要求的物理删除由专门流程执行并覆盖备份/对象存储。
 
@@ -80,7 +80,11 @@ LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
 
 ## 5.1 系统知识与孩子状态分离
 
-`KnowledgePoint` 是跨学科规范主表，`ChineseCharacter` 是一对一的汉字属性，`KnowledgeRelation` 表达知识间关系。它们属于系统目录，不引用 Child。未来孩子掌握情况使用单独关系/事实表，通过 `child_id + knowledge_point_id` 建立上下文，避免污染共享知识。
+`KnowledgePoint` 是跨学科规范主表，`ChineseCharacter` 是一对一的汉字属性，`KnowledgeRelation` 表达知识间关系。它们属于系统目录，不引用 Child。孩子掌握情况由 `LearningRecord`、`AssessmentItem` 和 `ChildKnowledgeState` 通过 `child_id + knowledge_point_id` 建立上下文，不污染共享知识。
+
+## 5.2 Mastery V1 计算边界
+
+Mastery V1 是纯确定性服务，不调用 LLM。API 写入一批学习或测评证据后，只重算受影响的知识点；运维 CLI 可从全部历史重建所有投影。`ChildKnowledgeState` 不是事实来源，即使投影损坏或算法升级，原始记录仍可恢复它。稳定掌握要求多次独立正确且跨越足够时间，规则详见 [Mastery V1](MASTERY_ALGORITHM.md)。
 
 ## 6. AI 集成
 
@@ -96,7 +100,7 @@ LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
 
 - 后端业务 API 固定在 `/api/v1`，非业务探针使用 `/health`。
 - API 统一错误结构、请求 ID 和 ISO 8601 UTC 时间。
-- Next.js 使用 App Router；页面默认服务端组件，仅在需要交互时使用客户端组件。
+- Next.js 使用 App Router；认证和 active child 由统一 Provider 管理，学习页面始终使用同一孩子上下文。
 - 前端 API client 集中处理基础地址、超时、错误映射和未来的身份凭证。
 - 浏览器只访问公开的 `NEXT_PUBLIC_API_BASE_URL`，任何服务端密钥都不得进入前端构建产物。
 

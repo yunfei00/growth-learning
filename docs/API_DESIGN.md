@@ -41,7 +41,7 @@
 | `GET` | `/api/v1/children/{child_id}` | 所属家庭成员 |
 | `PATCH` | `/api/v1/children/{child_id}` | 所属家庭 `admin` |
 
-Phase 2 不提供家庭成员邀请、孩子删除、Teacher 或学习功能端点。
+当前不提供家庭成员邀请、孩子删除或 Teacher 端点。
 
 ### System administration
 
@@ -68,6 +68,22 @@ Phase 2 不提供家庭成员邀请、孩子删除、Teacher 或学习功能端�
 | `GET` | `/api/v1/characters/{id}` | 已登录；仅返回 active + enabled |
 
 普通用户没有汉字写入端点。
+
+### Child character learning
+
+下列接口全部先通过孩子所属家庭成员关系鉴权。家庭 `admin` 和 `companion` 可读取、学习和测评；优先级修改只允许家庭 `admin`。`system_role=admin` 不绕过家庭关系。
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/children/{child_id}/characters/summary` | 五级真实数量、优先数量和原始证据计数 |
+| `GET` | `/api/v1/children/{child_id}/characters` | 汉字/拼音搜索、掌握度/优先过滤、分页 |
+| `GET` | `/api/v1/children/{child_id}/characters/{knowledge_point_id}` | 当前投影和按时间排序的原始证据时间线 |
+| `GET` | `/api/v1/children/{child_id}/characters/recommendations` | `new` 或 `assessment` 的确定性候选，默认 5 字 |
+| `POST` | `/api/v1/children/{child_id}/learning-sessions` | 批量创建学习会话和追加式 LearningRecord |
+| `POST` | `/api/v1/children/{child_id}/assessment-sessions` | 批量创建测评会话和四类 AssessmentItem |
+| `PATCH` | `/api/v1/children/{child_id}/characters/{knowledge_point_id}/priority` | 家庭 `admin` 设置/取消优先学习 |
+
+学习和测评批量请求单次最多 50 个不同知识点；`(session_id, knowledge_point_id)` 唯一约束阻止同一会话重复记录。新证据与 Mastery V1 派生状态在同一事务中写入。没有原始证据的知识点按 `unlearned` 返回，但不会为了读取而批量生成空状态行。
 
 ## 错误约定
 
