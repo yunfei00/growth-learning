@@ -93,5 +93,8 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Validate deployment shell syntax
+        run: bash -n scripts/*.sh
+
       - name: Validate Docker Compose configuration
         run: cp .env.example .env && docker compose --env-file .env config --quiet

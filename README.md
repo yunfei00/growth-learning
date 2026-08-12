@@ -2,31 +2,49 @@
 
 Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。项目从汉字学习切入，逐步覆盖可重算掌握度、自适应复习、识字量测评、受控 AI 阅读、周末科学实验、家庭与老师协作以及长期成长档案。
 
-当前为 **Phase 1：工程基础**。仓库提供可运行的 Next.js + FastAPI 模块化单体，以及 PostgreSQL、Redis、MinIO 本地开发环境；尚未实现正式业务账户和学习数据。
+当前为 **Phase 1：工程基础**。仓库提供可运行的 Next.js + FastAPI 模块化单体，以及 PostgreSQL、Redis、MinIO 服务器集成环境；尚未实现正式业务账户和学习数据。
 
-## 快速开始（Docker，推荐）
+## Windows development
 
-要求：Git、Docker Desktop（Windows/macOS）或 Docker Engine（Linux），并启用 Docker Compose v2。
+Windows 只承担代码开发和轻量前后端调试，**不需要也不建议安装 Docker、Docker Desktop 或 WSL Docker**。完整数据服务和 Compose 验收统一在 Linux 服务器进行。
+
+### 工具版本
+
+- Node.js 24（仓库 `.nvmrc`；当前基线验证版本 24.14.0）
+- pnpm 11.16.0（由 `packageManager` 固定）
+- Python 3.12 或 3.13（仓库开发基线 `.python-version` 为 3.13）
+
+首次安装：
 
 ```powershell
-git clone git@github.com:yunfei00/growth-learning.git
-cd growth-learning
-Copy-Item .env.example .env
-# 打开 .env，替换两个 local-only 密码
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ".\backend[dev]"
+Set-Location frontend
+pnpm install --frozen-lockfile
+Set-Location ..
+```
+
+同时启动前后端：
+
+```powershell
 .\scripts\dev.ps1
 ```
 
-Linux/macOS：
+也可以在两个终端分别运行：
 
-```sh
-git clone git@github.com:yunfei00/growth-learning.git
-cd growth-learning
-cp .env.example .env
-# 打开 .env，替换两个 local-only 密码
-./scripts/dev.sh
+```powershell
+Set-Location backend
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+
+# 另一个终端
+Set-Location frontend
+pnpm dev
 ```
 
-首次启动会构建镜像和下载基础服务。所有健康检查通过后可访问：
+轻量 `/health` 和单元测试不会在导入时连接 PostgreSQL、Redis 或 MinIO；涉及数据迁移和跨服务联调时使用服务器环境。前端默认通过 `http://localhost:8000` 访问后端，不要把任何密钥放入 `NEXT_PUBLIC_*` 变量。
+
+本地地址：
 
 | 服务 | 地址 |
 | --- | --- |
@@ -34,56 +52,44 @@ cp .env.example .env
 | 开发状态页 | <http://localhost:3000/status> |
 | Backend health | <http://localhost:8000/health> |
 | Backend OpenAPI | <http://localhost:8000/docs> |
-| MinIO Console | <http://localhost:9001> |
 
-停止服务使用 `docker compose down`。本地数据保存在命名卷中；`docker compose down --volumes` 会永久删除本项目的本地数据库、缓存和对象存储数据，请谨慎使用。
+## Server integration / deployment
 
-## 本机开发
+Linux 服务器使用 Docker Engine 与 Docker Compose Plugin 运行完整五服务集成栈，固定部署目录为：
 
-### 工具版本
-
-- Node.js 24（仓库 `.nvmrc`；当前基线验证版本 24.14.0）
-- pnpm 11.16.0（由 `packageManager` 固定）
-- Python 3.12 或 3.13（仓库开发基线 `.python-version` 为 3.13）
-- Docker Compose v2
-
-### Backend
-
-PowerShell：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e ".\backend[dev]"
-Set-Location backend
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```text
+/opt/apps/growth-learning
 ```
 
-Linux/macOS：
+首次部署：
 
-```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -e './backend[dev]'
-cd backend
-../.venv/bin/python -m uvicorn app.main:app --reload
+```bash
+mkdir -p /opt/apps
+git clone https://github.com/yunfei00/growth-learning.git /opt/apps/growth-learning
+cd /opt/apps/growth-learning
+
+GROWTH_LEARNING_PUBLIC_FRONTEND_ORIGIN=http://<server-ip>:3000 \
+GROWTH_LEARNING_PUBLIC_API_BASE_URL=http://<server-ip>:8000 \
+  bash scripts/server-bootstrap.sh
+
+source /root/.bashrc
+bash scripts/server-deploy.sh
 ```
 
-本机运行后端时仍需 PostgreSQL/Redis/MinIO 的连接配置；轻量 `/health` 和单元测试不会在导入时连接这些服务。迁移命令在 `backend` 目录运行：
+`server-bootstrap.sh` 可重复执行：已有 `.env` 会被保留；首次运行会生成随机 PostgreSQL/MinIO 密码，并以 managed block 方式安装快捷命令。服务器 `.env` 不得提交到 Git。
 
-```powershell
-..\.venv\Scripts\python.exe -m alembic upgrade head
+部署后可使用：
+
+```text
+gl-start     启动已有镜像
+gl-stop      停止本项目并保留命名卷
+gl-restart   重启本项目
+gl-status    查看五个服务状态
+gl-logs      跟踪日志（可追加服务名）
+gl-update    fast-forward 拉取 main、顺序重建并启动
 ```
 
-### Frontend
-
-```powershell
-Set-Location frontend
-pnpm install --frozen-lockfile
-pnpm dev
-```
-
-前端读取 `NEXT_PUBLIC_API_BASE_URL`，未设置时使用 `http://localhost:8000`。不要把任何密钥放入 `NEXT_PUBLIC_*` 变量。
+PostgreSQL、Redis、MinIO 只在私有 Compose 网络中通信，不映射宿主机端口。只有 Frontend 和 Backend 通过 `.env` 中的绑定地址与端口发布；若默认端口冲突，修改 `FRONTEND_PORT` / `BACKEND_PORT`，不要停止无关项目抢占端口。
 
 ## 验证
 
@@ -106,12 +112,13 @@ Backend:  ruff check, ruff format --check, pytest
 Frontend: eslint, tsc --noEmit, next build
 ```
 
-Compose 配置检查与运行态检查：
+服务器 Compose 配置与运行态检查：
 
-```powershell
+```bash
 docker compose --env-file .env config --quiet
 docker compose --env-file .env ps
-Invoke-RestMethod http://localhost:8000/health
+curl http://127.0.0.1:${BACKEND_PORT:-8000}/health
+curl -I http://127.0.0.1:${FRONTEND_PORT:-3000}/status
 ```
 
 ## 配置
@@ -126,6 +133,9 @@ Invoke-RestMethod http://localhost:8000/health
 | `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | 对象存储凭据 | 从 `.env` 注入 |
 | `MINIO_BUCKET` | 私有媒体 bucket 名 | `growth-learning` |
 | `CORS_ORIGINS` | 逗号分隔的 Web origins | `http://localhost:3000` |
+| `BACKEND_BIND_ADDRESS` / `BACKEND_PORT` | Backend 宿主机监听 | `0.0.0.0:8000` |
+| `FRONTEND_BIND_ADDRESS` / `FRONTEND_PORT` | Frontend 宿主机监听 | `0.0.0.0:3000` |
+| `PUBLIC_API_BASE_URL` | 构建进浏览器端代码的 API 地址 | `http://localhost:8000` |
 | `AI_PROVIDER` | `disabled` 或 `openai_compatible` | `disabled` |
 | `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | OpenAI-compatible 供应商配置 | Phase 1 不调用真实模型 |
 | `NEXT_PUBLIC_API_BASE_URL` | 浏览器访问的 API 地址 | `http://localhost:8000` |
@@ -138,11 +148,11 @@ Invoke-RestMethod http://localhost:8000/health
 frontend/            Next.js App Router、页面与 API client
 backend/             FastAPI、SQLAlchemy、Alembic 与外部适配器
 docs/                产品、架构、数据模型、API 与路线图
-infra/               本地基础设施说明
-scripts/             Windows/Linux 启动与验证脚本
+infra/               Linux 服务器集成环境说明
+scripts/             Windows 开发、Linux 部署与验证脚本
 tests/               跨服务测试入口（后续阶段扩展）
 .github/workflows/   持续集成
-docker-compose.yml   本地五服务开发栈
+docker-compose.yml   Linux 服务器五服务集成栈
 ```
 
 核心设计文档：
@@ -163,11 +173,11 @@ docker-compose.yml   本地五服务开发栈
 
 ## 常见问题
 
-- **`docker` 命令不存在**：安装/启动 Docker Desktop 或 Docker Engine，确认 `docker compose version` 可用。
+- **Windows 没有 `docker`**：这是预期状态；Windows 使用原生 Node.js/Python 开发流程。
+- **服务器 `docker` 命令不存在**：仅在 Linux 服务器安装官方 Docker Engine 与 Compose Plugin。
 - **端口占用**：在 `.env` 修改对应的主机端口，不需要改 Compose 文件。
 - **前端显示后端离线**：先检查 <http://localhost:8000/health>，再确认浏览器使用的 `NEXT_PUBLIC_API_BASE_URL`。
 - **数据库密码包含特殊字符**：Compose 直接组成连接 URL，请在本地开发密码中使用 URL-safe 字符，或将完整编码后的 `DATABASE_URL` 直接提供给本机后端。
 - **依赖状态异常**：后端删除并重建 `.venv`；前端运行 `pnpm install --frozen-lockfile`，不要提交生成目录。
 
 项目任务来源：[GitHub Issue #1](https://github.com/yunfei00/growth-learning/issues/1)。
-
