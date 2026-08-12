@@ -318,6 +318,18 @@ async def test_companion_can_participate_but_cannot_set_priority(
         )
         assert owner_priority.status_code == 200
         assert owner_priority.json()["is_priority"] is True
+        owner_unmark = await owner.patch(
+            f"/api/v1/children/{child['id']}/characters/{point_id}/priority",
+            json={"is_priority": False},
+        )
+        assert owner_unmark.status_code == 200
+        assert owner_unmark.json()["is_priority"] is False
+        owner_remark = await owner.patch(
+            f"/api/v1/children/{child['id']}/characters/{point_id}/priority",
+            json={"is_priority": True},
+        )
+        assert owner_remark.status_code == 200
+        assert owner_remark.json()["is_priority"] is True
 
 
 async def test_cross_family_and_system_admin_without_membership_are_denied(
