@@ -1,160 +1,101 @@
 # Growth Learning 数据模型
 
-本文描述目标领域模型，不代表 Phase 1 会一次创建所有表。首阶段只建立 ORM 与迁移基础；正式表应随用例逐步落地，并为每次迁移补充约束与回滚评估。
+本文记录已落地的数据模型与后续边界。Phase 2 只创建身份、家庭、成员和孩子四类正式业务实体，不提前创建学习、复习、故事或教师业务表。
 
-## 1. 约定
+## 通用约定
 
-- 主键使用 UUID；时间使用带时区 UTC 时间戳。
-- 家庭域表显式保存 `family_id`，查询必须受家庭边界约束。
-- 可修改实体包含 `created_at`、`updated_at`；需要追溯的实体包含状态变更或审计信息。
-- 原始学习事实采用追加式记录，不通过修改历史答案来“修正”当前状态。
-- 枚举值以稳定机器码存储，展示文本由应用层本地化。
-- JSON 只保存供应商元数据或版本化快照，不替代核心关系和约束。
+- 主键使用 UUID。
+- `created_at`、`updated_at` 使用带时区时间戳，由数据库提供初始值。
+- 家庭是最上层业务数据边界；所有家庭内资源必须通过成员关系鉴权。
+- 孩子不是登录账户，也不继承 `User`。
+- 年龄不入库，由 `birth_date` 按当前日期动态计算。
+- Phase 2 不提供孩子或家庭的物理删除 API。长期数据删除/归档策略将在后续阶段单独设计。
 
-## 2. 身份、家庭与授权
+## 已实现实体
 
-### User
+### `users`
 
-登录主体：`id`、`email/phone`、`display_name`、`status`、身份提供方信息。敏感认证材料由专门身份机制管理。
+登录成年人账户。
 
-### Family
+| 字段 | 说明 |
+| --- | --- |
+| `id` | UUID 主键 |
+| `email` | 规范化为小写；唯一约束和唯一索引 |
+| `display_name` | 用户显示名称 |
+| `password_hash` | Argon2 密码哈希；禁止 API 返回 |
+| `is_active` | 账户是否可登录 |
+| `created_at` / `updated_at` | 审计时间戳 |
 
-家庭数据边界：`id`、`name`、`timezone`、`locale`、`status`。
+密码、会话 token、密码哈希不得写入应用日志。数据库不保存明文密码。
 
-### FamilyMember
+### `families`
 
-连接 User 与 Family：`family_id`、`user_id`、`role`（parent/companion）、`status`、`joined_at`。唯一约束 `(family_id, user_id)`；至少一名有效管理员由业务规则保证。
+家庭是权限和数据隔离边界，不直接保存 `user_id`。
 
-### Child
+| 字段 | 说明 |
+| --- | --- |
+| `id` | UUID 主键 |
+| `name` | 家庭名称 |
+| `created_at` / `updated_at` | 审计时间戳 |
 
-家庭内儿童档案：`family_id`、`preferred_name`、`birth_date`（可选/最小化保存）、`learning_preferences`、`status`。Child 不要求关联登录账号；未来可选关联 User。
+### `family_members`
 
-### Teacher
+通过中间表连接 `users` 和 `families`，唯一约束为 `(family_id, user_id)`。
 
-老师专业档案，关联一个 User：`user_id`、`display_name`、`organization`、`verification_status`。
+| 字段 | 说明 |
+| --- | --- |
+| `id` | UUID 主键 |
+| `family_id` | 所属家庭 |
+| `user_id` | 成年用户 |
+| `role` | `admin` 或 `companion` |
+| `created_at` / `updated_at` | 审计时间戳 |
 
-### TeacherChildRelation
+角色能力：
 
-家长授予老师的有限权限：`teacher_id`、`child_id`、`granted_by_user_id`、`scopes`、`allowed_actions`、`valid_from`、`expires_at`、`revoked_at`。读取时必须验证时间和撤销状态；授权范围变更保留历史。
+- `admin`：查看家庭/成员/孩子；修改家庭；创建和修改孩子。
+- `companion`：查看家庭/成员/孩子；不能修改家庭核心配置或孩子资料。
 
-## 3. 课程与知识图谱
+Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/拒绝、邮箱验证、撤销和审计，不使用“输入邮箱即加入”的临时实现。
 
-### Subject
+### `children`
 
-学科或领域，例如 Chinese Literacy、Science：`code`、`name`、`status`。
+家庭内的孩子成长档案。
 
-### Ability
+| 字段 | 说明 |
+| --- | --- |
+| `id` | UUID 主键 |
+| `family_id` | 所属家庭 |
+| `display_name` | 正式显示名称 |
+| `nickname` | 可选昵称 |
+| `birth_date` | 出生日期，用于动态计算年龄 |
+| `gender` | 可选：`male`、`female`、`other` |
+| `avatar_key` | 可选的私有对象存储键 |
+| `created_at` / `updated_at` | 审计时间戳 |
 
-能力维度，例如识别、理解、书写、应用：`subject_id`、`code`、`name`、`description`。
+## 外键删除策略
 
-### KnowledgePoint
+首个迁移 `20260812_0001_create_identity_and_family_tables` 对每条业务外键显式采用 `ON DELETE RESTRICT`：
 
-通用、可版本化的最小学习单元：`subject_id`、`code`、`name`、`kind`、`content`、`difficulty`、`metadata`、`version`、`status`。汉字、词语、概念都通过 `kind` 表达。
+| 外键 | 删除策略 | 原因 |
+| --- | --- | --- |
+| `family_members.family_id → families.id` | `RESTRICT` | 不允许删除家庭时连带删除成员关系 |
+| `family_members.user_id → users.id` | `RESTRICT` | 不允许删除账户时破坏家庭归属和审计边界 |
+| `children.family_id → families.id` | `RESTRICT` | 不允许家庭操作级联删除多年孩子数据 |
 
-### KnowledgeRelation
+后续若需要停用账户、家庭或孩子，优先引入显式状态和归档流程，不直接扩大级联删除范围。
 
-知识点有向关系：`source_id`、`target_id`、`relation_type`（prerequisite/part_of/related_to 等）、`weight`、`version`。禁止自环；有向无环要求仅对 prerequisite 子图成立并由服务校验。
+## 权限查询约束
 
-### Course / CourseUnit / LearningActivity
+- 家庭读取必须存在 `(current_user.id, family_id)` 成员关系。
+- 家庭和孩子写入必须在同一成员关系上具备 `admin` 角色。
+- 孩子读取通过 `children.family_id = family_members.family_id` 与当前用户联合查询。
+- 对跨家庭资源统一返回 `404`，避免泄露资源是否存在；权限存在但角色不足返回 `403`。
+- 前端隐藏按钮不是权限措施，所有规则由后端重复验证。
 
-- Course：课程集合、适用年龄/阶段和版本。
-- CourseUnit：课程内有序单元，可表达先修关系。
-- LearningActivity：实际可执行活动，关联一个或多个知识点、能力维度、内容版本与预估时长。
+## 后续教师模型边界
 
-课程发布后保留版本；历史记录引用当时的活动版本，避免内容更新改变历史含义。
+教师是家庭外部授权角色，不能自动成为 `FamilyMember`。后续阶段使用类似 `TeacherChildRelation` 的独立关系，把指定孩子、权限范围、有效期、授权人和撤销状态绑定在一起。Phase 2 不创建 Teacher 表或教师授权接口。
 
-## 4. 学习事实与派生状态
+## 后续学习数据
 
-### LearningRecord（原始事实）
-
-一次学习行为：`child_id`、`activity_id/version`、`knowledge_point_id`、`ability_id`、`occurred_at`、`duration_seconds`、`result`、`attempt_data`、`source`、`idempotency_key`。
-
-### AssessmentSession / AssessmentItem（原始事实）
-
-- Session 保存测评类型、内容版本、开始/结束时间和环境。
-- Item 保存题目快照、知识点、作答、正确性、响应时长、评分规则版本。
-
-题目快照保证多年后仍能解释当时评分；估算值属于会话结果，不覆盖单题证据。
-
-### ReviewRecord（原始事实）
-
-实际发生的复习：`child_id`、`knowledge_point_id`、`schedule_id`（可选）、`occurred_at`、`prompt/result`、`response_time`、`quality`、`idempotency_key`。
-
-### ReviewSchedule（可更新计划）
-
-某知识点下一次复习建议：`child_id`、`knowledge_point_id`、`due_at`、`priority`、`reason_codes`、`algorithm_version`、`status`。它是调度投影，不是学习证据；重新计划不修改 ReviewRecord。
-
-### ChildKnowledgeState（派生投影）
-
-当前状态：`child_id`、`knowledge_point_id`、`ability_id`、`mastery_score`、`confidence`、`evidence_count`、`last_evidence_at`、`next_review_at`、`algorithm_version`、`evidence_through`、`computed_at`。
-
-唯一约束 `(child_id, knowledge_point_id, ability_id)`。分数必须带置信度和算法版本，不能单独解释为事实。
-
-### 为什么必须分离
-
-`LearningRecord`、`AssessmentItem` 和 `ReviewRecord` 回答“发生过什么”，必须长期、稳定、可审计。`ChildKnowledgeState` 回答“按当前算法如何理解这些证据”，会随着新证据、衰减时间和算法升级而改变。
-
-如果只保存 `mastery_score = 0.83`，系统无法解释分数、回放误判、升级复习算法或纠正旧逻辑。分离后可以按 `algorithm_version` 在后台重算状态，同时比较新旧结果而不破坏历史。
-
-## 5. 阅读、实验与成长
-
-### Story / ReadingSession
-
-- Story 保存家庭/孩子可见范围、文本版本、目标知识点、允许字符集快照、供应商/模型/模板版本、规则校验结果和发布状态。
-- ReadingSession 保存孩子实际阅读的故事版本、开始/完成时间、理解题作答和反馈。
-
-### ScienceExperiment / ExperimentSession
-
-- ScienceExperiment 保存版本化实验方案、年龄范围、材料、步骤、风险等级、安全要求和关联知识点。
-- ExperimentSession 保存实际准备、执行、观察、结论、成人确认和媒体引用。
-
-### GrowthEvent
-
-统一时间线事件：`family_id`、`child_id`、`event_type`、`occurred_at`、`source_type/source_id`、`title`、`summary`、`visibility`。可引用学习里程碑、实验、作品或人工记录，但不复制全部源数据。
-
-### GrowthReport
-
-周期性、可重建报告：`child_id`、`period_start/end`、`generator_version`、`evidence_through`、`content_snapshot`、`status`、`published_at`。
-
-### MediaAsset
-
-对象存储元数据：`family_id`、`owner_type/id`、`bucket`、`object_key`、`mime_type`、`size`、`sha256`、`purpose`、`status`。bucket 保持私有，对象键使用不可猜测 ID。
-
-## 6. 主要关系
-
-```text
-User ──< FamilyMember >── Family ──< Child
-User ── Teacher ──< TeacherChildRelation >── Child
-
-Subject ──< Ability
-Subject ──< KnowledgePoint ──< KnowledgeRelation >── KnowledgePoint
-Course ──< CourseUnit ──< LearningActivity >── KnowledgePoint
-
-Child ──< LearningRecord >── KnowledgePoint
-Child ──< AssessmentSession ──< AssessmentItem >── KnowledgePoint
-Child ──< ReviewRecord >── KnowledgePoint
-Child ──< ChildKnowledgeState >── KnowledgePoint
-Child ──< ReviewSchedule >── KnowledgePoint
-
-Child ──< ReadingSession >── Story
-Child ──< ExperimentSession >── ScienceExperiment
-Child ──< GrowthEvent
-Child ──< GrowthReport
-Family ──< MediaAsset
-```
-
-## 7. 索引、分区与保留策略
-
-- 高频事实表优先索引 `(child_id, occurred_at desc)`、`(child_id, knowledge_point_id, occurred_at desc)` 和幂等键。
-- 所有授权查询索引有效状态与到期时间；所有家庭资源索引 `family_id`。
-- 先使用普通 PostgreSQL 表；只有真实数据量和查询证据支持时，才按时间对事件表分区。
-- 媒体生命周期与引用实体解耦：先标记删除，异步清理无引用对象并记录结果。
-- 家庭导出包含版本化 JSON/CSV、媒体 manifest、时区和生成时间；导入不是 V1 承诺，但导出不得依赖专有二进制格式。
-
-## 8. 数据演进规则
-
-- Alembic 迁移只向前追加并经 CI 验证；生产迁移避免不可控的长锁。
-- 破坏性字段变更采用 expand/migrate/contract，先兼容读写再清理旧字段。
-- 算法重算使用新版本写入或原子替换投影，不修改原始事实。
-- 课程、故事、题目和实验的已使用版本不可原地改写；发布新版本并让新会话引用它。
-
+识字、复习、测评、阅读、AI 故事和科学实验属于后续阶段。学习事实将以孩子为上下文，并保留原始事实与可重算派生状态的分离；Phase 2 不创建假学习记录或统计数据。
