@@ -34,6 +34,7 @@ export function AppHeader() {
         {status === "authenticated" ? (
           <>
             <Link href="/home">家长首页</Link>
+            <Link href="/learn/characters">识字学习</Link>
             {user?.system_role === "admin" ? <Link href="/admin">管理后台</Link> : null}
             <span className="header-user">{user?.display_name}</span>
             <button

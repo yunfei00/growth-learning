@@ -102,6 +102,7 @@ function OnboardingContent() {
         gender: gender || null,
       });
       window.localStorage.setItem("growth-learning:active-child-id", child.id);
+      window.dispatchEvent(new Event("growth-learning:household-changed"));
       router.replace("/home");
       router.refresh();
     } catch (requestError) {

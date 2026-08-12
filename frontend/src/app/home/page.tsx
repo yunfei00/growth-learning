@@ -1,141 +1,74 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
+import { useActiveChild } from "@/components/active-child-provider";
 import { ChildSwitcher } from "@/components/child-switcher";
 import { ProtectedPage } from "@/components/protected-page";
 import {
   ApiClientError,
-  type Child,
-  type Family,
-  listChildren,
-  listFamilies,
+  type CharacterMasterySummary,
+  getCharacterMasterySummary,
 } from "@/lib/api/client";
-
-const ACTIVE_CHILD_KEY = "growth-learning:active-child-id";
 
 function formatAge(birthDate: string): string {
   const birth = new Date(`${birthDate}T00:00:00`);
   const today = new Date();
   let months =
-    (today.getFullYear() - birth.getFullYear()) * 12 +
-    today.getMonth() -
-    birth.getMonth();
-  if (today.getDate() < birth.getDate()) {
-    months -= 1;
-  }
+    (today.getFullYear() - birth.getFullYear()) * 12 + today.getMonth() - birth.getMonth();
+  if (today.getDate() < birth.getDate()) months -= 1;
   months = Math.max(0, months);
   const years = Math.floor(months / 12);
   const remainingMonths = months % 12;
-  if (years === 0) {
-    return `${remainingMonths}个月`;
-  }
+  if (years === 0) return `${remainingMonths}个月`;
   return remainingMonths === 0 ? `${years}岁` : `${years}岁${remainingMonths}个月`;
 }
 
 function ParentHomeContent() {
   const router = useRouter();
-  const [family, setFamily] = useState<Family | null>(null);
-  const [children, setChildren] = useState<Child[]>([]);
-  const [activeChildId, setActiveChildId] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const loadHome = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      const families = await listFamilies();
-      if (families.length === 0) {
-        router.replace("/onboarding");
-        return;
-      }
-      const currentFamily = families[0];
-      const familyChildren = await listChildren(currentFamily.id);
-      if (familyChildren.length === 0) {
-        router.replace("/onboarding");
-        return;
-      }
-
-      const savedChildId = window.localStorage.getItem(ACTIVE_CHILD_KEY);
-      const selected = familyChildren.some((child) => child.id === savedChildId)
-        ? savedChildId!
-        : familyChildren[0].id;
-      window.localStorage.setItem(ACTIVE_CHILD_KEY, selected);
-      setFamily(currentFamily);
-      setChildren(familyChildren);
-      setActiveChildId(selected);
-    } catch (requestError) {
-      setError(
-        requestError instanceof ApiClientError
-          ? requestError.message
-          : "暂时无法加载家庭信息",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [router]);
+  const {
+    status,
+    family,
+    children,
+    activeChild,
+    error: householdError,
+    setActiveChildId,
+    refresh,
+  } = useActiveChild();
+  const [summary, setSummary] = useState<CharacterMasterySummary | null>(null);
+  const [summaryError, setSummaryError] = useState("");
 
   useEffect(() => {
+    if (status === "ready" && (!family || !activeChild)) router.replace("/onboarding");
+  }, [activeChild, family, router, status]);
+
+  useEffect(() => {
+    if (!activeChild) return;
     let cancelled = false;
-    listFamilies()
-      .then(async (families) => {
-        if (families.length === 0) {
-          router.replace("/onboarding");
-          return null;
+    getCharacterMasterySummary(activeChild.id)
+      .then((value) => {
+        if (!cancelled) {
+          setSummary(value);
+          setSummaryError("");
         }
-        const currentFamily = families[0];
-        const familyChildren = await listChildren(currentFamily.id);
-        return { currentFamily, familyChildren };
-      })
-      .then((result) => {
-        if (cancelled || result === null) {
-          return;
-        }
-        if (result.familyChildren.length === 0) {
-          router.replace("/onboarding");
-          return;
-        }
-        const savedChildId = window.localStorage.getItem(ACTIVE_CHILD_KEY);
-        const selected = result.familyChildren.some((child) => child.id === savedChildId)
-          ? savedChildId!
-          : result.familyChildren[0].id;
-        window.localStorage.setItem(ACTIVE_CHILD_KEY, selected);
-        setFamily(result.currentFamily);
-        setChildren(result.familyChildren);
-        setActiveChildId(selected);
       })
       .catch((requestError: unknown) => {
         if (!cancelled) {
-          setError(
+          setSummaryError(
             requestError instanceof ApiClientError
               ? requestError.message
-              : "暂时无法加载家庭信息",
+              : "暂时无法加载识字进度",
           );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [activeChild]);
 
-  const activeChild = useMemo(
-    () => children.find((child) => child.id === activeChildId) ?? null,
-    [activeChildId, children],
-  );
-
-  const switchChild = (childId: string) => {
-    window.localStorage.setItem(ACTIVE_CHILD_KEY, childId);
-    setActiveChildId(childId);
-  };
-
-  if (isLoading) {
+  if (status === "idle" || status === "loading") {
     return (
       <section className="center-state section-shell">
         <span className="loading-spinner" aria-hidden="true" />
@@ -144,19 +77,36 @@ function ParentHomeContent() {
     );
   }
 
-  if (error || !family || !activeChild) {
+  if (status === "error") {
     return (
       <section className="center-state section-shell">
         <h1>暂时无法进入家长首页</h1>
-        <p>{error || "没有找到可用的家庭资料"}</p>
-        <button className="button button-primary" onClick={() => void loadHome()} type="button">
+        <p>{householdError}</p>
+        <button className="button button-primary" onClick={() => void refresh()} type="button">
           重新加载
         </button>
       </section>
     );
   }
 
+  if (!family || !activeChild) {
+    return (
+      <section className="center-state section-shell">
+        <span className="loading-spinner" aria-hidden="true" />
+        <p>正在前往家庭设置…</p>
+      </section>
+    );
+  }
+
   const childName = activeChild.nickname || activeChild.display_name;
+  const learned = summary
+    ? summary.introduced + summary.recognizing + summary.proficient + summary.stable
+    : null;
+  const switchChild = (childId: string) => {
+    setSummary(null);
+    setSummaryError("");
+    setActiveChildId(childId);
+  };
 
   return (
     <section className="dashboard-page section-shell">
@@ -192,11 +142,28 @@ function ParentHomeContent() {
             <p className="eyebrow">Today</p>
             <h2>今日学习</h2>
           </div>
-          <span>真实进度将在开始学习后记录</span>
+          <span>所有数字均来自孩子的真实学习记录</span>
         </div>
         <div className="learning-grid">
+          <article className="learning-card learning-card-active">
+            <span className="learning-mark">字</span>
+            <div>
+              <h3>识字学习</h3>
+              {summaryError ? (
+                <p>{summaryError}</p>
+              ) : summary ? (
+                <p>
+                  已接触 {learned} 字 · 稳定掌握 {summary.stable} 字
+                </p>
+              ) : (
+                <p>正在读取真实进度…</p>
+              )}
+              <Link className="card-link" href="/learn/characters">
+                开始学习
+              </Link>
+            </div>
+          </article>
           {[
-            ["识字学习", "字"],
             ["阅读", "书"],
             ["科学实验", "光"],
           ].map(([title, mark]) => (
@@ -211,7 +178,7 @@ function ParentHomeContent() {
         </div>
       </section>
 
-      <p className="archive-note">成长学习正在为孩子建立长期学习档案</p>
+      <p className="archive-note">成长学习正在为孩子建立长期、可追溯的学习档案</p>
     </section>
   );
 }

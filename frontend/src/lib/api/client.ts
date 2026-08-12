@@ -95,6 +95,90 @@ export type HealthResponse = {
   status: "ok";
 };
 
+export type MasteryLevel =
+  | "unlearned"
+  | "introduced"
+  | "recognizing"
+  | "proficient"
+  | "stable";
+
+export type CharacterMasterySummary = {
+  total_enabled: number;
+  unlearned: number;
+  introduced: number;
+  recognizing: number;
+  proficient: number;
+  stable: number;
+  priority: number;
+  learning_records: number;
+  assessment_items: number;
+};
+
+export type CharacterMasteryState = {
+  knowledge_point_id: string;
+  character: string;
+  pinyin: string;
+  common_words: string[];
+  simple_meaning: string | null;
+  mastery_level: MasteryLevel;
+  mastery_score: number;
+  first_introduced_at: string | null;
+  last_learning_at: string | null;
+  last_assessed_at: string | null;
+  correct_count: number;
+  hinted_correct_count: number;
+  uncertain_count: number;
+  incorrect_count: number;
+  consecutive_correct: number;
+  consecutive_incorrect: number;
+  average_response_time_ms: number | null;
+  is_priority: boolean;
+  algorithm_version: string;
+};
+
+export type CharacterMasteryPage = {
+  items: CharacterMasteryState[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type CharacterRecommendation = {
+  id: string;
+  character: string;
+  pinyin: string;
+  common_words: string[];
+  simple_meaning: string | null;
+  example_sentence: string | null;
+  mastery_level: MasteryLevel;
+  is_priority: boolean;
+};
+
+export type TimelineItem = {
+  id: string;
+  evidence_type: "learning" | "assessment";
+  value: string;
+  occurred_at: string;
+  response_time_ms: number | null;
+};
+
+export type CharacterMasteryDetail = {
+  state: CharacterMasteryState;
+  timeline: TimelineItem[];
+};
+
+export type EvidenceSession = {
+  id: string;
+  child_id: string;
+  status: "in_progress" | "completed" | "abandoned";
+  source: string;
+  item_count: number;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+};
+
 type ErrorPayload = {
   detail?: string | Array<{ msg?: string }>;
 };
@@ -283,4 +367,91 @@ export function importStarterCharacters(): Promise<ImportReport> {
   return request<ImportReport>("/api/v1/admin/characters/import-starter", {
     method: "POST",
   });
+}
+
+export function getCharacterMasterySummary(childId: string): Promise<CharacterMasterySummary> {
+  return request<CharacterMasterySummary>(`/api/v1/children/${childId}/characters/summary`);
+}
+
+export function listCharacterMastery(
+  childId: string,
+  filters: {
+    search?: string;
+    masteryLevel?: MasteryLevel;
+    priority?: boolean;
+    page?: number;
+    pageSize?: number;
+  },
+): Promise<CharacterMasteryPage> {
+  const query = new URLSearchParams();
+  if (filters.search) query.set("search", filters.search);
+  if (filters.masteryLevel) query.set("mastery_level", filters.masteryLevel);
+  if (filters.priority !== undefined) query.set("priority", String(filters.priority));
+  query.set("page", String(filters.page ?? 1));
+  query.set("page_size", String(filters.pageSize ?? 20));
+  return request<CharacterMasteryPage>(
+    `/api/v1/children/${childId}/characters?${query.toString()}`,
+  );
+}
+
+export function getCharacterMasteryDetail(
+  childId: string,
+  knowledgePointId: string,
+): Promise<CharacterMasteryDetail> {
+  return request<CharacterMasteryDetail>(
+    `/api/v1/children/${childId}/characters/${knowledgePointId}`,
+  );
+}
+
+export function getCharacterRecommendations(
+  childId: string,
+  mode: "new" | "assessment",
+  limit = 5,
+): Promise<CharacterRecommendation[]> {
+  return request<CharacterRecommendation[]>(
+    `/api/v1/children/${childId}/characters/recommendations?mode=${mode}&limit=${limit}`,
+  );
+}
+
+export function createLearningSession(
+  childId: string,
+  knowledgePointIds: string[],
+): Promise<EvidenceSession> {
+  return request<EvidenceSession>(`/api/v1/children/${childId}/learning-sessions`, {
+    method: "POST",
+    body: jsonBody({
+      status: "completed",
+      source: "parent_assisted",
+      items: knowledgePointIds.map((knowledge_point_id) => ({
+        knowledge_point_id,
+        activity_type: "introduced",
+      })),
+    }),
+  });
+}
+
+export function createAssessmentSession(
+  childId: string,
+  items: Array<{
+    knowledge_point_id: string;
+    outcome: "correct" | "hinted_correct" | "uncertain" | "incorrect";
+    response_time_ms: number;
+    hint_used?: boolean;
+  }>,
+): Promise<EvidenceSession> {
+  return request<EvidenceSession>(`/api/v1/children/${childId}/assessment-sessions`, {
+    method: "POST",
+    body: jsonBody({ status: "completed", source: "quick_recognition", items }),
+  });
+}
+
+export function updateCharacterPriority(
+  childId: string,
+  knowledgePointId: string,
+  isPriority: boolean,
+): Promise<CharacterMasteryState> {
+  return request<CharacterMasteryState>(
+    `/api/v1/children/${childId}/characters/${knowledgePointId}/priority`,
+    { method: "PATCH", body: jsonBody({ is_priority: isPriority }) },
+  );
 }
