@@ -17,8 +17,11 @@ compose=(docker compose --env-file .env)
 
 "${compose[@]}" config --quiet
 
-# Build sequentially on small servers, then start without an implicit second build.
-COMPOSE_PARALLEL_LIMIT="$COMPOSE_PARALLEL_LIMIT" "${compose[@]}" build backend frontend
+# Use separate build invocations: BuildKit can still parallelize services passed
+# to one command even when Compose's parallel limit is one.
+for service in backend frontend; do
+  COMPOSE_PARALLEL_LIMIT="$COMPOSE_PARALLEL_LIMIT" "${compose[@]}" build "$service"
+done
 "${compose[@]}" up -d --no-build --remove-orphans
 
 deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS))
