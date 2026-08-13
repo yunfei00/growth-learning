@@ -1,6 +1,8 @@
 """MinIO-compatible private object storage construction."""
 
 import io
+from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Protocol
 
 from anyio import to_thread
@@ -37,7 +39,11 @@ class PrivateObjectStorage(Protocol):
 
     async def put(self, object_key: str, content: bytes, mime_type: str) -> None: ...
 
+    async def put_file(self, object_key: str, path: Path, mime_type: str) -> None: ...
+
     async def read(self, object_key: str) -> bytes: ...
+
+    def stream(self, object_key: str, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]: ...
 
     async def remove(self, object_key: str) -> None: ...
 
@@ -71,6 +77,15 @@ class MinioPrivateObjectStorage:
 
         await to_thread.run_sync(write)
 
+    async def put_file(self, object_key: str, path: Path, mime_type: str) -> None:
+        """Upload a potentially large export from disk without materializing it in memory."""
+
+        def write() -> None:
+            self._ensure_bucket()
+            self.client.fput_object(self.bucket, object_key, str(path), content_type=mime_type)
+
+        await to_thread.run_sync(write)
+
     async def read(self, object_key: str) -> bytes:
         def fetch() -> bytes:
             response = self.client.get_object(self.bucket, object_key)
@@ -81,6 +96,17 @@ class MinioPrivateObjectStorage:
                 response.release_conn()
 
         return await to_thread.run_sync(fetch)
+
+    async def stream(self, object_key: str, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
+        """Read a private object in bounded chunks after the caller authorizes access."""
+
+        response = await to_thread.run_sync(self.client.get_object, self.bucket, object_key)
+        try:
+            while chunk := await to_thread.run_sync(response.read, chunk_size):
+                yield chunk
+        finally:
+            await to_thread.run_sync(response.close)
+            await to_thread.run_sync(response.release_conn)
 
     async def remove(self, object_key: str) -> None:
         await to_thread.run_sync(self.client.remove_object, self.bucket, object_key)

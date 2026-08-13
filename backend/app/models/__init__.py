@@ -2,6 +2,21 @@
 
 from app.db.base import Base
 from app.models.family import Child, Family, FamilyMember, FamilyRole
+from app.models.growth import (
+    ExportJob,
+    ExportJobStatus,
+    GrowthBook,
+    GrowthBookEdition,
+    GrowthBookVersion,
+    GrowthEvent,
+    GrowthEventCategory,
+    GrowthEventType,
+    GrowthMediaAsset,
+    GrowthReport,
+    GrowthReportPeriod,
+    GrowthReportVersion,
+    GrowthSourceType,
+)
 from app.models.identity import SystemRole, User
 from app.models.knowledge import (
     ChineseCharacter,
@@ -79,6 +94,19 @@ __all__ = [
     "FamilyRole",
     "SystemRole",
     "User",
+    "GrowthEvent",
+    "GrowthEventCategory",
+    "GrowthEventType",
+    "GrowthSourceType",
+    "GrowthMediaAsset",
+    "GrowthReport",
+    "GrowthReportPeriod",
+    "GrowthReportVersion",
+    "GrowthBook",
+    "GrowthBookEdition",
+    "GrowthBookVersion",
+    "ExportJob",
+    "ExportJobStatus",
     "ChineseCharacter",
     "KnowledgePoint",
     "KnowledgeRelation",
