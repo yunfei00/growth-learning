@@ -117,6 +117,10 @@ jobs:
                   "knowledge_points", "chinese_characters", "knowledge_relations",
                   "learning_sessions", "learning_records", "assessment_sessions",
                   "assessment_items", "child_knowledge_states",
+                  "child_learning_settings", "child_review_schedules",
+                  "daily_learning_plans", "daily_plan_items",
+                  "assessment_session_plans", "assessment_session_targets",
+                  "literacy_estimates",
               }
               missing = required - tables
               if missing:
