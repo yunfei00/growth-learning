@@ -200,6 +200,12 @@ async def test_growth_archive_reports_books_export_and_privacy(
         assert timeline.status_code == 200
         assert timeline.json()["total"] == 2
         assert exact_text in [item["body"] for item in timeline.json()["items"]]
+        science_event = next(
+            item for item in timeline.json()["items"] if item["source_type"] == "system"
+        )
+        assert science_event["source_url"] == (
+            f"/science/session/{science_event['source_entity_id']}"
+        )
         assert (
             await companion.post(
                 f"/api/v1/children/{child['id']}/growth/events",

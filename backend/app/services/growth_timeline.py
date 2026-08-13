@@ -48,11 +48,11 @@ def _source_url(event: GrowthEvent) -> str | None:
         return None
     if event.source_entity_type == "reading_session":
         version_id = event.evidence_snapshot.get("story_version_id")
-        return f"/growth/read/{version_id}" if version_id else None
+        return f"/read/{version_id}" if version_id else None
     if event.source_entity_type == "experiment_session":
-        return f"/growth/science/session/{event.source_entity_id}"
+        return f"/science/session/{event.source_entity_id}"
     if event.source_entity_type == "assessment_session":
-        return "/growth/learn/characters"
+        return "/learn/characters"
     return None
 
 
