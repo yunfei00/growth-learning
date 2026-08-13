@@ -220,6 +220,15 @@ export type DailyPlan = {
   literacy_estimate: number | null;
   literacy_catalog_size: number;
   items: DailyPlanItem[];
+  reading: DailyReadingTask;
+};
+
+export type DailyReadingTask = {
+  status: "needs_story" | "pending" | "in_progress" | "completed";
+  target_count: number;
+  story_version_id: string | null;
+  reading_session_id: string | null;
+  title: string | null;
 };
 
 export type AssessmentSource =
@@ -286,6 +295,138 @@ export type LiteracyEstimate = {
   created_at: string | null;
 };
 
+export type StoryDifficulty = "beginner" | "normal" | "challenge";
+
+export type StoryTarget = {
+  knowledge_point_id: string;
+  character: string;
+  mastery_level: MasteryLevel;
+  is_priority: boolean;
+};
+
+export type ReadingContext = {
+  child_id: string;
+  age_band: string;
+  provider_configured: boolean;
+  provider: string;
+  model: string;
+  recommended_difficulty: StoryDifficulty | null;
+  strong_known_count: number;
+  usable_recognizing_count: number;
+  automatic_targets: StoryTarget[];
+  safe_themes: string[];
+  catalog_size: number;
+  catalog_limitation: string;
+  feasibility_message: string | null;
+};
+
+export type ReadingQuestion = {
+  id: string;
+  position: number;
+  question: string;
+  options: string[];
+};
+
+export type CharacterGlossary = {
+  knowledge_point_id: string;
+  character: string;
+  pinyin: string;
+  simple_meaning: string | null;
+  common_words: string[];
+};
+
+export type StoryVersion = {
+  id: string;
+  story_id: string;
+  version_number: number;
+  title: string;
+  paragraphs: string[];
+  summary: string | null;
+  theme: string;
+  custom_theme: string | null;
+  difficulty: StoryDifficulty;
+  requested_known_coverage: number;
+  actual_strong_known_coverage: number;
+  actual_usable_known_coverage: number;
+  actual_target_coverage: number;
+  actual_unexpected_coverage: number;
+  unique_known_coverage: number;
+  total_han_occurrences: number;
+  unique_han_count: number;
+  unexpected_characters: string[];
+  target_characters: string[];
+  snapshot_at: string;
+  coverage_policy_version: string;
+  analyzer_version: string;
+  prompt_version: string;
+  provider: string;
+  model: string;
+  questions: ReadingQuestion[];
+  glossary: CharacterGlossary[];
+  created_at: string;
+};
+
+export type StoryGenerationResult = {
+  generation_run_id: string;
+  status: "succeeded";
+  attempt_count: number;
+  version: StoryVersion;
+};
+
+export type StoryListItem = {
+  story_id: string;
+  story_version_id: string;
+  title: string;
+  theme: string;
+  difficulty: StoryDifficulty;
+  actual_known_coverage: number;
+  target_characters: string[];
+  generated_at: string;
+  reading_status: "in_progress" | "completed" | "abandoned" | null;
+  reading_mode: "independent" | "with_help" | null;
+  comprehension_answered: number;
+  comprehension_total: number;
+};
+
+export type StoryPage = {
+  items: StoryListItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type ReadingAnswer = {
+  question_id: string;
+  selected_option_index: number;
+  outcome: "correct" | "with_help" | "partial" | "incorrect";
+  answered_at: string;
+};
+
+export type ReadingSession = {
+  id: string;
+  child_id: string;
+  story_version_id: string;
+  reading_mode: "independent" | "with_help";
+  status: "in_progress" | "completed" | "abandoned";
+  started_at: string;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  parent_note: string | null;
+  answers: ReadingAnswer[];
+  story_exposure_count: number;
+};
+
+export type ReadingSummary = {
+  stories_read_this_week: number;
+  independent_this_week: number;
+  with_help_this_week: number;
+  comprehension_correct: number;
+  comprehension_answered: number;
+  comprehension_message: string;
+  target_exposure_count: number;
+};
+
 type ErrorPayload = {
   detail?: string | Array<{ msg?: string }>;
 };
@@ -324,9 +465,13 @@ function errorMessage(payload: ErrorPayload | null, fallback: string): string {
   return fallback;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<T> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   const hasBody = init?.body !== undefined;
 
   try {
@@ -629,4 +774,75 @@ export function getAssessmentHistory(childId: string): Promise<AssessmentHistory
 
 export function getLiteracyEstimate(childId: string): Promise<LiteracyEstimate> {
   return request<LiteracyEstimate>(`/api/v1/children/${childId}/literacy-estimate`);
+}
+
+export function getReadingContext(childId: string): Promise<ReadingContext> {
+  return request<ReadingContext>(`/api/v1/children/${childId}/reading-context`);
+}
+
+export function generateStory(
+  childId: string,
+  payload: {
+    difficulty: StoryDifficulty;
+    theme: string;
+    custom_theme?: string | null;
+    target_knowledge_point_ids?: string[];
+    request_key?: string;
+    story_id?: string;
+  },
+): Promise<StoryGenerationResult> {
+  return request<StoryGenerationResult>(
+    `/api/v1/children/${childId}/stories/generate`,
+    { method: "POST", body: jsonBody(payload) },
+    90_000,
+  );
+}
+
+export function listStories(childId: string, page = 1): Promise<StoryPage> {
+  return request<StoryPage>(`/api/v1/children/${childId}/stories?page=${page}&page_size=12`);
+}
+
+export function getStoryVersion(childId: string, versionId: string): Promise<StoryVersion> {
+  return request<StoryVersion>(`/api/v1/children/${childId}/story-versions/${versionId}`);
+}
+
+export function startReading(
+  childId: string,
+  versionId: string,
+  readingMode: "independent" | "with_help",
+): Promise<ReadingSession> {
+  return request<ReadingSession>(
+    `/api/v1/children/${childId}/story-versions/${versionId}/reading/start`,
+    { method: "POST", body: jsonBody({ reading_mode: readingMode }) },
+  );
+}
+
+export function submitReadingAnswers(
+  childId: string,
+  sessionId: string,
+  answers: Array<{
+    question_id: string;
+    selected_option_index: number;
+    outcome: "correct" | "with_help" | "partial" | "incorrect";
+  }>,
+): Promise<ReadingSession> {
+  return request<ReadingSession>(
+    `/api/v1/children/${childId}/reading-sessions/${sessionId}/answers`,
+    { method: "POST", body: jsonBody({ answers }) },
+  );
+}
+
+export function completeReading(
+  childId: string,
+  sessionId: string,
+  payload: { duration_seconds?: number; parent_note?: string | null },
+): Promise<ReadingSession> {
+  return request<ReadingSession>(
+    `/api/v1/children/${childId}/reading-sessions/${sessionId}/complete`,
+    { method: "POST", body: jsonBody(payload) },
+  );
+}
+
+export function getReadingSummary(childId: string): Promise<ReadingSummary> {
+  return request<ReadingSummary>(`/api/v1/children/${childId}/reading-summary`);
 }

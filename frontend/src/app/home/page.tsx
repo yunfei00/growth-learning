@@ -11,7 +11,9 @@ import {
   ApiClientError,
   type CharacterMasterySummary,
   type DailyPlan,
+  type ReadingSummary,
   getCharacterMasterySummary,
+  getReadingSummary,
   getTodayPlan,
 } from "@/lib/api/client";
 
@@ -48,6 +50,7 @@ function ParentHomeContent() {
   } = useActiveChild();
   const [summary, setSummary] = useState<CharacterMasterySummary | null>(null);
   const [plan, setPlan] = useState<DailyPlan | null>(null);
+  const [readingSummary, setReadingSummary] = useState<ReadingSummary | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -57,11 +60,16 @@ function ParentHomeContent() {
   useEffect(() => {
     if (!activeChild) return;
     let cancelled = false;
-    Promise.all([getCharacterMasterySummary(activeChild.id), getTodayPlan(activeChild.id)])
-      .then(([summaryValue, planValue]) => {
+    Promise.all([
+      getCharacterMasterySummary(activeChild.id),
+      getTodayPlan(activeChild.id),
+      getReadingSummary(activeChild.id),
+    ])
+      .then(([summaryValue, planValue, readingValue]) => {
         if (!cancelled) {
           setSummary(summaryValue);
           setPlan(planValue);
+          setReadingSummary(readingValue);
           setError("");
         }
       })
@@ -129,6 +137,7 @@ function ParentHomeContent() {
           onChange={(childId) => {
             setSummary(null);
             setPlan(null);
+            setReadingSummary(null);
             setError("");
             setActiveChildId(childId);
           }}
@@ -194,7 +203,9 @@ function ParentHomeContent() {
             <div className="period-status-row">
               <span>本周小挑战：{PERIOD_LABELS[plan.weekly_status] ?? plan.weekly_status}</span>
               <span>本月识字检测：{PERIOD_LABELS[plan.monthly_status] ?? plan.monthly_status}</span>
-              <span>阅读：暂未开启</span>
+              <span>
+                今日阅读：{plan.reading.status === "completed" ? "已完成" : plan.reading.status === "in_progress" ? "进行中" : plan.reading.status === "pending" ? "待阅读" : "需要生成故事"}
+              </span>
             </div>
             <Link className="button button-primary today-start" href="/learn/characters">
               开始今日学习
@@ -219,9 +230,16 @@ function ParentHomeContent() {
             </Link>
           </div>
         </article>
-        <article className="learning-card">
+        <article className="learning-card learning-card-active">
           <span className="learning-mark">读</span>
-          <div><h3>阅读</h3><p>尚未开始</p></div>
+          <div>
+            <h3>我的故事书</h3>
+            <p>
+              本周 {readingSummary?.stories_read_this_week ?? 0} 篇 · 独立完成 {readingSummary?.independent_this_week ?? 0} 篇 · 陪读 {readingSummary?.with_help_this_week ?? 0} 篇
+            </p>
+            <p>{readingSummary?.comprehension_message ?? "阅读理解数据不足"}</p>
+            <Link className="card-link" href="/read">进入阅读</Link>
+          </div>
         </article>
         <article className="learning-card">
           <span className="learning-mark">科</span>

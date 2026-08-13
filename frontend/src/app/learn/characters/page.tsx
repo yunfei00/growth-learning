@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -438,6 +439,7 @@ function CharacterLearningContent() {
               <div className="today-task-grid">
                 <article><span>新字</span><strong>{plan.recommended_new_count}</strong><small>已完成 {plan.new_completed_count}</small><button onClick={() => void startNewLearning()} disabled={plan.recommended_new_count === 0 || plan.new_completed_count >= plan.recommended_new_count} type="button">学习今日新字</button></article>
                 <article><span>复习</span><strong>{plan.review_count}</strong><small>待复习总数 {plan.due_count}</small><button onClick={() => void beginPlannedSession("daily_review")} disabled={plan.review_count === 0} type="button">开始 / 继续复习</button></article>
+                <article><span>阅读</span><strong>1 篇</strong><small>{plan.reading.title ?? (plan.reading.status === "needs_story" ? "需要生成今天的故事" : "故事已准备")}</small><Link className="task-link-button" href={plan.reading.story_version_id ? `/read/${plan.reading.story_version_id}` : "/read"}>{plan.reading.status === "completed" ? "查看已完成故事" : plan.reading.status === "in_progress" ? "继续阅读" : plan.reading.status === "pending" ? "开始阅读" : "生成今天的故事"}</Link></article>
               </div>
               <div className="plan-explanation"><strong>安排说明</strong><p>{plan.recommendation_reason}</p>{plan.due_count > plan.review_count ? <p>剩余项目不会丢失，按当前容量预计约 {plan.estimated_backlog_days} 天逐步完成。</p> : null}</div>
               <div className="period-action-grid">
