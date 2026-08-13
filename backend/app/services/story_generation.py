@@ -64,6 +64,13 @@ UNSAFE_TERMS = {
     "虐待",
     "枪战",
     "成人内容",
+    "sex",
+    "suicide",
+    "self-harm",
+    "drug",
+    "gambling",
+    "murder",
+    "gun",
 }
 
 
@@ -532,6 +539,8 @@ async def generate_story(
             title=draft.title,
             paragraphs=draft.paragraphs,
             summary=draft.summary,
+            theme=theme,
+            custom_theme=custom_theme,
             difficulty=payload.difficulty,
             requested_known_coverage=PROFILES[payload.difficulty].target_known,
             actual_strong_known_coverage=analysis.strong_known_coverage,
@@ -603,7 +612,9 @@ async def generate_story(
         run.output_tokens = response.output_tokens
         run.completed_at = datetime.now(UTC)
         from app.services.daily_reading import attach_story_to_today
+        from app.services.review_planning import get_or_create_daily_plan
 
+        await get_or_create_daily_plan(session, child.id)
         await attach_story_to_today(session, child.id, version.id)
         await session.commit()
         return run, version

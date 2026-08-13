@@ -90,8 +90,8 @@ async def story_version_response(
         title=version.title,
         paragraphs=version.paragraphs,
         summary=version.summary,
-        theme=story.theme,
-        custom_theme=story.custom_theme,
+        theme=version.theme,
+        custom_theme=version.custom_theme,
         difficulty=version.difficulty,
         requested_known_coverage=version.requested_known_coverage,
         actual_strong_known_coverage=version.actual_strong_known_coverage,
@@ -138,17 +138,19 @@ async def list_storybook(
     *,
     page: int,
     page_size: int,
+    search: str | None = None,
+    difficulty: str | None = None,
 ) -> StoryPageResponse:
-    rows = list(
-        (
-            await session.execute(
-                select(Story, StoryVersion)
-                .join(StoryVersion, StoryVersion.story_id == Story.id)
-                .where(Story.child_id == child_id)
-                .order_by(StoryVersion.created_at.desc())
-            )
-        ).all()
+    query = (
+        select(Story, StoryVersion)
+        .join(StoryVersion, StoryVersion.story_id == Story.id)
+        .where(Story.child_id == child_id)
     )
+    if search:
+        query = query.where(StoryVersion.title.ilike(f"%{search.strip()}%"))
+    if difficulty:
+        query = query.where(StoryVersion.difficulty == difficulty)
+    rows = list((await session.execute(query.order_by(StoryVersion.created_at.desc()))).all())
     total = len(rows)
     selected = rows[(page - 1) * page_size : page * page_size]
     items: list[StoryListItemResponse] = []
@@ -184,7 +186,7 @@ async def list_storybook(
                 story_id=story.id,
                 story_version_id=version.id,
                 title=version.title,
-                theme=story.theme,
+                theme=version.theme,
                 difficulty=version.difficulty,
                 actual_known_coverage=version.actual_usable_known_coverage,
                 target_characters=version.target_characters,

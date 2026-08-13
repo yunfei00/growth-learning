@@ -234,10 +234,12 @@ async def test_fake_provider_repair_then_success_and_snapshot_immutability(
             configured_model="deterministic-test-model",
         )
         assert second_version.version_number == 2
+        assert second_version.theme == "nature"
         old_version = await session.get(StoryVersion, version_id)
         assert old_version is not None
         assert old_version.version_number == 1
         assert old_version.title == title_before
+        assert old_version.theme == "animals"
 
 
 async def test_generation_stops_after_three_invalid_attempts(
@@ -439,6 +441,14 @@ async def test_provider_disabled_and_household_story_privacy(
         )
         assert generated.status_code == 201, generated.text
         version_id = generated.json()["version"]["id"]
+        searched = await owner.get(f"/api/v1/children/{child_payload['id']}/stories?search=不存在")
+        assert searched.status_code == 200
+        assert searched.json()["total"] == 0
+        filtered = await owner.get(
+            f"/api/v1/children/{child_payload['id']}/stories?difficulty=normal"
+        )
+        assert filtered.status_code == 200
+        assert filtered.json()["total"] == 1
         assert (
             await companion.get(
                 f"/api/v1/children/{child_payload['id']}/story-versions/{version_id}"

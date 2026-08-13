@@ -2251,6 +2251,30 @@ main {
   gap: 14px;
 }
 
+.storybook-filters {
+  margin-top: 18px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.storybook-filters label {
+  display: grid;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.storybook-filters input,
+.storybook-filters select {
+  min-height: 42px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+}
+
 .story-card {
   min-height: 220px;
   padding: 20px;

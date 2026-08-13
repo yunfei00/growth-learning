@@ -798,8 +798,14 @@ export function generateStory(
   );
 }
 
-export function listStories(childId: string, page = 1): Promise<StoryPage> {
-  return request<StoryPage>(`/api/v1/children/${childId}/stories?page=${page}&page_size=12`);
+export function listStories(
+  childId: string,
+  filters: { page?: number; search?: string; difficulty?: StoryDifficulty } = {},
+): Promise<StoryPage> {
+  const query = new URLSearchParams({ page: String(filters.page ?? 1), page_size: "12" });
+  if (filters.search) query.set("search", filters.search);
+  if (filters.difficulty) query.set("difficulty", filters.difficulty);
+  return request<StoryPage>(`/api/v1/children/${childId}/stories?${query}`);
 }
 
 export function getStoryVersion(childId: string, versionId: string): Promise<StoryVersion> {

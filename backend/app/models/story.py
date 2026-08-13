@@ -155,6 +155,8 @@ class StoryVersion(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     paragraphs: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     summary: Mapped[str | None] = mapped_column(Text)
+    theme: Mapped[str] = mapped_column(String(40), nullable=False)
+    custom_theme: Mapped[str | None] = mapped_column(String(80))
     difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
     requested_known_coverage: Mapped[float] = mapped_column(Float, nullable=False)
     actual_strong_known_coverage: Mapped[float] = mapped_column(Float, nullable=False)

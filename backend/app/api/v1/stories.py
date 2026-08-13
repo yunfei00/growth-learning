@@ -122,9 +122,18 @@ async def get_storybook(
     current_user: CurrentUser,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=12, ge=1, le=50),
+    search: str | None = Query(default=None, max_length=80),
+    difficulty: str | None = Query(default=None, pattern="^(beginner|normal|challenge)$"),
 ) -> StoryPageResponse:
     await get_authorized_child(session, current_user, child_id)
-    return await list_storybook(session, child_id, page=page, page_size=page_size)
+    return await list_storybook(
+        session,
+        child_id,
+        page=page,
+        page_size=page_size,
+        search=search,
+        difficulty=difficulty,
+    )
 
 
 @router.get("/{child_id}/story-versions/{story_version_id}", response_model=StoryVersionResponse)

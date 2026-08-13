@@ -60,6 +60,8 @@ function ReadingLibrary() {
   const [customTheme, setCustomTheme] = useState("");
   const [manualTargets, setManualTargets] = useState(false);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [libraryDifficulty, setLibraryDifficulty] = useState<StoryDifficulty | "">("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
 
@@ -68,7 +70,10 @@ function ReadingLibrary() {
     try {
       const [contextValue, storiesValue, summaryValue] = await Promise.all([
         getReadingContext(activeChild.id),
-        listStories(activeChild.id),
+        listStories(activeChild.id, {
+          search: librarySearch.trim() || undefined,
+          difficulty: libraryDifficulty || undefined,
+        }),
         getReadingSummary(activeChild.id),
       ]);
       setContext(contextValue);
@@ -82,7 +87,7 @@ function ReadingLibrary() {
     } catch (requestError) {
       setError(messageFrom(requestError, "暂时无法加载故事书"));
     }
-  }, [activeChild]);
+  }, [activeChild, libraryDifficulty, librarySearch]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -243,6 +248,19 @@ function ReadingLibrary() {
 
       <section className="storybook-section">
         <div className="section-title-row"><div><p className="eyebrow">Archive</p><h2>按时间保存的真实版本</h2></div><span>{stories?.total ?? 0} 个版本</span></div>
+        <div className="storybook-filters">
+          <label>
+            搜索标题
+            <input onChange={(event) => setLibrarySearch(event.target.value)} placeholder="输入故事名" value={librarySearch} />
+          </label>
+          <label>
+            难度
+            <select onChange={(event) => setLibraryDifficulty(event.target.value as StoryDifficulty | "")} value={libraryDifficulty}>
+              <option value="">全部</option>
+              {DIFFICULTIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+        </div>
         {stories && stories.items.length > 0 ? (
           <div className="storybook-grid">
             {stories.items.map((story) => (

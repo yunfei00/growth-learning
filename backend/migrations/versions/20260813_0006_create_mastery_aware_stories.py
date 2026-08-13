@@ -102,6 +102,8 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=120), nullable=False),
         sa.Column("paragraphs", sa.JSON(), nullable=False),
         sa.Column("summary", sa.Text(), nullable=True),
+        sa.Column("theme", sa.String(length=40), nullable=False),
+        sa.Column("custom_theme", sa.String(length=80), nullable=True),
         sa.Column("difficulty", sa.String(length=20), nullable=False),
         sa.Column("requested_known_coverage", sa.Float(), nullable=False),
         sa.Column("actual_strong_known_coverage", sa.Float(), nullable=False),

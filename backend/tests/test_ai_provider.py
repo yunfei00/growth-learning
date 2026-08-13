@@ -20,6 +20,8 @@ async def test_disabled_provider_fails_closed() -> None:
 async def test_openai_compatible_provider_normalizes_response() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["authorization"] == "Bearer test-key"
+        assert b'"response_format":{"type":"json_object"}' in request.content
+        assert request.url.path == "/v1/chat/completions"
         return httpx.Response(
             200,
             json={
@@ -37,7 +39,9 @@ async def test_openai_compatible_provider_normalizes_response() -> None:
             client=client,
         )
         result = await provider.complete(
-            AICompletionRequest(messages=[AIMessage(role="user", content="Write a story")])
+            AICompletionRequest(
+                messages=[AIMessage(role="user", content="Write a story")], json_response=True
+            )
         )
 
     assert result.text == "A safe story."
