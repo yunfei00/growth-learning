@@ -11,9 +11,11 @@ import {
   ApiClientError,
   type CharacterMasterySummary,
   type DailyPlan,
+  type GrowthEvent,
   type ReadingSummary,
   type ScienceRecommendation,
   getCharacterMasterySummary,
+  getRecentGrowth,
   getReadingSummary,
   getTodayPlan,
   listScienceRecommendations,
@@ -54,6 +56,7 @@ function ParentHomeContent() {
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [readingSummary, setReadingSummary] = useState<ReadingSummary | null>(null);
   const [science, setScience] = useState<ScienceRecommendation[]>([]);
+  const [recentGrowth, setRecentGrowth] = useState<GrowthEvent[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -68,13 +71,15 @@ function ParentHomeContent() {
       getTodayPlan(activeChild.id),
       getReadingSummary(activeChild.id),
       listScienceRecommendations(activeChild.id),
+      getRecentGrowth(activeChild.id),
     ])
-      .then(([summaryValue, planValue, readingValue, scienceValue]) => {
+      .then(([summaryValue, planValue, readingValue, scienceValue, growthValue]) => {
         if (!cancelled) {
           setSummary(summaryValue);
           setPlan(planValue);
           setReadingSummary(readingValue);
           setScience(scienceValue);
+          setRecentGrowth(growthValue);
           setError("");
         }
       })
@@ -222,6 +227,21 @@ function ParentHomeContent() {
             <p>正在根据复习积压和近期表现生成今日任务…</p>
           </div>
         )}
+      </section>
+
+      <section className="recent-growth-home">
+        <div className="section-title-row">
+          <div><p className="eyebrow">最近成长</p><h2>值得记住的瞬间</h2></div>
+          <Link href="/growth">查看全部</Link>
+        </div>
+        <div className="recent-growth-list">
+          {recentGrowth.slice(0, 5).map((event) => (
+            <article key={event.id}>
+              <span>✓</span><div><strong>{event.title}</strong><small>{new Date(event.occurred_at).toLocaleDateString("zh-CN")}</small></div>
+            </article>
+          ))}
+          {recentGrowth.length === 0 ? <p>从学习、阅读、科学探索或一条家庭记录开始积累成长瞬间。</p> : null}
+        </div>
       </section>
 
       <section className="learning-grid">

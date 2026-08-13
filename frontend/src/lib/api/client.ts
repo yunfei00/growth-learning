@@ -579,6 +579,124 @@ export type ExperimentGrowthCard = {
   capability_tags: string[];
 };
 
+export type GrowthCategory =
+  | "learning"
+  | "assessment"
+  | "reading"
+  | "science"
+  | "family"
+  | "original_words"
+  | "achievement"
+  | "report";
+
+export type GrowthMedia = {
+  id: string;
+  media_kind: "image" | "video" | "audio";
+  mime_type: string;
+  size_bytes: number;
+  original_filename: string;
+  created_at: string;
+  content_url: string;
+};
+
+export type GrowthEvent = {
+  id: string;
+  child_id: string;
+  event_type: string;
+  category: GrowthCategory;
+  occurred_at: string;
+  title: string;
+  body: string;
+  source_type: "system" | "parent" | "companion";
+  actor_user_id: string | null;
+  actor_display_name: string | null;
+  source_entity_type: string | null;
+  source_entity_id: string | null;
+  source_url: string | null;
+  evidence_snapshot: Record<string, unknown>;
+  policy_version: string;
+  archived_at: string | null;
+  media: GrowthMedia[];
+};
+
+export type GrowthEventPage = {
+  items: GrowthEvent[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type GrowthReport = {
+  id: string;
+  report_id: string;
+  version_number: number;
+  period_type: "monthly" | "yearly" | "custom";
+  period_start: string;
+  period_end: string;
+  generated_at: string;
+  source_cutoff_at: string;
+  policy_version: string;
+  metrics: Record<string, unknown>;
+  sections: Record<string, unknown>;
+  selected_event_ids: string[];
+  ai_narrative: string | null;
+  ai_provider: string | null;
+  ai_model: string | null;
+  ai_prompt_version: string | null;
+};
+
+export type GrowthReportSummary = {
+  id: string;
+  period_type: "monthly" | "yearly" | "custom";
+  period_start: string;
+  period_end: string;
+  latest_version: number;
+  generated_at: string;
+};
+
+export type GrowthBook = {
+  id: string;
+  growth_book_id: string;
+  version_number: number;
+  edition_type: "yearly" | "age_year";
+  edition_key: string;
+  title: string;
+  selected_event_ids: string[];
+  selected_media: Array<Record<string, string>>;
+  snapshot: Record<string, unknown>;
+  parent_message: string | null;
+  message_author_user_id: string | null;
+  message_recorded_at: string | null;
+  created_at: string;
+};
+
+export type GrowthBookSummary = {
+  id: string;
+  edition_type: "yearly" | "age_year";
+  edition_key: string;
+  latest_version: number;
+  title: string;
+  created_at: string;
+};
+
+export type ExportJob = {
+  id: string;
+  family_id: string;
+  child_id: string | null;
+  requested_by_user_id: string;
+  status: "pending" | "processing" | "completed" | "failed" | "expired";
+  schema_version: string;
+  size_bytes: number | null;
+  checksum_sha256: string | null;
+  failure_reason: string | null;
+  completed_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+  download_url: string | null;
+};
+
 type ErrorPayload = {
   detail?: string | Array<{ msg?: string }>;
 };
@@ -1140,4 +1258,119 @@ export function updateAdminScienceExperiment(id: string, payload: Partial<Scienc
 
 export function importStarterScience(): Promise<{ created: number; updated: number; skipped: number; materials_created: number; errors: string[] }> {
   return request("/api/v1/admin/science/import-starter", { method: "POST" });
+}
+
+export function listGrowthEvents(
+  childId: string,
+  filters: { category?: GrowthCategory; year?: number; month?: number } = {},
+): Promise<GrowthEventPage> {
+  const query = new URLSearchParams({ page: "1", page_size: "100" });
+  if (filters.category) query.set("category", filters.category);
+  if (filters.year) query.set("year", String(filters.year));
+  if (filters.month) query.set("month", String(filters.month));
+  return request<GrowthEventPage>(`/api/v1/children/${childId}/growth/events?${query}`);
+}
+
+export function getRecentGrowth(childId: string): Promise<GrowthEvent[]> {
+  return request<GrowthEvent[]>(`/api/v1/children/${childId}/growth/recent`);
+}
+
+export function createGrowthEvent(
+  childId: string,
+  payload: {
+    occurred_at: string;
+    title?: string | null;
+    text: string;
+    event_type: "manual_growth_note" | "family_observation";
+    category: "family" | "learning" | "reading" | "science";
+  },
+): Promise<GrowthEvent> {
+  return request<GrowthEvent>(`/api/v1/children/${childId}/growth/events`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function uploadGrowthMedia(
+  childId: string,
+  eventId: string,
+  file: File,
+): Promise<GrowthEvent> {
+  const body = new FormData();
+  body.set("file", file);
+  return request<GrowthEvent>(
+    `/api/v1/children/${childId}/growth/events/${eventId}/media`,
+    { method: "POST", body },
+    120_000,
+  );
+}
+
+export function generateGrowthReport(
+  childId: string,
+  payload: {
+    period_type: "monthly" | "yearly" | "custom";
+    period_start: string;
+    period_end: string;
+    include_ai_narrative?: boolean;
+  },
+): Promise<GrowthReport> {
+  return request<GrowthReport>(`/api/v1/children/${childId}/growth/reports`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function listGrowthReports(childId: string): Promise<GrowthReportSummary[]> {
+  return request<GrowthReportSummary[]>(`/api/v1/children/${childId}/growth/reports`);
+}
+
+export function getGrowthReport(childId: string, reportId: string): Promise<GrowthReport> {
+  return request<GrowthReport>(`/api/v1/children/${childId}/growth/reports/${reportId}`);
+}
+
+export function createGrowthBook(
+  childId: string,
+  payload: {
+    edition_type: "yearly" | "age_year";
+    edition_key: string;
+    title: string;
+    selected_event_ids: string[];
+    selected_media: Array<Record<string, string>>;
+    parent_message?: string | null;
+  },
+): Promise<GrowthBook> {
+  return request<GrowthBook>(`/api/v1/children/${childId}/growth/books`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function listGrowthBooks(childId: string): Promise<GrowthBookSummary[]> {
+  return request<GrowthBookSummary[]>(`/api/v1/children/${childId}/growth/books`);
+}
+
+export function getGrowthBook(childId: string, bookId: string): Promise<GrowthBook> {
+  return request<GrowthBook>(`/api/v1/children/${childId}/growth/books/${bookId}`);
+}
+
+export function requestFamilyExport(familyId: string, childId?: string): Promise<ExportJob> {
+  return request<ExportJob>(`/api/v1/families/${familyId}/exports`, {
+    method: "POST",
+    body: jsonBody({ child_id: childId || null }),
+  }, 120_000);
+}
+
+export async function downloadFamilyExport(job: ExportJob): Promise<void> {
+  if (!job.download_url) throw new ApiClientError("导出文件尚不可下载");
+  const response = await fetch(`${getApiBaseUrl()}${job.download_url}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiClientError("导出文件下载失败", response.status);
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `growth-learning-export-${job.id}.zip`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
