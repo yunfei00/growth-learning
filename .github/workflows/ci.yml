@@ -125,6 +125,11 @@ jobs:
                   "stories", "story_versions", "story_generation_runs",
                   "story_knowledge_points", "reading_questions",
                   "reading_sessions", "reading_answers", "daily_reading_tasks",
+                  "science_experiments", "science_experiment_versions",
+                  "experiment_materials", "experiment_material_requirements",
+                  "family_materials", "experiment_knowledge_points",
+                  "experiment_sessions", "experiment_evidence",
+                  "experiment_media_assets",
               }
               missing = required - tables
               if missing:

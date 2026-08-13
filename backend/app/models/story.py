@@ -81,6 +81,9 @@ class Story(TimestampMixin, Base):
     )
     theme: Mapped[str] = mapped_column(String(40), nullable=False)
     custom_theme: Mapped[str | None] = mapped_column(String(80))
+    source_experiment_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("experiment_sessions.id", ondelete="RESTRICT"), index=True
+    )
 
 
 class StoryGenerationRun(TimestampMixin, Base):
@@ -107,6 +110,9 @@ class StoryGenerationRun(TimestampMixin, Base):
         ForeignKey("stories.id", ondelete="RESTRICT"), index=True
     )
     story_version_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
+    source_experiment_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("experiment_sessions.id", ondelete="RESTRICT"), index=True
+    )
     request_key: Mapped[str | None] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(
         String(20), default=StoryGenerationStatus.PENDING, server_default="pending", nullable=False
@@ -175,6 +181,9 @@ class StoryVersion(TimestampMixin, Base):
     prompt_version: Mapped[str] = mapped_column(String(30), nullable=False)
     provider: Mapped[str] = mapped_column(String(60), nullable=False)
     model: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_experiment_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("experiment_sessions.id", ondelete="RESTRICT"), index=True
+    )
 
 
 class StoryKnowledgePoint(TimestampMixin, Base):

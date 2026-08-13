@@ -32,6 +32,7 @@ class LearningActivityType(StrEnum):
     RELEARNED = "relearned"
     PARENT_MARKED_SEEN = "parent_marked_seen"
     STORY_EXPOSURE = "story_exposure"
+    SCIENCE_EXPERIMENT_EXPOSURE = "science_experiment_exposure"
 
 
 class AssessmentOutcome(StrEnum):
@@ -86,7 +87,8 @@ class LearningRecord(TimestampMixin, Base):
             "session_id", "knowledge_point_id", name="uq_learning_record_session_point"
         ),
         CheckConstraint(
-            "activity_type IN ('introduced', 'relearned', 'parent_marked_seen', 'story_exposure')",
+            "activity_type IN ('introduced', 'relearned', 'parent_marked_seen', "
+            "'story_exposure', 'science_experiment_exposure')",
             name="ck_learning_records_activity_type",
         ),
     )

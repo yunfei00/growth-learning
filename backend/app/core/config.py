@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     minio_secret_key: SecretStr = SecretStr("")
     minio_bucket: str = "growth-learning"
     minio_secure: bool = False
+    science_image_max_bytes: int = 10 * 1024 * 1024
+    science_video_max_bytes: int = 50 * 1024 * 1024
+    science_audio_max_bytes: int = 20 * 1024 * 1024
 
     ai_provider: Literal["disabled", "openai_compatible"] = "disabled"
     ai_base_url: str = "https://api.openai.com/v1"

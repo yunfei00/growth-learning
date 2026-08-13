@@ -134,6 +134,7 @@ class AdminOverviewResponse(BaseModel):
     families: int
     children: int
     characters: int
+    science_experiments: int = 0
 
 
 class KnowledgeRelationCreate(BaseModel):
