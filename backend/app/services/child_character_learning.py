@@ -31,6 +31,10 @@ from app.schemas.learning import (
     TimelineItem,
 )
 from app.services.mastery import recompute_child_knowledge_state
+from app.services.review_planning import (
+    recompute_review_schedule,
+    update_daily_learning_progress,
+)
 
 
 def _state_response(
@@ -360,6 +364,8 @@ async def create_learning_session(
     await session.flush()
     for point_id in point_ids:
         await recompute_child_knowledge_state(session, child_id, point_id)
+        await recompute_review_schedule(session, child_id, point_id)
+    await update_daily_learning_progress(session, child_id, point_ids, now=now)
     await session.commit()
     return EvidenceSessionResponse(
         id=learning_session.id,
@@ -407,6 +413,7 @@ async def create_assessment_session(
     await session.flush()
     for point_id in point_ids:
         await recompute_child_knowledge_state(session, child_id, point_id)
+        await recompute_review_schedule(session, child_id, point_id)
     await session.commit()
     return EvidenceSessionResponse(
         id=assessment_session.id,

@@ -1,8 +1,9 @@
 """Child character learning, assessment, and mastery API schemas."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -145,3 +146,164 @@ class PriorityUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     is_priority: bool
+
+
+AssessmentSourceValue = Literal["quick_test", "daily_review", "weekly_check", "monthly_assessment"]
+PlanStatusValue = Literal["pending", "in_progress", "completed"]
+
+
+class LearningSettingsResponse(BaseModel):
+    max_new_characters_per_day: int
+    daily_review_capacity: int
+    weekly_assessment_enabled: bool
+    monthly_assessment_enabled: bool
+    timezone: str
+
+
+class LearningSettingsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    max_new_characters_per_day: int | None = Field(default=None, ge=0, le=20)
+    daily_review_capacity: int | None = Field(default=None, ge=1, le=100)
+    weekly_assessment_enabled: bool | None = None
+    monthly_assessment_enabled: bool | None = None
+    timezone: str | None = Field(default=None, min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def valid_timezone(self) -> "LearningSettingsUpdate":
+        if self.timezone is not None:
+            try:
+                ZoneInfo(self.timezone)
+            except ZoneInfoNotFoundError as error:
+                raise ValueError("Unknown IANA timezone") from error
+        return self
+
+
+class ReviewScheduleResponse(BaseModel):
+    knowledge_point_id: uuid.UUID
+    character: str
+    pinyin: str
+    last_review_at: datetime
+    next_review_at: datetime
+    interval_days: int
+    interval_stage: int
+    last_outcome: str
+    scheduling_reason: str
+    is_priority: bool
+    overdue_days: int
+    algorithm_version: str
+
+
+class ReviewBacklogResponse(BaseModel):
+    due_count: int
+    selected_count: int
+    capacity: int
+    estimated_days_to_clear: int
+    items: list[ReviewScheduleResponse]
+
+
+class DailyPlanItemResponse(BaseModel):
+    knowledge_point_id: uuid.UUID
+    character: str
+    pinyin: str
+    common_words: list[str]
+    simple_meaning: str | None
+    example_sentence: str | None
+    item_kind: Literal["new", "review"]
+    status: Literal["pending", "completed"]
+    position: int
+    selection_reason: str
+
+
+class DailyPlanResponse(BaseModel):
+    id: uuid.UUID
+    child_id: uuid.UUID
+    plan_date: date
+    timezone: str
+    recommended_new_count: int
+    review_count: int
+    due_count: int
+    estimated_backlog_days: int
+    recommendation_reason: str
+    new_completed_count: int
+    review_completed_count: int
+    status: PlanStatusValue
+    recent_independent_correct_rate: float | None
+    weekly_status: str
+    monthly_status: str
+    literacy_status: str
+    literacy_estimate: float | None
+    literacy_catalog_size: int
+    items: list[DailyPlanItemResponse]
+
+
+class AssessmentTargetResponse(BaseModel):
+    knowledge_point_id: uuid.UUID
+    character: str
+    pinyin: str
+    position: int
+    sampling_class: str
+    outcome: AssessmentOutcomeValue | None = None
+    response_time_ms: int | None = None
+
+
+class PlannedAssessmentResponse(BaseModel):
+    id: uuid.UUID
+    child_id: uuid.UUID
+    source: AssessmentSourceValue
+    status: SessionStatusValue
+    sampling_method: str
+    sampling_version: str
+    eligible_catalog_size: int
+    started_at: datetime
+    completed_at: datetime | None
+    total_items: int
+    completed_items: int
+    targets: list[AssessmentTargetResponse]
+
+
+class AssessmentBatchSubmit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[AssessmentItemInput] = Field(default_factory=list, max_length=100)
+    complete: bool = False
+
+    @model_validator(mode="after")
+    def unique_items(self) -> "AssessmentBatchSubmit":
+        ids = [item.knowledge_point_id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("A knowledge point can appear only once per submission")
+        if not self.items and not self.complete:
+            raise ValueError("Submit at least one item or complete the session")
+        return self
+
+
+class AssessmentHistoryEntry(BaseModel):
+    id: uuid.UUID
+    source: AssessmentSourceValue
+    status: SessionStatusValue
+    started_at: datetime
+    completed_at: datetime | None
+    item_count: int
+    correct: int
+    hinted_correct: int
+    uncertain: int
+    incorrect: int
+
+
+class LiteracyEstimateResponse(BaseModel):
+    id: uuid.UUID | None
+    assessment_session_id: uuid.UUID | None
+    catalog_size: int
+    sample_size: int
+    known_count: int
+    unknown_count: int
+    sampling_method: str | None
+    sampling_version: str | None
+    estimate: float | None
+    lower_bound: float | None
+    upper_bound: float | None
+    is_sufficient: bool
+    estimation_version: str
+    limitation: str
+    created_at: datetime | None

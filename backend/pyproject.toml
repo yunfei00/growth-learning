@@ -19,6 +19,7 @@ dependencies = [
   "pwdlib[argon2]==0.3.0",
   "redis==8.1.0",
   "sqlalchemy[asyncio]==2.0.51",
+  "tzdata==2026.3",
   "uvicorn[standard]==0.52.1",
 ]
 

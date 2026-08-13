@@ -22,6 +22,19 @@ from app.models.learning import (
     MasteryLevel,
     SessionStatus,
 )
+from app.models.review import (
+    AssessmentSessionPlan,
+    AssessmentSessionTarget,
+    AssessmentSource,
+    ChildLearningSettings,
+    ChildReviewSchedule,
+    DailyLearningPlan,
+    DailyPlanItem,
+    DailyPlanItemKind,
+    DailyPlanStatus,
+    LiteracyEstimate,
+    PlanItemStatus,
+)
 
 __all__ = [
     "Base",
@@ -46,4 +59,15 @@ __all__ = [
     "LearningSession",
     "MasteryLevel",
     "SessionStatus",
+    "AssessmentSessionPlan",
+    "AssessmentSessionTarget",
+    "AssessmentSource",
+    "ChildLearningSettings",
+    "ChildReviewSchedule",
+    "DailyLearningPlan",
+    "DailyPlanItem",
+    "DailyPlanItemKind",
+    "DailyPlanStatus",
+    "LiteracyEstimate",
+    "PlanItemStatus",
 ]
