@@ -14,6 +14,7 @@ class AICompletionRequest(BaseModel):
     messages: list[AIMessage] = Field(min_length=1)
     temperature: float = Field(default=0.2, ge=0, le=2)
     max_tokens: int = Field(default=800, gt=0)
+    json_response: bool = False
 
 
 class AICompletionResponse(BaseModel):

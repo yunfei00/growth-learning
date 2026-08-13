@@ -38,6 +38,8 @@ class OpenAICompatibleProvider:
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,
         }
+        if request.json_response:
+            payload["response_format"] = {"type": "json_object"}
         headers = {"Authorization": f"Bearer {self._api_key}"}
 
         try:

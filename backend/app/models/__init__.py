@@ -35,6 +35,23 @@ from app.models.review import (
     LiteracyEstimate,
     PlanItemStatus,
 )
+from app.models.story import (
+    DailyReadingStatus,
+    DailyReadingTask,
+    ReadingAnswer,
+    ReadingAnswerOutcome,
+    ReadingMode,
+    ReadingQuestion,
+    ReadingSession,
+    ReadingStatus,
+    Story,
+    StoryDifficulty,
+    StoryGenerationRun,
+    StoryGenerationStatus,
+    StoryKnowledgePoint,
+    StoryKnowledgeRole,
+    StoryVersion,
+)
 
 __all__ = [
     "Base",
@@ -70,4 +87,19 @@ __all__ = [
     "DailyPlanStatus",
     "LiteracyEstimate",
     "PlanItemStatus",
+    "DailyReadingStatus",
+    "DailyReadingTask",
+    "ReadingAnswer",
+    "ReadingAnswerOutcome",
+    "ReadingMode",
+    "ReadingQuestion",
+    "ReadingSession",
+    "ReadingStatus",
+    "Story",
+    "StoryDifficulty",
+    "StoryGenerationRun",
+    "StoryGenerationStatus",
+    "StoryKnowledgePoint",
+    "StoryKnowledgeRole",
+    "StoryVersion",
 ]

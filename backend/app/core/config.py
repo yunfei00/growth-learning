@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     ai_api_key: SecretStr = SecretStr("")
     ai_model: str = ""
     ai_timeout_seconds: float = 30.0
+    ai_story_max_attempts: int = 3
 
     @property
     def cors_origin_list(self) -> list[str]:
