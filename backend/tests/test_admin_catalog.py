@@ -153,6 +153,7 @@ async def test_system_admin_allowed_but_has_no_implicit_family_access(
             "families": 1,
             "children": 1,
             "characters": 0,
+            "science_experiments": 0,
         }
         assert (await admin.get(f"/api/v1/children/{child.json()['id']}")).status_code == 404
         assert (await admin.get(f"/api/v1/families/{family.json()['id']}")).status_code == 404

@@ -1,11 +1,11 @@
 # Growth Learning
 
-Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 6 在真实字符掌握证据之上生成、校验并保存适合当前孩子阅读的故事，同时保留可恢复阅读会话、理解题和长期故事书。
+Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 7 把周末线下科学探索纳入同一真实证据体系：版本化实验、家庭材料、孩子原话、私有媒体、成长卡和受掌握度约束的实验故事。
 
 ## 当前用户流程
 
 ```text
-注册 → 登录 → 创建家庭 → 添加孩子 → 今日识字/复习 → 生成适读故事 → 阅读理解 → 我的故事书
+注册 → 登录 → 创建家庭 → 添加孩子 → 今日识字/复习 → 适读故事 → 周末科学实验 → 长期成长证据
 ```
 
 再次登录后，应用通过 HttpOnly Cookie 获取当前用户，从 PostgreSQL 加载家庭和孩子。家长首页的识字数字来自真实 LearningRecord、AssessmentItem 与 ChildKnowledgeState，不展示虚构统计。
@@ -36,6 +36,7 @@ Set-Location ..
 | Admin | <http://localhost:3000/admin> |
 | Character Learning | <http://localhost:3000/learn/characters> |
 | My Storybook | <http://localhost:3000/read> |
+| Weekend Science Lab | <http://localhost:3000/science> |
 | Backend health | <http://localhost:8000/health> |
 | Backend OpenAPI | <http://localhost:8000/docs> |
 
@@ -66,13 +67,14 @@ docker compose exec backend python -m app.cli.admin promote-admin \
 docker compose exec backend python -m app.cli.admin set-password \
   --email admin@example.com
 docker compose exec backend python -m app.cli.characters import-starter
+docker compose exec backend python -m app.cli.science import-starter
 docker compose exec backend python -m app.cli.mastery
 docker compose exec backend python -m app.cli.mastery --child-id CHILD_UUID
 docker compose exec backend python -m app.cli.review
 docker compose exec backend python -m app.cli.review --child-id CHILD_UUID
 ```
 
-`create-admin` 可重复执行且不会重复创建账户；已有普通账户必须显式执行 `promote-admin`。项目自有 Starter 数据位于 `backend/data/chinese_characters_v1.json`，不宣称官方标准、教材清单或精确字频。
+`create-admin` 可重复执行且不会重复创建账户；已有普通账户必须显式执行 `promote-admin`。项目自有 Starter 数据位于 `backend/data/chinese_characters_v1.json` 和 `backend/data/science_experiments_v1.json`；科学数据是项目自编的家庭实验起始集，不复制商业课程，也不宣称官方标准。
 
 ## AI 故事运行时配置
 
@@ -119,6 +121,7 @@ gl-update
 → 启动/确认 PostgreSQL、Redis、MinIO healthy
 → alembic upgrade head
 → alembic current
+→ 幂等导入 Starter 科学实验
 → 从原始证据重算 Review V1 日程
 → 更新 backend/frontend
 → 容器与 HTTP health check
@@ -141,6 +144,7 @@ gl-update
 - [路线图](docs/ROADMAP.md)
 - [Phase 5 复习与识字估算算法](docs/REVIEW_AND_LITERACY_ALGORITHMS.md)
 - [Phase 6 AI 故事与汉字覆盖策略](docs/AI_STORY_POLICY.md)
+- [Phase 7 科学实验数据与隐私边界](docs/DATA_MODEL.md#phase-7-周末科学实验室)
 
 ## 安全边界
 
@@ -151,6 +155,8 @@ gl-update
 - 家庭 `admin` 与 `companion` 都能陪孩子学习/测评；只有家庭 `admin` 能修改优先学习标记。
 - 学习与测评事实只追加；Mastery V1 可重算且不会删除原始证据。
 - 读完故事只追加 `story_exposure`，绝不伪造认字 `correct` 测评证据。
+- 完成科学实验只追加 `science_experiment_exposure`；孩子原话不可覆盖，行为标签不生成数值分数。
+- 实验媒体存于私有 MinIO，并由家庭鉴权 API 流式读取；对象键不含儿童姓名。
 - 发给 AI 的数据仅限年龄段、主题、难度、允许字和目标字；不发送姓名、生日、家庭、邮箱、照片或成长笔记。
 - `system_role=admin` 只授予平台知识管理权限，不自动取得任何家庭或孩子资料。
 - 所有 `/api/v1/admin/*` 在后端统一校验系统管理员角色；普通/家庭管理员均返回 `403`。

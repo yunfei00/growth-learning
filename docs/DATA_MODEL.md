@@ -1,6 +1,6 @@
 # Growth Learning 数据模型
 
-本文记录已落地的数据模型与后续边界。Phase 6 在身份、家庭、知识目录和孩子原始证据之上加入不可变故事版本、生成审计、可恢复阅读会话与理解题；不包含开放式聊天、教师或其他学科业务表。
+本文记录已落地的数据模型与后续边界。Phase 7 在既有学习与阅读证据之上加入版本化科学实验目录、家庭材料、可恢复实验会话、孩子原话和私有媒体；不包含能力分数、教师或开放式聊天。
 
 ## 通用约定
 
@@ -195,3 +195,13 @@ Phase 5 新增表的每条业务外键均显式使用 `ON DELETE RESTRICT`。派
 每个 Phase 5 DailyLearningPlan 最多一条阅读任务，状态为 `needs_story`、`pending`、`in_progress` 或 `completed`。它引用当时实际阅读的 StoryVersion/ReadingSession，使刷新、退出和重新登录后可继续。
 
 上述全部孩子、用户、知识、计划、故事和阅读业务外键均为 `ON DELETE RESTRICT`。系统管理员没有跳过 `FamilyMember` 的故事读取权限。
+
+## Phase 7 周末科学实验室
+
+`science_experiments` 保存可搜索、可启用/归档的模板身份；每次内容变化写入新的 `science_experiment_versions.snapshot`，既有实验会话永远引用当时版本。`experiment_materials` 是可复用材料目录，`experiment_material_requirements` 保存必需/可选、数量和替代建议；`family_materials` 是家庭隔离的常备材料清单。
+
+`experiment_sessions` 以孩子和家庭成员为边界，保存 `planned`、`in_progress`、`completed`、`abandoned`、当前步骤和完整模板快照。`experiment_evidence` 只追加预测、观察、孩子总结、提问及孩子原话；`capability_tags` 是非评分行为标签，不能保存数值能力分。原始文本没有更新/删除 API，任何未来 AI 派生内容只能写入独立 derived 字段，不能覆盖原话。
+
+`experiment_media_assets` 只保存私有 MinIO 对象元数据。对象键使用 UUID，不包含姓名；读取必须重新通过孩子家庭鉴权，不返回公共 bucket URL。实验完成最多创建一组 `science_experiment_exposure` LearningRecord，不创建 AssessmentItem，也不推断孩子已经认识关联汉字。
+
+`stories`、`story_generation_runs`、`story_versions` 可选引用 `source_experiment_session_id`。实验故事 Prompt 仅接收实验模板标题、引导问题和预期现象，不发送孩子原话、媒体、姓名、家庭或家长备注。所有新增业务外键均显式 `ON DELETE RESTRICT`。

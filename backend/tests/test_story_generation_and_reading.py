@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from datetime import date
 
 import httpx
 import pytest
@@ -17,6 +18,7 @@ from app.models import (
     Child,
     ChildKnowledgeState,
     DailyReadingTask,
+    ExperimentSession,
     FamilyMember,
     FamilyRole,
     LearningActivityType,
@@ -175,6 +177,19 @@ async def test_fake_provider_repair_then_success_and_snapshot_immutability(
     provider = FakeAIProvider([invalid_story_json(), valid_story_json(CATALOG[:-2], CATALOG[-2:])])
 
     async with session_factory() as session:
+        experiment_session = ExperimentSession(
+            child_id=uuid.UUID(child_payload["id"]),
+            experiment_id=uuid.uuid4(),
+            experiment_version_id=uuid.uuid4(),
+            experiment_snapshot={"title": "纸桥实验"},
+            accompanying_user_id=uuid.UUID(user["id"]),
+            status="completed",
+            current_step="complete",
+            local_date=date(2026, 8, 13),
+            timezone="Asia/Shanghai",
+        )
+        session.add(experiment_session)
+        await session.flush()
         run, version = await generate_story(
             session,
             child=child,
@@ -188,10 +203,18 @@ async def test_fake_provider_repair_then_success_and_snapshot_immutability(
             provider=provider,
             provider_name="fake",
             configured_model="deterministic-test-model",
+            source_experiment_session_id=experiment_session.id,
+            experience_context={
+                "template_title": "纸桥实验",
+                "guiding_question": "纸怎样托起积木？",
+                "expected_phenomenon": "折纸更稳",
+            },
         )
         assert run.attempt_count == 2
         assert version.actual_usable_known_coverage == 0.9
         assert version.actual_target_coverage == 0.1
+        assert version.source_experiment_session_id == experiment_session.id
+        assert run.source_experiment_session_id == experiment_session.id
         snapshot_before = version.mastery_snapshot
         title_before = version.title
         version_id = version.id
@@ -203,6 +226,8 @@ async def test_fake_provider_repair_then_success_and_snapshot_immutability(
     assert child_payload["display_name"] not in prompt
     assert "story-pipeline@example.com" not in prompt
     assert "birth_date" not in prompt
+    assert "纸桥实验" in prompt
+    assert "孩子的私密原话" not in prompt
 
     async with session_factory() as session:
         state = await session.scalar(

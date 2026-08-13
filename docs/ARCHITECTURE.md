@@ -176,3 +176,18 @@ ChildKnowledgeState
 覆盖分析、资格判断、目标选择和学习证据都属于应用服务，不交给 LLM。Provider 只接收年龄段、主题、难度、可用字符和目标字符；不接收孩子姓名/生日、家庭、邮箱、照片或成长笔记。GenerationRun 记录 Provider/Model/版本/延迟和失败类别，不记录 secret 或原始私密 payload。
 
 StoryVersion 与掌握快照是不可变审计材料。当前掌握状态后来变化不会回写旧故事；阅读完成也不会生成 AssessmentItem。`daily_reading_tasks` 只把 Phase 6 阅读状态连入 Phase 5 计划，不重写 Phase 5 算法。
+
+## 14. Phase 7 线下科学证据闭环
+
+```text
+Versioned ScienceExperiment + household materials
+  → deterministic child recommendation
+  → resumable ExperimentSession (immutable template snapshot)
+  → append-only prediction / observation / child words
+  → private MinIO media streamed through household authorization
+  → completion creates exposure only (never AssessmentItem.correct)
+  → Growth Card
+  → optional mastery-aware StoryVersion linked to the actual session
+```
+
+科学模块保持模块化单体事务：模板、版本、材料、证据和媒体元数据在 PostgreSQL，二进制对象在私有 MinIO。媒体不能依赖可分享的永久 URL；每次读取都重新检查 `FamilyMember`。实验转故事复用 Phase 6 的结构化 Provider、有限重试和程序覆盖率分析，并采用数据最小化上下文。

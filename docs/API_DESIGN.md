@@ -60,6 +60,25 @@
 
 导入响应包含 `created`、`updated`、`skipped`、`errors`。重复导入不会创建重复汉字或关系。
 
+### Weekend Science Lab
+
+| Method | Path | 权限与说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/science/experiments` | 已登录；只读 enabled 系统模板，支持搜索/难度/分页 |
+| `GET` | `/api/v1/science/experiments/{id}` | 已登录；模板详情与材料、安全、家长解释 |
+| `GET/PUT` | `/api/v1/families/{family_id}/science/materials` | 家庭成员读；仅家庭 admin 写 |
+| `GET` | `/api/v1/children/{child_id}/science/recommendations` | 按年龄、家中材料、近 60 天历史和难度确定性排序 |
+| `POST/GET` | `/api/v1/children/{child_id}/experiment-sessions` | 家庭 admin/companion 开始、恢复和查看历史 |
+| `GET/PATCH` | `/api/v1/children/{child_id}/experiment-sessions/{id}` | 家庭成员；已完成/放弃会话不可修改 |
+| `POST` | `.../{id}/evidence` | 追加孩子预测、观察、提问、原话与非评分标签 |
+| `POST/GET` | `.../{id}/media` / `.../media/{media_id}/content` | 鉴权上传并流式读取私有图片/视频/语音 |
+| `POST` | `.../{id}/complete` | 幂等完成，只产生 science exposure |
+| `GET` | `.../{id}/growth-card` | 返回可读成长卡，不返回能力分数 |
+| `POST` | `.../{id}/generate-story` | 家庭 admin；完成实验后复用 Phase 6 覆盖分析 |
+| `GET/POST/PATCH` | `/api/v1/admin/science/*` | system admin 管理、版本化、归档和幂等 Starter 导入 |
+
+系统管理员不自动拥有家庭实验、证据、媒体或故事权限；跨家庭统一返回 `404`。媒体 MIME 和大小在服务端验证，MinIO 不暴露公网端口。
+
 ### Character read API
 
 | Method | Path | 权限 |
