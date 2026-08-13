@@ -275,9 +275,9 @@ def _review_sort_key(
         AssessmentOutcome.HINTED_CORRECT: 1,
     }.get(schedule.last_outcome, 0)
     return (
+        -overdue_seconds,
         -int(state.is_priority if state else False),
         -risk,
-        -overdue_seconds,
         _utc(schedule.next_review_at),
         character.character,
     )

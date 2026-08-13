@@ -172,9 +172,14 @@ async def test_daily_plan_is_idempotent_capacity_limited_and_priority_ordered(
     async with session_factory() as session:
         schedules = list((await session.scalars(select(ChildReviewSchedule))).all())
         assert len(schedules) == 6
-        records = list((await session.scalars(select(LearningRecord))).all())
-        for index, record in enumerate(records):
-            record.learned_at = datetime.now(UTC) - timedelta(days=index + 2)
+        records = {
+            str(record.knowledge_point_id): record
+            for record in (await session.scalars(select(LearningRecord))).all()
+        }
+        offsets = [6, 6, 5, 4, 3, 7]
+        evidence_now = datetime.now(UTC)
+        for point_id, days_ago in zip(point_ids[:6], offsets, strict=True):
+            records[point_id].learned_at = evidence_now - timedelta(days=days_ago)
         priority = await session.scalar(
             select(ChildKnowledgeState).where(
                 ChildKnowledgeState.knowledge_point_id == uuid.UUID(point_ids[0])
@@ -194,7 +199,11 @@ async def test_daily_plan_is_idempotent_capacity_limited_and_priority_ordered(
     assert first.json()["estimated_backlog_days"] == 2
     assert first.json()["recommended_new_count"] == 0
     review_items = [item for item in first.json()["items"] if item["item_kind"] == "review"]
-    assert review_items[0]["knowledge_point_id"] == point_ids[0]
+    assert [item["knowledge_point_id"] for item in review_items] == [
+        point_ids[5],
+        point_ids[0],
+        point_ids[1],
+    ]
 
     async with session_factory() as session:
         priority = await session.scalar(
