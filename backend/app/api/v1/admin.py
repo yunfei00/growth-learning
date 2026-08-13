@@ -13,6 +13,7 @@ from app.models import (
     Family,
     KnowledgePoint,
     KnowledgeRelation,
+    ScienceExperiment,
     User,
 )
 from app.schemas.knowledge import (
@@ -52,6 +53,9 @@ async def get_overview(session: DbSession) -> AdminOverviewResponse:
         children=int(await session.scalar(select(func.count()).select_from(Child)) or 0),
         characters=int(
             await session.scalar(select(func.count()).select_from(ChineseCharacter)) or 0
+        ),
+        science_experiments=int(
+            await session.scalar(select(func.count()).select_from(ScienceExperiment)) or 0
         ),
     )
 

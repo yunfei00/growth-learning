@@ -86,6 +86,7 @@ async def story_version_response(
     return StoryVersionResponse(
         id=version.id,
         story_id=story.id,
+        source_experiment_session_id=version.source_experiment_session_id,
         version_number=version.version_number,
         title=version.title,
         paragraphs=version.paragraphs,

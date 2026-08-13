@@ -342,6 +342,7 @@ def _prompt(
     known: set[str],
     recognizing: set[str],
     targets: list[SnapshotCharacter],
+    experience_context: dict[str, str] | None = None,
     repair_reasons: tuple[str, ...] = (),
 ) -> AICompletionRequest:
     profile = PROFILES[difficulty]
@@ -360,6 +361,7 @@ def _prompt(
         "strong_known_characters": "".join(sorted(known)),
         "recognizing_usable_characters": "".join(sorted(recognizing)),
         "required_target_characters": [item.character for item in targets],
+        "completed_science_experience": experience_context,
         "requirements": [
             "目标字必须在自然完整的情节中出现",
             "内容温暖、安全、适合年龄段，禁止成人、暴力、自伤、毒品和赌博内容",
@@ -416,6 +418,8 @@ async def generate_story(
     configured_model: str,
     max_attempts: int = 3,
     now: datetime | None = None,
+    source_experiment_session_id: uuid.UUID | None = None,
+    experience_context: dict[str, str] | None = None,
 ) -> tuple[StoryGenerationRun, StoryVersion]:
     theme, custom_theme = validate_theme(payload.theme, payload.custom_theme)
     snapshot = await build_mastery_snapshot(session, child.id, now=now)
@@ -458,6 +462,7 @@ async def generate_story(
         provider=provider_name,
         model=configured_model,
         prompt_version=PROMPT_VERSION,
+        source_experiment_session_id=source_experiment_session_id,
     )
     session.add(run)
     await session.flush()
@@ -477,6 +482,7 @@ async def generate_story(
                     known=strong,
                     recognizing=recognizing,
                     targets=targets,
+                    experience_context=experience_context,
                     repair_reasons=last_reasons,
                 )
             )
@@ -517,6 +523,7 @@ async def generate_story(
                 created_by_user_id=requested_by_user_id,
                 theme=theme,
                 custom_theme=custom_theme,
+                source_experiment_session_id=source_experiment_session_id,
             )
             session.add(story)
             await session.flush()
@@ -559,6 +566,7 @@ async def generate_story(
             prompt_version=PROMPT_VERSION,
             provider=response.provider,
             model=response.model,
+            source_experiment_session_id=source_experiment_session_id,
         )
         session.add(version)
         await session.flush()

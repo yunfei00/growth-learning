@@ -109,6 +109,7 @@ class CharacterGlossaryResponse(BaseModel):
 class StoryVersionResponse(BaseModel):
     id: uuid.UUID
     story_id: uuid.UUID
+    source_experiment_session_id: uuid.UUID | None
     version_number: int
     title: str
     paragraphs: list[str]
