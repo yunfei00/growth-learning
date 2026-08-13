@@ -1,6 +1,6 @@
 # Growth Learning 数据模型
 
-本文记录已落地的数据模型与后续边界。Phase 5 在身份、家庭、系统知识目录和孩子原始学习证据之上，加入可重算复习日程、每日计划、周期测评抽样和字库范围识字估算；不包含 AI 故事或教师业务表。
+本文记录已落地的数据模型与后续边界。Phase 6 在身份、家庭、知识目录和孩子原始证据之上加入不可变故事版本、生成审计、可恢复阅读会话与理解题；不包含开放式聊天、教师或其他学科业务表。
 
 ## 通用约定
 
@@ -136,7 +136,7 @@ Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/�
 
 ### `learning_sessions` / `learning_records`
 
-`learning_sessions` 保存一次有边界的学习活动，包含孩子、执行成年人、来源、开始/结束时间以及 `in_progress`、`completed`、`abandoned` 状态。`learning_records` 以 `(session_id, knowledge_point_id)` 唯一，保存 `introduced`、`relearned` 或 `parent_marked_seen` 原始事实。记录只追加，不提供更新或删除 API。
+`learning_sessions` 保存一次有边界的学习活动，包含孩子、执行成年人、来源、开始/结束时间以及 `in_progress`、`completed`、`abandoned` 状态。`learning_records` 以 `(session_id, knowledge_point_id)` 唯一，保存 `introduced`、`relearned`、`parent_marked_seen` 或 `story_exposure` 原始事实。`story_exposure` 只表示在故事中接触，不能等价为认识。记录只追加，不提供更新或删除 API。
 
 ### `assessment_sessions` / `assessment_items`
 
@@ -173,3 +173,25 @@ Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/�
 每个已完成月度检测最多产生一条字库范围估算，保存当时字库大小、样本量、独立认识/未知数量、抽样方法与版本、点估计、上下界、数据是否充分和 `literacy-v1`。它不表示孩子全部汉字识字量；样本不足时估算字段保持 `NULL`。
 
 Phase 5 新增表的每条业务外键均显式使用 `ON DELETE RESTRICT`。派生数据可重建不代表可以通过账户或孩子删除操作级联清除；原始证据与审计关系始终优先保护。完整规则见 [Phase 5 算法](REVIEW_AND_LITERACY_ALGORITHMS.md)。
+
+## Phase 6 故事与阅读数据
+
+### `stories` / `story_versions`
+
+`stories` 是孩子私有的故事身份；`story_versions` 保存永不覆盖的具体标题、段落、主题、难度、问题、实际覆盖率和生成版本。重新生成创建 Version 2，孩子读过的 Version 1 仍可原样回看。版本保存 `snapshot_at`、已知/可用/目标知识点及当时掌握级别、策略/分析器/Prompt 版本、Provider/Model 和实际指标。
+
+### `story_generation_runs` / `story_knowledge_points`
+
+生成运行保存状态、有限尝试次数、幂等 request key、延迟、非敏感失败分类及可用 token 数；绝不保存 API key。字符使用表按版本保存 `strong_known`、`usable_recognizing`、`target`、`unexpected` 角色、出现次数和生成时掌握度。字库外陌生字仍保留在 Version JSON 指标，不伪造知识点。
+
+### `reading_questions` / `reading_sessions` / `reading_answers`
+
+理解题与故事版本绑定，保存选项和标准选项。`reading_sessions` 以 `(child_id, story_version_id)` 唯一，保存 `independent`/`with_help`、开始/完成时间、可靠时长和可选家长备注，重复开始返回同一会话。答案按会话/问题唯一，支持 `correct`、`with_help`、`partial`、`incorrect`，不写入汉字识别 AssessmentItem。
+
+阅读完成后只针对目标字创建一个 `story_reading` LearningSession 和追加式 `story_exposure` LearningRecord；完成接口幂等，重复调用不产生重复证据。
+
+### `daily_reading_tasks`
+
+每个 Phase 5 DailyLearningPlan 最多一条阅读任务，状态为 `needs_story`、`pending`、`in_progress` 或 `completed`。它引用当时实际阅读的 StoryVersion/ReadingSession，使刷新、退出和重新登录后可继续。
+
+上述全部孩子、用户、知识、计划、故事和阅读业务外键均为 `ON DELETE RESTRICT`。系统管理员没有跳过 `FamilyMember` 的故事读取权限。

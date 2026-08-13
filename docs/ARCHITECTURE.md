@@ -93,7 +93,7 @@ Mastery V1 是纯确定性服务，不调用 LLM。API 写入一批学习或测�
 - 输入采用消息、温度、最大输出和可选结构化输出约束。
 - 返回统一的文本、供应商、模型、用量和结束原因。
 - `OpenAICompatibleProvider` 通过 `base_url`、`api_key` 和 `model` 支持 OpenAI、DeepSeek、Qwen/DashScope 或本地兼容服务。
-- Phase 1 提供禁用实现和接口验证，不发送真实请求。
+- 默认提供禁用实现；Phase 6 由 OpenAI-compatible 适配器请求严格 JSON，CI 只使用确定性 Fake Provider。
 - 提示模板、规则和模型版本必须可记录；面向孩子的输出需经过确定性内容规则和必要的家长确认。
 
 ## 7. API 与前端
@@ -157,3 +157,22 @@ LearningRecord / AssessmentItem（权威、追加式）
 每日计划以孩子设置的 IANA 时区确定本地日期；UTC 只作为持久化时间基准。题目选择会持久化，因此恢复会话不依赖缓存或浏览器状态。Redis 不是正确性的来源。
 
 算法版本分别记录为 `review-v1`、`plan-v1`、`sampling-v1` 和 `literacy-v1`。部署迁移后运行 `python -m app.cli.review`，为既有 Phase 4 证据安全回填日程；该过程不修改原始证据。详细规则及限制见 [Phase 5 算法](REVIEW_AND_LITERACY_ALGORITHMS.md)。
+
+## 13. Phase 6 受控故事生成与阅读证据
+
+```text
+ChildKnowledgeState
+  → immutable mastery snapshot
+  → deterministic target selection + difficulty policy
+  → structured provider JSON
+  → Pydantic validation
+  → Han Coverage Analyzer V1
+  → accept / finite repair (max 3) / safe failure
+  → StoryVersion + questions + generation audit
+  → resumable ReadingSession
+  → comprehension answers + story_exposure only
+```
+
+覆盖分析、资格判断、目标选择和学习证据都属于应用服务，不交给 LLM。Provider 只接收年龄段、主题、难度、可用字符和目标字符；不接收孩子姓名/生日、家庭、邮箱、照片或成长笔记。GenerationRun 记录 Provider/Model/版本/延迟和失败类别，不记录 secret 或原始私密 payload。
+
+StoryVersion 与掌握快照是不可变审计材料。当前掌握状态后来变化不会回写旧故事；阅读完成也不会生成 AssessmentItem。`daily_reading_tasks` 只把 Phase 6 阅读状态连入 Phase 5 计划，不重写 Phase 5 算法。

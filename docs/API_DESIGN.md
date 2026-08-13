@@ -108,6 +108,23 @@
 
 `daily_review`、`weekly_check`、`monthly_assessment` 是 `AssessmentSession.source`，不会建立并行的答案表。抽样题目和分层由 `AssessmentSessionTarget` 固定，月测中的 `unseen_not_system_taught` 明确表示系统此前没有正式教过该字。
 
+### Mastery-aware stories and reading
+
+所有端点首先验证孩子所属家庭；跨家庭及仅有 `system_role=admin` 的用户返回 `404`。家庭 `admin` 可生成，`admin`/`companion` 均可阅读、回答和完成会话。
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/children/{child_id}/reading-context` | 年龄段、强掌握/可用字数量、确定性目标候选、推荐难度、Provider 状态 |
+| `POST` | `/api/v1/children/{child_id}/stories/generate` | 家庭 `admin` 结构化生成；有限 repair/retry；支持幂等 `request_key` |
+| `GET` | `/api/v1/children/{child_id}/stories` | 孩子的不可变版本故事书，支持标题搜索、难度过滤和分页 |
+| `GET` | `/api/v1/children/{child_id}/story-versions/{version_id}` | 当时真实版本、实际覆盖率、问题与字库释义 |
+| `POST` | `/api/v1/children/{child_id}/story-versions/{version_id}/reading/start` | 开始或恢复唯一阅读会话 |
+| `POST` | `/api/v1/children/{child_id}/reading-sessions/{session_id}/answers` | 批量保存 2–3 道理解题答案 |
+| `POST` | `/api/v1/children/{child_id}/reading-sessions/{session_id}/complete` | 幂等完成并追加目标字 story exposure |
+| `GET` | `/api/v1/children/{child_id}/reading-summary` | 近 7 天真实阅读/陪读/理解题与接触计数 |
+
+Provider 未配置时 context 返回 `provider_configured=false`，生成返回 `503 AI 服务尚未配置`；不会暴露缺失 key、Provider 原始错误或堆栈。故事响应的 coverage 均由应用分析器计算，不采信模型自报值。
+
 ## 错误约定
 
 - `400/422`：请求内容无效。
