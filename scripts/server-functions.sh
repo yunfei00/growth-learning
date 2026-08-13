@@ -44,3 +44,9 @@ gl-update() (
   git pull --ff-only origin main
   bash scripts/server-deploy.sh
 )
+
+gl-backup() (
+  set -Eeuo pipefail
+  cd "$(_growth_learning_dir)"
+  bash scripts/server-backup.sh
+)

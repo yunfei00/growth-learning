@@ -130,6 +130,9 @@ jobs:
                   "family_materials", "experiment_knowledge_points",
                   "experiment_sessions", "experiment_evidence",
                   "experiment_media_assets",
+                  "growth_events", "growth_media_assets",
+                  "growth_reports", "growth_report_versions",
+                  "growth_books", "growth_book_versions", "export_jobs",
               }
               missing = required - tables
               if missing:
