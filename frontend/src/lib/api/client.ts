@@ -179,6 +179,113 @@ export type EvidenceSession = {
   created_at: string;
 };
 
+export type LearningSettings = {
+  max_new_characters_per_day: number;
+  daily_review_capacity: number;
+  weekly_assessment_enabled: boolean;
+  monthly_assessment_enabled: boolean;
+  timezone: string;
+};
+
+export type DailyPlanItem = {
+  knowledge_point_id: string;
+  character: string;
+  pinyin: string;
+  common_words: string[];
+  simple_meaning: string | null;
+  example_sentence: string | null;
+  item_kind: "new" | "review";
+  status: "pending" | "completed";
+  position: number;
+  selection_reason: string;
+};
+
+export type DailyPlan = {
+  id: string;
+  child_id: string;
+  plan_date: string;
+  timezone: string;
+  recommended_new_count: number;
+  review_count: number;
+  due_count: number;
+  estimated_backlog_days: number;
+  recommendation_reason: string;
+  new_completed_count: number;
+  review_completed_count: number;
+  status: "pending" | "in_progress" | "completed";
+  recent_independent_correct_rate: number | null;
+  weekly_status: string;
+  monthly_status: string;
+  literacy_status: string;
+  literacy_estimate: number | null;
+  literacy_catalog_size: number;
+  items: DailyPlanItem[];
+};
+
+export type AssessmentSource =
+  | "quick_test"
+  | "daily_review"
+  | "weekly_check"
+  | "monthly_assessment";
+
+export type AssessmentOutcome = "correct" | "hinted_correct" | "uncertain" | "incorrect";
+
+export type AssessmentTarget = {
+  knowledge_point_id: string;
+  character: string;
+  pinyin: string;
+  position: number;
+  sampling_class: string;
+  outcome: AssessmentOutcome | null;
+  response_time_ms: number | null;
+};
+
+export type PlannedAssessment = {
+  id: string;
+  child_id: string;
+  source: AssessmentSource;
+  status: "in_progress" | "completed" | "abandoned";
+  sampling_method: string;
+  sampling_version: string;
+  eligible_catalog_size: number;
+  started_at: string;
+  completed_at: string | null;
+  total_items: number;
+  completed_items: number;
+  targets: AssessmentTarget[];
+};
+
+export type AssessmentHistoryEntry = {
+  id: string;
+  source: AssessmentSource;
+  status: "in_progress" | "completed" | "abandoned";
+  started_at: string;
+  completed_at: string | null;
+  item_count: number;
+  correct: number;
+  hinted_correct: number;
+  uncertain: number;
+  incorrect: number;
+};
+
+export type LiteracyEstimate = {
+  id: string | null;
+  assessment_session_id: string | null;
+  catalog_size: number;
+  sample_size: number;
+  known_count: number;
+  unknown_count: number;
+  sampling_method: string | null;
+  sampling_version: string | null;
+  estimate: number | null;
+  lower_bound: number | null;
+  upper_bound: number | null;
+  is_sufficient: boolean;
+  estimation_version: string;
+  limitation: string;
+  created_at: string | null;
+};
+
 type ErrorPayload = {
   detail?: string | Array<{ msg?: string }>;
 };
@@ -454,4 +561,72 @@ export function updateCharacterPriority(
     `/api/v1/children/${childId}/characters/${knowledgePointId}/priority`,
     { method: "PATCH", body: jsonBody({ is_priority: isPriority }) },
   );
+}
+
+export function getLearningSettings(childId: string): Promise<LearningSettings> {
+  return request<LearningSettings>(`/api/v1/children/${childId}/learning-settings`);
+}
+
+export function updateLearningSettings(
+  childId: string,
+  payload: Partial<LearningSettings>,
+): Promise<LearningSettings> {
+  return request<LearningSettings>(`/api/v1/children/${childId}/learning-settings`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function getTodayPlan(childId: string): Promise<DailyPlan> {
+  return request<DailyPlan>(`/api/v1/children/${childId}/today`);
+}
+
+export function startPlannedAssessment(
+  childId: string,
+  source: "daily_review" | "weekly_check" | "monthly_assessment",
+): Promise<PlannedAssessment> {
+  const route = {
+    daily_review: "reviews",
+    weekly_check: "weekly-check",
+    monthly_assessment: "monthly-assessment",
+  }[source];
+  return request<PlannedAssessment>(`/api/v1/children/${childId}/${route}/start`, {
+    method: "POST",
+  });
+}
+
+export function getPlannedAssessment(
+  childId: string,
+  sessionId: string,
+): Promise<PlannedAssessment> {
+  return request<PlannedAssessment>(
+    `/api/v1/children/${childId}/planned-assessments/${sessionId}`,
+  );
+}
+
+export function submitPlannedAssessment(
+  childId: string,
+  sessionId: string,
+  payload: {
+    items: Array<{
+      knowledge_point_id: string;
+      outcome: AssessmentOutcome;
+      response_time_ms: number;
+      hint_used?: boolean;
+    }>;
+    complete?: boolean;
+  },
+): Promise<PlannedAssessment> {
+  return request<PlannedAssessment>(
+    `/api/v1/children/${childId}/planned-assessments/${sessionId}/items`,
+    { method: "POST", body: jsonBody(payload) },
+  );
+}
+
+export function getAssessmentHistory(childId: string): Promise<AssessmentHistoryEntry[]> {
+  return request<AssessmentHistoryEntry[]>(`/api/v1/children/${childId}/assessment-history`);
+}
+
+export function getLiteracyEstimate(childId: string): Promise<LiteracyEstimate> {
+  return request<LiteracyEstimate>(`/api/v1/children/${childId}/literacy-estimate`);
 }

@@ -10,7 +10,9 @@ import { ProtectedPage } from "@/components/protected-page";
 import {
   ApiClientError,
   type CharacterMasterySummary,
+  type DailyPlan,
   getCharacterMasterySummary,
+  getTodayPlan,
 } from "@/lib/api/client";
 
 function formatAge(birthDate: string): string {
@@ -26,6 +28,13 @@ function formatAge(birthDate: string): string {
   return remainingMonths === 0 ? `${years}岁` : `${years}岁${remainingMonths}个月`;
 }
 
+const PERIOD_LABELS: Record<string, string> = {
+  pending: "待完成",
+  in_progress: "进行中",
+  completed: "已完成",
+  disabled: "未开启",
+};
+
 function ParentHomeContent() {
   const router = useRouter();
   const {
@@ -38,7 +47,8 @@ function ParentHomeContent() {
     refresh,
   } = useActiveChild();
   const [summary, setSummary] = useState<CharacterMasterySummary | null>(null);
-  const [summaryError, setSummaryError] = useState("");
+  const [plan, setPlan] = useState<DailyPlan | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (status === "ready" && (!family || !activeChild)) router.replace("/onboarding");
@@ -47,19 +57,20 @@ function ParentHomeContent() {
   useEffect(() => {
     if (!activeChild) return;
     let cancelled = false;
-    getCharacterMasterySummary(activeChild.id)
-      .then((value) => {
+    Promise.all([getCharacterMasterySummary(activeChild.id), getTodayPlan(activeChild.id)])
+      .then(([summaryValue, planValue]) => {
         if (!cancelled) {
-          setSummary(value);
-          setSummaryError("");
+          setSummary(summaryValue);
+          setPlan(planValue);
+          setError("");
         }
       })
       .catch((requestError: unknown) => {
         if (!cancelled) {
-          setSummaryError(
+          setError(
             requestError instanceof ApiClientError
               ? requestError.message
-              : "暂时无法加载识字进度",
+              : "暂时无法加载今天的学习计划",
           );
         }
       });
@@ -76,7 +87,6 @@ function ParentHomeContent() {
       </section>
     );
   }
-
   if (status === "error") {
     return (
       <section className="center-state section-shell">
@@ -88,25 +98,20 @@ function ParentHomeContent() {
       </section>
     );
   }
-
-  if (!family || !activeChild) {
-    return (
-      <section className="center-state section-shell">
-        <span className="loading-spinner" aria-hidden="true" />
-        <p>正在前往家庭设置…</p>
-      </section>
-    );
-  }
+  if (!family || !activeChild) return null;
 
   const childName = activeChild.nickname || activeChild.display_name;
   const learned = summary
     ? summary.introduced + summary.recognizing + summary.proficient + summary.stable
     : null;
-  const switchChild = (childId: string) => {
-    setSummary(null);
-    setSummaryError("");
-    setActiveChildId(childId);
-  };
+  const retention =
+    plan?.recent_independent_correct_rate == null
+      ? "数据不足"
+      : `${Math.round(plan.recent_independent_correct_rate * 100)}%`;
+  const literacy =
+    plan?.literacy_status === "available" && plan.literacy_estimate != null
+      ? `约 ${Math.round(plan.literacy_estimate)} / ${plan.literacy_catalog_size}`
+      : "数据不足";
 
   return (
     <section className="dashboard-page section-shell">
@@ -121,7 +126,12 @@ function ParentHomeContent() {
         <ChildSwitcher
           activeChildId={activeChild.id}
           childOptions={children}
-          onChange={switchChild}
+          onChange={(childId) => {
+            setSummary(null);
+            setPlan(null);
+            setError("");
+            setActiveChildId(childId);
+          }}
         />
       </div>
 
@@ -136,57 +146,92 @@ function ParentHomeContent() {
         </div>
       </div>
 
+      {error ? <p className="form-message form-error">{error}</p> : null}
+
       <section className="today-section">
         <div className="section-title-row">
           <div>
             <p className="eyebrow">Today</p>
-            <h2>今日学习</h2>
+            <h2>今日任务</h2>
           </div>
-          <span>所有数字均来自孩子的真实学习记录</span>
+          <span>{plan ? `${plan.plan_date} · ${plan.timezone}` : "正在生成真实计划…"}</span>
         </div>
-        <div className="learning-grid">
-          <article className="learning-card learning-card-active">
-            <span className="learning-mark">字</span>
-            <div>
-              <h3>识字学习</h3>
-              {summaryError ? (
-                <p>{summaryError}</p>
-              ) : summary ? (
-                <p>
-                  已接触 {learned} 字 · 稳定掌握 {summary.stable} 字
-                </p>
-              ) : (
-                <p>正在读取真实进度…</p>
-              )}
-              <Link className="card-link" href="/learn/characters">
-                开始学习
-              </Link>
+
+        {plan ? (
+          <>
+            <div className="today-plan-grid">
+              <article>
+                <span>今日新字</span>
+                <strong>{plan.recommended_new_count}</strong>
+                <small>已完成 {plan.new_completed_count}</small>
+              </article>
+              <article>
+                <span>今日复习</span>
+                <strong>{plan.review_count}</strong>
+                <small>待复习总数 {plan.due_count}</small>
+              </article>
+              <article>
+                <span>最近 7 天独立认识率</span>
+                <strong className="metric-text">{retention}</strong>
+                <small>仅作保留情况参考</small>
+              </article>
+              <article>
+                <span>当前字库内估算识字量</span>
+                <strong className="metric-text">{literacy}</strong>
+                <small>不是全部汉字识字量</small>
+              </article>
             </div>
-          </article>
-          {[
-            ["阅读", "书"],
-            ["科学实验", "光"],
-          ].map(([title, mark]) => (
-            <article className="learning-card" key={title}>
-              <span className="learning-mark">{mark}</span>
-              <div>
-                <h3>{title}</h3>
-                <p>尚未开始</p>
-              </div>
-            </article>
-          ))}
-        </div>
+            <div className="plan-explanation">
+              <strong>今天这样安排的原因</strong>
+              <p>{plan.recommendation_reason}</p>
+              {plan.due_count > plan.review_count ? (
+                <p>
+                  还有 {plan.due_count - plan.review_count} 个到期项目会保留在队列中，按当前容量预计约
+                  {" "}{plan.estimated_backlog_days} 天逐步完成。
+                </p>
+              ) : null}
+            </div>
+            <div className="period-status-row">
+              <span>本周小挑战：{PERIOD_LABELS[plan.weekly_status] ?? plan.weekly_status}</span>
+              <span>本月识字检测：{PERIOD_LABELS[plan.monthly_status] ?? plan.monthly_status}</span>
+              <span>阅读：暂未开启</span>
+            </div>
+            <Link className="button button-primary today-start" href="/learn/characters">
+              开始今日学习
+            </Link>
+          </>
+        ) : (
+          <div className="center-state compact">
+            <span className="loading-spinner" aria-hidden="true" />
+            <p>正在根据复习积压和近期表现生成今日任务…</p>
+          </div>
+        )}
       </section>
 
-      <p className="archive-note">成长学习正在为孩子建立长期、可追溯的学习档案</p>
+      <section className="learning-grid">
+        <article className="learning-card learning-card-active">
+          <span className="learning-mark">字</span>
+          <div>
+            <h3>识字学习</h3>
+            <p>已接触 {learned ?? "…"} 字 · 稳定掌握 {summary?.stable ?? "…"} 字</p>
+            <Link className="card-link" href="/learn/characters">
+              查看识字档案
+            </Link>
+          </div>
+        </article>
+        <article className="learning-card">
+          <span className="learning-mark">读</span>
+          <div><h3>阅读</h3><p>尚未开始</p></div>
+        </article>
+        <article className="learning-card">
+          <span className="learning-mark">科</span>
+          <div><h3>科学实验</h3><p>尚未开始</p></div>
+        </article>
+      </section>
     </section>
   );
 }
 
 export default function ParentHomePage() {
-  return (
-    <ProtectedPage>
-      <ParentHomeContent />
-    </ProtectedPage>
-  );
+  return <ProtectedPage><ParentHomeContent /></ProtectedPage>;
 }

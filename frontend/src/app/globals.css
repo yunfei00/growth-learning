@@ -701,9 +701,14 @@ main {
 
 .dashboard-toolbar h1 {
   margin: 0;
+  overflow-wrap: anywhere;
   font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
   font-size: clamp(2.2rem, 5vw, 3.6rem);
   letter-spacing: -0.04em;
+}
+
+.dashboard-toolbar > * {
+  min-width: 0;
 }
 
 .role-note {
@@ -1282,6 +1287,10 @@ main {
     flex-direction: column;
   }
 
+  .dashboard-toolbar h1 {
+    font-size: clamp(2rem, 11vw, 2.75rem);
+  }
+
   .child-switcher {
     width: 100%;
   }
@@ -1801,5 +1810,299 @@ main {
 
   .mastery-detail li {
     grid-template-columns: 62px 1fr;
+  }
+}
+
+.today-plan-grid,
+.today-task-grid,
+.period-action-grid,
+.result-count-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.today-plan-grid article,
+.today-task-grid article,
+.result-count-grid article {
+  min-height: 138px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  display: grid;
+  align-content: space-between;
+  background: rgba(255, 253, 248, 0.82);
+}
+
+.today-plan-grid span,
+.today-plan-grid small,
+.today-task-grid span,
+.today-task-grid small,
+.result-count-grid span {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.today-plan-grid strong,
+.today-task-grid strong,
+.result-count-grid strong {
+  color: var(--forest-dark);
+  font-family: "Noto Serif SC", SimSun, serif;
+  font-size: 2.35rem;
+}
+
+.today-plan-grid .metric-text {
+  font-size: 1.45rem;
+}
+
+.plan-explanation,
+.literacy-panel,
+.history-session-detail {
+  margin-top: 18px;
+  padding: 20px 22px;
+  border: 1px solid rgba(37, 93, 74, 0.2);
+  border-radius: 15px;
+  background: rgba(220, 234, 223, 0.34);
+}
+
+.plan-explanation p,
+.literacy-panel p {
+  margin: 7px 0 0;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.period-status-row {
+  margin-top: 15px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.period-status-row span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: var(--forest-dark);
+  background: #e8d8a8;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.today-start {
+  margin-top: 22px;
+  display: inline-flex;
+}
+
+.phase5-today .today-task-grid {
+  margin-top: 30px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.today-task-grid article button {
+  min-height: 42px;
+  margin-top: 14px;
+  border: 0;
+  border-radius: 9px;
+  color: #fff;
+  background: var(--forest);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.today-task-grid article button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.period-action-grid {
+  margin-top: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.period-action-grid article {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 253, 248, 0.86);
+}
+
+.period-action-grid h3 {
+  margin: 4px 0 8px;
+  font-family: "Noto Serif SC", SimSun, serif;
+  font-size: 1.4rem;
+}
+
+.period-action-grid p:not(.eyebrow) {
+  min-height: 48px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.literacy-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 24px;
+  align-items: center;
+}
+
+.literacy-panel h2 {
+  margin: 3px 0 0;
+  font-family: "Noto Serif SC", SimSun, serif;
+}
+
+.literacy-panel > strong {
+  color: var(--forest-dark);
+  font-family: "Noto Serif SC", SimSun, serif;
+  font-size: clamp(1.45rem, 4vw, 2.2rem);
+}
+
+.literacy-panel p,
+.literacy-panel small {
+  grid-column: 1 / -1;
+}
+
+.session-result {
+  margin-top: 28px;
+  text-align: center;
+}
+
+.session-result > p {
+  color: var(--ink-soft);
+}
+
+.session-result .result-count-grid {
+  margin: 22px 0;
+}
+
+.result-count-grid article {
+  min-height: 110px;
+}
+
+.assessment-history-list {
+  margin-top: 25px;
+  display: grid;
+  gap: 9px;
+}
+
+.assessment-history-list > button {
+  width: 100%;
+  padding: 17px 18px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  color: var(--ink);
+  text-align: left;
+  background: #fff;
+  cursor: pointer;
+}
+
+.assessment-history-list button > div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.assessment-history-list button span {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+.target-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.target-chip-list > span {
+  min-width: 110px;
+  padding: 11px;
+  border-radius: 10px;
+  display: grid;
+  gap: 3px;
+  background: #fff;
+  font-size: 0.75rem;
+}
+
+.target-chip-list strong {
+  color: var(--forest-dark);
+  font-family: "Noto Serif SC", SimSun, serif;
+  font-size: 1.7rem;
+}
+
+.target-chip-list small {
+  color: var(--ink-soft);
+  font-size: 0.64rem;
+}
+
+.learning-settings-form {
+  max-width: 720px;
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.learning-settings-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.learning-settings-form input:not([type="checkbox"]) {
+  min-height: 45px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.learning-settings-form .toggle-setting {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.learning-settings-form .button,
+.learning-settings-form .role-note {
+  grid-column: 1 / -1;
+}
+
+.priority-badge.static {
+  margin-left: 7px;
+  position: static;
+}
+
+@media (max-width: 920px) {
+  .today-plan-grid,
+  .result-count-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .today-plan-grid,
+  .today-task-grid,
+  .period-action-grid,
+  .result-count-grid,
+  .learning-settings-form,
+  .literacy-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .assessment-history-list > button {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .literacy-panel > * {
+    grid-column: 1 !important;
   }
 }
