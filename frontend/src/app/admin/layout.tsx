@@ -16,9 +16,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <Link href="/admin">概览</Link>
             <p>知识库</p>
             <Link href="/admin/characters">汉字</Link>
+            <Link href="/admin/science">科学实验</Link>
             <p>以后扩展</p>
             <span aria-disabled="true">课程</span>
-            <span aria-disabled="true">科学实验</span>
             <span aria-disabled="true">系统配置</span>
           </nav>
         </aside>

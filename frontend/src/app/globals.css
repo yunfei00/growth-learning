@@ -1813,6 +1813,158 @@ main {
   }
 }
 
+/* Phase 7 · household-private Weekend Science Lab */
+.science-hub,
+.science-detail,
+.science-session { padding-bottom: 80px; }
+
+.science-panel {
+  margin-top: 26px;
+  padding: clamp(22px, 4vw, 36px);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.science-card-grid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.science-card {
+  min-height: 245px;
+  padding: 21px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  display: grid;
+  align-content: start;
+  gap: 11px;
+  background: #fff;
+}
+
+.science-card > div,
+.experiment-history > a {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+}
+
+.science-card h3 { margin: 5px 0 0; font-family: "Noto Serif SC", SimSun, serif; font-size: 1.35rem; }
+.science-card p,
+.science-card small { margin: 0; color: var(--ink-soft); line-height: 1.55; }
+.science-card .ready { color: var(--forest); }
+.science-card .missing { color: #8b6421; }
+
+.material-inventory {
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 15px;
+  background: var(--mint);
+}
+.material-inventory > div { margin: 15px 0; display: flex; flex-wrap: wrap; gap: 9px; }
+.material-inventory label { padding: 8px 10px; border-radius: 9px; background: #fff; font-size: 0.78rem; }
+.material-inventory input { margin-right: 7px; }
+
+.experiment-history { margin-top: 18px; display: grid; gap: 9px; }
+.experiment-history > a { padding: 16px; border: 1px solid var(--line); border-radius: 12px; align-items: center; background: #fff; }
+.experiment-history strong { margin-right: auto; color: var(--ink); }
+
+.science-detail > a { display: inline-flex; margin-bottom: 28px; color: var(--forest-dark); font-weight: 750; }
+.science-detail > header,
+.science-session > header { max-width: 760px; }
+.science-detail h1,
+.science-session h1 { margin: 7px 0 12px; font-family: "Noto Serif SC", SimSun, serif; font-size: clamp(2.3rem, 6vw, 4rem); }
+.science-detail header > p:not(.eyebrow),
+.science-session header > p:not(.eyebrow) { color: var(--ink-soft); font-size: 1.02rem; line-height: 1.7; }
+
+.experiment-prep-grid,
+.experiment-guidance,
+.growth-evidence-grid {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.experiment-prep-grid article,
+.experiment-guidance article,
+.growth-evidence-grid article { padding: 23px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.experiment-prep-grid h2 { font-family: "Noto Serif SC", SimSun, serif; }
+.experiment-prep-grid li { margin: 9px 0; color: var(--ink-soft); line-height: 1.5; }
+.experiment-start,
+.experiment-finish { margin-top: 25px; }
+
+.experiment-steps { margin: 28px 0; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 7px; }
+.experiment-steps button { min-height: 72px; padding: 9px 5px; border: 1px solid var(--line); border-radius: 11px; display: grid; place-content: center; gap: 4px; color: var(--ink-soft); background: #fff; font: inherit; font-size: 0.7rem; cursor: pointer; }
+.experiment-steps button.active { border-color: var(--forest); color: #fff; background: var(--forest); }
+.experiment-steps small { font-weight: 800; }
+.experiment-guidance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.experiment-guidance p:not(.eyebrow) { color: var(--ink-soft); line-height: 1.65; }
+
+.evidence-capture,
+.media-capture,
+.growth-card { margin-top: 28px; padding: clamp(22px, 4vw, 34px); border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
+.evidence-capture > p,
+.media-capture > p,
+.growth-card > p { color: var(--ink-soft); line-height: 1.6; }
+.evidence-form { display: grid; grid-template-columns: 190px 1fr auto; gap: 10px; align-items: stretch; }
+.evidence-form select,
+.evidence-form textarea { padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.evidence-form textarea { min-height: 90px; resize: vertical; }
+.evidence-list { margin-top: 18px; display: grid; gap: 9px; }
+.evidence-list article { padding: 15px 17px; border-left: 4px solid var(--forest); border-radius: 0 11px 11px 0; background: #fff; }
+.evidence-list span,
+.evidence-list small { color: var(--ink-soft); font-size: 0.7rem; }
+.evidence-list p { margin: 7px 0; }
+
+.experiment-media-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.experiment-media-grid img,
+.experiment-media-grid video { width: 100%; min-height: 170px; border-radius: 12px; object-fit: cover; background: #111; }
+.experiment-media-grid audio { width: 100%; }
+.science-session > .parent-note { max-width: 760px; margin-top: 24px; }
+.growth-card { background: rgba(220, 234, 223, 0.48); }
+.growth-evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.growth-evidence-grid p { color: var(--ink-soft); line-height: 1.6; }
+
+.admin-science-filters { margin: 22px 0; display: grid; grid-template-columns: 1fr 180px auto; gap: 10px; align-items: center; }
+.admin-science-filters input,
+.admin-science-filters select,
+.science-editor input,
+.science-editor select,
+.science-editor textarea { min-height: 44px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+.admin-science-layout { display: grid; grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.2fr); gap: 18px; }
+.admin-science-list { display: grid; align-content: start; gap: 8px; }
+.admin-science-list button { padding: 15px; border: 1px solid var(--line); border-radius: 11px; display: grid; gap: 5px; color: var(--ink); text-align: left; background: #fff; cursor: pointer; }
+.admin-science-list button.selected { border-color: var(--forest); background: var(--mint); }
+.admin-science-list span,
+.admin-science-list small { color: var(--ink-soft); }
+.science-editor { padding: 22px; border: 1px solid var(--line); border-radius: 16px; display: grid; gap: 13px; background: var(--surface); }
+.science-editor label { display: grid; gap: 6px; color: var(--ink-soft); font-size: 0.78rem; font-weight: 750; }
+.science-editor textarea { min-height: 82px; resize: vertical; }
+
+@media (max-width: 920px) {
+  .science-card-grid,
+  .experiment-prep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .experiment-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .admin-science-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .science-card-grid,
+  .experiment-prep-grid,
+  .experiment-guidance,
+  .growth-evidence-grid,
+  .experiment-media-grid,
+  .admin-science-filters { grid-template-columns: 1fr; }
+  .experiment-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .evidence-form { grid-template-columns: 1fr; }
+  .experiment-history > a { align-items: flex-start; flex-direction: column; }
+}
+
 .today-plan-grid,
 .today-task-grid,
 .period-action-grid,

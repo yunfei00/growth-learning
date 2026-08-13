@@ -16,6 +16,7 @@ export type AdminOverview = {
   families: number;
   children: number;
   characters: number;
+  science_experiments: number;
 };
 
 export type CharacterStatus = "active" | "archived";
@@ -338,6 +339,7 @@ export type CharacterGlossary = {
 export type StoryVersion = {
   id: string;
   story_id: string;
+  source_experiment_session_id: string | null;
   version_number: number;
   title: string;
   paragraphs: string[];
@@ -427,6 +429,156 @@ export type ReadingSummary = {
   target_exposure_count: number;
 };
 
+export type ScienceDifficulty = "intro" | "explore" | "advanced";
+export type ScienceExperimentStatus = "draft" | "enabled" | "archived";
+
+export type ExperimentMaterial = {
+  id: string;
+  canonical_key: string;
+  name: string;
+  aliases: string[];
+  description: string | null;
+  unit: string | null;
+  category: string | null;
+  safety_note: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MaterialRequirement = {
+  id: string;
+  material: ExperimentMaterial;
+  quantity_text: string | null;
+  is_required: boolean;
+  substitution_notes: string | null;
+  position: number;
+};
+
+export type ScienceExperiment = {
+  id: string;
+  canonical_key: string;
+  title: string;
+  description: string;
+  age_min: number;
+  age_max: number | null;
+  difficulty: ScienceDifficulty;
+  estimated_duration_minutes: number;
+  guiding_question: string;
+  expected_phenomenon: string;
+  child_friendly_explanation: string;
+  parent_scientific_explanation: string;
+  safety_notes: string[];
+  common_failure_reasons: string[];
+  follow_up_questions: string[];
+  likely_child_questions: string[];
+  steps: string[];
+  status: ScienceExperimentStatus;
+  source_type: "system" | "family";
+  content_version: number;
+  requirements: MaterialRequirement[];
+  related_knowledge_points: Array<{
+    knowledge_point_id: string;
+    title: string;
+    character: string | null;
+    exposure_enabled: boolean;
+  }>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ScienceExperimentPage = {
+  items: ScienceExperiment[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type FamilyMaterial = {
+  material: ExperimentMaterial;
+  is_owned: boolean;
+  quantity_text: string | null;
+  note: string | null;
+  updated_at: string | null;
+};
+
+export type ScienceRecommendation = {
+  experiment: ScienceExperiment;
+  ready_at_home: boolean;
+  owned_required_materials: string[];
+  missing_required_materials: string[];
+  optional_substitutions: string[];
+  reasons: string[];
+  recently_completed: boolean;
+};
+
+export type ExperimentEvidence = {
+  id: string;
+  evidence_type: "prediction" | "observation" | "child_summary" | "question_asked" | "child_original_words" | "parent_explanation";
+  original_text: string;
+  capability_tags: string[];
+  recorder_user_id: string;
+  captured_at: string;
+};
+
+export type ExperimentMedia = {
+  id: string;
+  media_kind: "image" | "video" | "audio";
+  mime_type: string;
+  size_bytes: number;
+  original_filename: string;
+  uploader_user_id: string;
+  created_at: string;
+  content_url: string;
+};
+
+export type ExperimentSession = {
+  id: string;
+  child_id: string;
+  experiment_id: string;
+  experiment_version_id: string;
+  experiment_snapshot: Record<string, unknown>;
+  accompanying_user_id: string;
+  status: "planned" | "in_progress" | "completed" | "abandoned";
+  current_step: "question" | "prediction" | "materials" | "experiment" | "observation" | "explanation" | "follow_up" | "summary" | "complete";
+  local_date: string;
+  timezone: string;
+  started_at: string | null;
+  completed_at: string | null;
+  parent_note: string | null;
+  evidence: ExperimentEvidence[];
+  media: ExperimentMedia[];
+  science_exposure_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExperimentSessionPage = {
+  items: ExperimentSession[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type ExperimentGrowthCard = {
+  session_id: string;
+  title: string;
+  completed_at: string;
+  accompanying_user: string;
+  prediction: string[];
+  observation: string[];
+  child_original_words: string[];
+  child_summary: string[];
+  questions_asked: string[];
+  media: ExperimentMedia[];
+  scientific_explanation: string;
+  follow_up_questions: string[];
+  related_characters: string[];
+  capability_tags: string[];
+};
+
 type ErrorPayload = {
   detail?: string | Array<{ msg?: string }>;
 };
@@ -441,7 +593,7 @@ export class ApiClientError extends Error {
   }
 }
 
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (configuredBaseUrl) {
     return configuredBaseUrl.replace(/\/$/, "");
@@ -472,7 +624,7 @@ async function request<T>(
 ): Promise<T> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-  const hasBody = init?.body !== undefined;
+  const hasJsonBody = init?.body !== undefined && !(init.body instanceof FormData);
 
   try {
     const response = await fetch(`${getApiBaseUrl()}${path}`, {
@@ -481,7 +633,7 @@ async function request<T>(
       credentials: "include",
       headers: {
         Accept: "application/json",
-        ...(hasBody ? { "Content-Type": "application/json" } : {}),
+        ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
         ...init?.headers,
       },
       signal: controller.signal,
@@ -851,4 +1003,141 @@ export function completeReading(
 
 export function getReadingSummary(childId: string): Promise<ReadingSummary> {
   return request<ReadingSummary>(`/api/v1/children/${childId}/reading-summary`);
+}
+
+export function listScienceExperiments(filters: {
+  search?: string;
+  difficulty?: ScienceDifficulty;
+  page?: number;
+  pageSize?: number;
+} = {}): Promise<ScienceExperimentPage> {
+  const query = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 20),
+  });
+  if (filters.search) query.set("search", filters.search);
+  if (filters.difficulty) query.set("difficulty", filters.difficulty);
+  return request<ScienceExperimentPage>(`/api/v1/science/experiments?${query}`);
+}
+
+export function getScienceExperiment(id: string): Promise<ScienceExperiment> {
+  return request<ScienceExperiment>(`/api/v1/science/experiments/${id}`);
+}
+
+export function listScienceRecommendations(childId: string): Promise<ScienceRecommendation[]> {
+  return request<ScienceRecommendation[]>(`/api/v1/children/${childId}/science/recommendations`);
+}
+
+export function getFamilyMaterials(familyId: string): Promise<FamilyMaterial[]> {
+  return request<FamilyMaterial[]>(`/api/v1/families/${familyId}/science/materials`);
+}
+
+export function updateFamilyMaterials(
+  familyId: string,
+  items: Array<{ material_id: string; is_owned: boolean; quantity_text?: string | null; note?: string | null }>,
+): Promise<FamilyMaterial[]> {
+  return request<FamilyMaterial[]>(`/api/v1/families/${familyId}/science/materials`, {
+    method: "PUT",
+    body: jsonBody({ items }),
+  });
+}
+
+export function startExperimentSession(
+  childId: string,
+  experimentId: string,
+): Promise<ExperimentSession> {
+  return request<ExperimentSession>(`/api/v1/children/${childId}/experiment-sessions`, {
+    method: "POST",
+    body: jsonBody({
+      experiment_id: experimentId,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
+      request_key: crypto.randomUUID(),
+      start_immediately: true,
+    }),
+  });
+}
+
+export function listExperimentSessions(childId: string): Promise<ExperimentSessionPage> {
+  return request<ExperimentSessionPage>(`/api/v1/children/${childId}/experiment-sessions`);
+}
+
+export function getExperimentSession(childId: string, sessionId: string): Promise<ExperimentSession> {
+  return request<ExperimentSession>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}`);
+}
+
+export function updateExperimentSession(
+  childId: string,
+  sessionId: string,
+  payload: { action?: "start" | "advance" | "abandon"; current_step?: ExperimentSession["current_step"]; parent_note?: string | null },
+): Promise<ExperimentSession> {
+  return request<ExperimentSession>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function addExperimentEvidence(
+  childId: string,
+  sessionId: string,
+  items: Array<{ evidence_type: ExperimentEvidence["evidence_type"]; original_text: string; capability_tags: string[]; client_key?: string }>,
+): Promise<ExperimentEvidence[]> {
+  return request<ExperimentEvidence[]>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}/evidence`, {
+    method: "POST",
+    body: jsonBody({ items }),
+  });
+}
+
+export function uploadExperimentMedia(childId: string, sessionId: string, file: File): Promise<ExperimentSession> {
+  const body = new FormData();
+  body.set("file", file);
+  return request<ExperimentSession>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}/media`, {
+    method: "POST",
+    body,
+  }, 120_000);
+}
+
+export function completeExperiment(childId: string, sessionId: string, parentNote?: string): Promise<ExperimentSession> {
+  return request<ExperimentSession>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}/complete`, {
+    method: "POST",
+    body: jsonBody({ parent_note: parentNote || null }),
+  });
+}
+
+export function getExperimentGrowthCard(childId: string, sessionId: string): Promise<ExperimentGrowthCard> {
+  return request<ExperimentGrowthCard>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}/growth-card`);
+}
+
+export function generateExperimentStory(
+  childId: string,
+  sessionId: string,
+  difficulty: StoryDifficulty = "normal",
+): Promise<StoryGenerationResult> {
+  return request<StoryGenerationResult>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}/generate-story`, {
+    method: "POST",
+    body: jsonBody({ difficulty, request_key: crypto.randomUUID() }),
+  }, 90_000);
+}
+
+export function listAdminScienceExperiments(filters: {
+  search?: string;
+  status?: ScienceExperimentStatus;
+  difficulty?: ScienceDifficulty;
+  page?: number;
+} = {}): Promise<ScienceExperimentPage> {
+  const query = new URLSearchParams({ page: String(filters.page ?? 1), page_size: "20" });
+  if (filters.search) query.set("search", filters.search);
+  if (filters.status) query.set("status", filters.status);
+  if (filters.difficulty) query.set("difficulty", filters.difficulty);
+  return request<ScienceExperimentPage>(`/api/v1/admin/science/experiments?${query}`);
+}
+
+export function updateAdminScienceExperiment(id: string, payload: Partial<ScienceExperiment>): Promise<ScienceExperiment> {
+  return request<ScienceExperiment>(`/api/v1/admin/science/experiments/${id}`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function importStarterScience(): Promise<{ created: number; updated: number; skipped: number; materials_created: number; errors: string[] }> {
+  return request("/api/v1/admin/science/import-starter", { method: "POST" });
 }

@@ -12,9 +12,11 @@ import {
   type CharacterMasterySummary,
   type DailyPlan,
   type ReadingSummary,
+  type ScienceRecommendation,
   getCharacterMasterySummary,
   getReadingSummary,
   getTodayPlan,
+  listScienceRecommendations,
 } from "@/lib/api/client";
 
 function formatAge(birthDate: string): string {
@@ -51,6 +53,7 @@ function ParentHomeContent() {
   const [summary, setSummary] = useState<CharacterMasterySummary | null>(null);
   const [plan, setPlan] = useState<DailyPlan | null>(null);
   const [readingSummary, setReadingSummary] = useState<ReadingSummary | null>(null);
+  const [science, setScience] = useState<ScienceRecommendation[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -64,12 +67,14 @@ function ParentHomeContent() {
       getCharacterMasterySummary(activeChild.id),
       getTodayPlan(activeChild.id),
       getReadingSummary(activeChild.id),
+      listScienceRecommendations(activeChild.id),
     ])
-      .then(([summaryValue, planValue, readingValue]) => {
+      .then(([summaryValue, planValue, readingValue, scienceValue]) => {
         if (!cancelled) {
           setSummary(summaryValue);
           setPlan(planValue);
           setReadingSummary(readingValue);
+          setScience(scienceValue);
           setError("");
         }
       })
@@ -243,7 +248,7 @@ function ParentHomeContent() {
         </article>
         <article className="learning-card">
           <span className="learning-mark">科</span>
-          <div><h3>科学实验</h3><p>尚未开始</p></div>
+          <div><h3>周末科学实验室</h3><p>{science[0] ? `本周推荐：${science[0].experiment.title}` : "正在准备真实实验推荐"}</p><Link className="card-link" href="/science">进入实验室</Link></div>
         </article>
       </section>
     </section>

@@ -10,6 +10,7 @@ const metrics: Array<{ key: keyof AdminOverview; label: string; note: string }> 
   { key: "families", label: "家庭", note: "正式家庭边界" },
   { key: "children", label: "孩子", note: "家庭内孩子档案" },
   { key: "characters", label: "汉字知识点", note: "系统规范知识" },
+  { key: "science_experiments", label: "科学实验", note: "可复用实验模板" },
 ];
 
 export default function AdminOverviewPage() {
