@@ -36,6 +36,7 @@ jobs:
           --health-retries 12
     env:
       DATABASE_URL: postgresql+asyncpg://growth_learning:ci-postgres-password@localhost:5432/growth_learning
+      AI_PROVIDER: disabled
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -121,6 +122,9 @@ jobs:
                   "daily_learning_plans", "daily_plan_items",
                   "assessment_session_plans", "assessment_session_targets",
                   "literacy_estimates",
+                  "stories", "story_versions", "story_generation_runs",
+                  "story_knowledge_points", "reading_questions",
+                  "reading_sessions", "reading_answers", "daily_reading_tasks",
               }
               missing = required - tables
               if missing:
