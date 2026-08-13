@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.story import DailyReadingTaskResponse
+
 SessionStatusValue = Literal["in_progress", "completed", "abandoned"]
 ActivityTypeValue = Literal["introduced", "relearned", "parent_marked_seen"]
 AssessmentOutcomeValue = Literal["correct", "hinted_correct", "uncertain", "incorrect"]
@@ -235,6 +237,7 @@ class DailyPlanResponse(BaseModel):
     literacy_estimate: float | None
     literacy_catalog_size: int
     items: list[DailyPlanItemResponse]
+    reading: DailyReadingTaskResponse
 
 
 class AssessmentTargetResponse(BaseModel):

@@ -45,6 +45,7 @@ from app.schemas.learning import (
     ReviewBacklogResponse,
     ReviewScheduleResponse,
 )
+from app.services.daily_reading import daily_reading_response, ensure_daily_reading_task
 from app.services.mastery import recompute_child_knowledge_state
 
 REVIEW_ALGORITHM_VERSION = "review-v1"
@@ -528,6 +529,8 @@ async def get_or_create_daily_plan(
         .order_by(LiteracyEstimate.created_at.desc())
     )
     catalog_size = await _enabled_catalog_size(session)
+    reading_task = await ensure_daily_reading_task(session, plan)
+    reading_response = await daily_reading_response(session, reading_task)
     await session.commit()
     return DailyPlanResponse(
         id=plan.id,
@@ -565,6 +568,7 @@ async def get_or_create_daily_plan(
             )
             for item, character in items
         ],
+        reading=reading_response,
     )
 
 
