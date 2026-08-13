@@ -1,6 +1,6 @@
 # Growth Learning 数据模型
 
-本文记录已落地的数据模型与后续边界。Phase 4 在身份、家庭和系统知识目录之上加入孩子汉字学习原始证据与可重算掌握状态；不包含复习调度、AI 故事或教师业务表。
+本文记录已落地的数据模型与后续边界。Phase 5 在身份、家庭、系统知识目录和孩子原始学习证据之上，加入可重算复习日程、每日计划、周期测评抽样和字库范围识字估算；不包含 AI 故事或教师业务表。
 
 ## 通用约定
 
@@ -149,3 +149,27 @@ Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/�
 五级为：`unlearned(0)`、`introduced(1)`、`recognizing(2)`、`proficient(3)`、`stable(4)`。状态可通过 `python -m app.cli.mastery` 从原始证据完整重算；重算保留 `is_priority`，不修改或删除任何原始记录。具体规则见 [Mastery V1](MASTERY_ALGORITHM.md)。
 
 家庭 `admin` 与 `companion` 都能陪孩子学习和测评；只有家庭 `admin` 能修改优先学习标记。平台系统管理员如果不是该家庭成员，仍不能访问这些表对应的 API。
+
+## Phase 5 派生学习数据
+
+### `child_review_schedules`
+
+以 `(child_id, knowledge_point_id)` 唯一，保存 `last_review_at`、`next_review_at`、间隔天数/阶段、最近结果、调度原因和 `review-v1` 版本。它完全由 `LearningRecord` 与 `AssessmentItem` 重建；`is_priority` 只在查询时参与队列排序，不伪造日程或掌握度。
+
+### `child_learning_settings`
+
+每个孩子一行，保存每日最多新字、每日复习容量、周/月检测开关和 IANA 时区。默认值分别为 5、15、开启、开启和 `Asia/Shanghai`。只有家庭 `admin` 可以修改，`companion` 只读。
+
+### `daily_learning_plans` / `daily_plan_items`
+
+`daily_learning_plans` 以 `(child_id, plan_date)` 唯一，保存计划时区、动态新字数、容量限制后的复习数、完整积压数、预计清理天数、可解释原因、完成进度和状态。`daily_plan_items` 固定当天的新字/复习字选择、顺序和完成状态，使刷新和重新登录后可以继续。
+
+### `assessment_session_plans` / `assessment_session_targets`
+
+这是 `AssessmentSession` 的可重复选题计划，不是新的答案证据。计划一对一保存抽样方法、版本、当时字库大小和可选每日计划；目标表保存题目、顺序及 `recently_learned`、`weak_or_priority`、`unseen_not_system_taught` 等抽样分层。答案仍只保存为追加式 `AssessmentItem`。
+
+### `literacy_estimates`
+
+每个已完成月度检测最多产生一条字库范围估算，保存当时字库大小、样本量、独立认识/未知数量、抽样方法与版本、点估计、上下界、数据是否充分和 `literacy-v1`。它不表示孩子全部汉字识字量；样本不足时估算字段保持 `NULL`。
+
+Phase 5 新增表的每条业务外键均显式使用 `ON DELETE RESTRICT`。派生数据可重建不代表可以通过账户或孩子删除操作级联清除；原始证据与审计关系始终优先保护。完整规则见 [Phase 5 算法](REVIEW_AND_LITERACY_ALGORITHMS.md)。

@@ -85,6 +85,29 @@
 
 学习和测评批量请求单次最多 50 个不同知识点；`(session_id, knowledge_point_id)` 唯一约束阻止同一会话重复记录。新证据与 Mastery V1 派生状态在同一事务中写入。没有原始证据的知识点按 `unlearned` 返回，但不会为了读取而批量生成空状态行。
 
+### Adaptive review and daily plan
+
+下列端点全部要求当前用户是孩子所属家庭成员；跨家庭和无家庭关系的系统管理员统一返回 `404`。
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/children/{child_id}/today` | 幂等获取/创建本地日期的今日计划、动态新字数和真实积压 |
+| `GET` | `/api/v1/children/{child_id}/reviews/backlog` | 完整到期数、容量、预计清理天数及当日排序队列 |
+| `GET` | `/api/v1/children/{child_id}/learning-settings` | 家庭成员读取孩子学习设置 |
+| `PATCH` | `/api/v1/children/{child_id}/learning-settings` | 仅家庭 `admin` 修改新字上限、复习容量、开关和时区 |
+| `POST` | `/api/v1/children/{child_id}/reviews/start` | 开始或恢复当天 `daily_review` 会话 |
+| `POST` | `/api/v1/children/{child_id}/weekly-check/start` | 开始、恢复或读取本周固定小挑战 |
+| `POST` | `/api/v1/children/{child_id}/monthly-assessment/start` | 开始、恢复或读取本月固定检测 |
+| `GET` | `/api/v1/children/{child_id}/planned-assessments/{session_id}` | 读取固定题目、已完成结果和进度 |
+| `POST` | `/api/v1/children/{child_id}/planned-assessments/{session_id}/items` | 批量/逐项追加结果；同一题不重复 |
+| `GET` | `/api/v1/children/{child_id}/assessment-history` | 每日复习、周度和月度测试历史及四类计数 |
+| `GET` | `/api/v1/children/{child_id}/literacy-estimate` | 最新字库范围估算或明确“数据不足” |
+| `GET` | `/api/v1/children/{child_id}/literacy-estimate/history` | 历次字库范围与抽样版本 |
+
+计划会话提交在一个数据库事务内追加 `AssessmentItem`、重算 `ChildKnowledgeState`、重算 `ChildReviewSchedule` 并更新 `DailyLearningPlan` 进度。若已有题目已经提交，重复请求返回 `409`；会话只有在所有固定目标都有原始证据后才能完成。
+
+`daily_review`、`weekly_check`、`monthly_assessment` 是 `AssessmentSession.source`，不会建立并行的答案表。抽样题目和分层由 `AssessmentSessionTarget` 固定，月测中的 `unseen_not_system_taught` 明确表示系统此前没有正式教过该字。
+
 ## 错误约定
 
 - `400/422`：请求内容无效。

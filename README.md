@@ -1,11 +1,11 @@
 # Growth Learning
 
-Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 4 已在通用汉字知识目录之上建立孩子学习证据、快速认读和可重算五级掌握状态；复习调度与 AI 故事仍不在本阶段范围内。
+Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 5 已在通用汉字知识目录和原始学习证据之上建立确定性自适应复习、每日任务、周/月检测与透明的当前字库范围识字估算；AI 故事仍不在本阶段范围内。
 
 ## 当前用户流程
 
 ```text
-注册 → 登录 → 创建家庭 → 添加第一个孩子 → 家长首页 → 识字学习/快速认读
+注册 → 登录 → 创建家庭 → 添加第一个孩子 → 今日任务 → 新字学习 → 每日复习 → 周/月检测
 ```
 
 再次登录后，应用通过 HttpOnly Cookie 获取当前用户，从 PostgreSQL 加载家庭和孩子。家长首页的识字数字来自真实 LearningRecord、AssessmentItem 与 ChildKnowledgeState，不展示虚构统计。
@@ -67,6 +67,8 @@ docker compose exec backend python -m app.cli.admin set-password \
 docker compose exec backend python -m app.cli.characters import-starter
 docker compose exec backend python -m app.cli.mastery
 docker compose exec backend python -m app.cli.mastery --child-id CHILD_UUID
+docker compose exec backend python -m app.cli.review
+docker compose exec backend python -m app.cli.review --child-id CHILD_UUID
 ```
 
 `create-admin` 可重复执行且不会重复创建账户；已有普通账户必须显式执行 `promote-admin`。项目自有 Starter 数据位于 `backend/data/chinese_characters_v1.json`，不宣称官方标准、教材清单或精确字频。
@@ -101,6 +103,7 @@ gl-update
 → 启动/确认 PostgreSQL、Redis、MinIO healthy
 → alembic upgrade head
 → alembic current
+→ 从原始证据重算 Review V1 日程
 → 更新 backend/frontend
 → 容器与 HTTP health check
 ```
@@ -120,6 +123,7 @@ gl-update
 - [系统架构](docs/ARCHITECTURE.md)
 - [产品需求](docs/PRODUCT_REQUIREMENTS.md)
 - [路线图](docs/ROADMAP.md)
+- [Phase 5 复习与识字估算算法](docs/REVIEW_AND_LITERACY_ALGORITHMS.md)
 
 ## 安全边界
 

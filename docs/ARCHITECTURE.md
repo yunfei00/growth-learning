@@ -134,3 +134,26 @@ Phase 1 提供轻量健康检查；后续按需增加结构化日志、指标和
 | Web 框架 | Next.js App Router | 服务端渲染、类型安全与成熟生态 |
 | AI | OpenAI-compatible 协议 | 供应商可替换，业务层不依赖专有 SDK |
 | 学习状态 | 原始证据 + 派生投影 | 保留历史并允许算法重算和解释 |
+
+## 12. Phase 5 自适应学习闭环
+
+```text
+LearningRecord / AssessmentItem（权威、追加式）
+            │
+            ├── Mastery V1 ──> ChildKnowledgeState
+            ├── Review V1 ───> ChildReviewSchedule
+            │                        │
+            │                        └── capacity + priority + retention
+            │                                      │
+            └──────────────────────────────> DailyLearningPlan
+                                                   │
+                                      AssessmentSessionTarget
+                                                   │
+                                      新 AssessmentItem（事务）
+```
+
+`review_planning` 服务集中实现复习重放、队列排序、动态新字负荷、周期抽样和字库范围估算。HTTP 路由只负责授权、请求映射和错误语义。关键写入在同一个 SQLAlchemy 事务中完成，避免“答案已保存但日程未更新”或相反的不一致。
+
+每日计划以孩子设置的 IANA 时区确定本地日期；UTC 只作为持久化时间基准。题目选择会持久化，因此恢复会话不依赖缓存或浏览器状态。Redis 不是正确性的来源。
+
+算法版本分别记录为 `review-v1`、`plan-v1`、`sampling-v1` 和 `literacy-v1`。部署迁移后运行 `python -m app.cli.review`，为既有 Phase 4 证据安全回填日程；该过程不修改原始证据。详细规则及限制见 [Phase 5 算法](REVIEW_AND_LITERACY_ALGORITHMS.md)。
