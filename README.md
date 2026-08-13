@@ -114,6 +114,14 @@ GROWTH_LEARNING_BIND_ADDRESS=127.0.0.1 \
 gl-update
 ```
 
+备份命令：
+
+```bash
+gl-backup
+```
+
+`gl-backup` 生成 PostgreSQL custom dump、私有对象清单、服务状态、manifest 和 SHA-256 校验材料；MinIO 二进制对象仍须通过独立 volume 快照或受控镜像保存。恢复前必须按 [备份恢复手册](docs/BACKUP_RESTORE.md) 在隔离环境演练。
+
 `gl-update` 只允许 clean working tree，并执行 fast-forward pull。部署脚本下载 CI 为当前 commit 构建的前后端镜像，然后按以下顺序更新：
 
 ```text
@@ -123,6 +131,7 @@ gl-update
 → alembic current
 → 幂等导入 Starter 科学实验
 → 从原始证据重算 Review V1 日程
+→ 幂等补齐 GrowthEvent V1 投影并清理过期导出
 → 更新 backend/frontend
 → 容器与 HTTP health check
 ```
@@ -145,6 +154,9 @@ gl-update
 - [Phase 5 复习与识字估算算法](docs/REVIEW_AND_LITERACY_ALGORITHMS.md)
 - [Phase 6 AI 故事与汉字覆盖策略](docs/AI_STORY_POLICY.md)
 - [Phase 7 科学实验数据与隐私边界](docs/DATA_MODEL.md#phase-7-周末科学实验室)
+- [Phase 8 成长档案与报告](docs/GROWTH_ARCHIVE.md)
+- [家庭导出格式 V1](docs/EXPORT_FORMAT.md)
+- [生产备份与恢复演练](docs/BACKUP_RESTORE.md)
 
 ## 安全边界
 
@@ -157,6 +169,8 @@ gl-update
 - 读完故事只追加 `story_exposure`，绝不伪造认字 `correct` 测评证据。
 - 完成科学实验只追加 `science_experiment_exposure`；孩子原话不可覆盖，行为标签不生成数值分数。
 - 实验媒体存于私有 MinIO，并由家庭鉴权 API 流式读取；对象键不含儿童姓名。
+- 成长档案自动投影可幂等重建，手工原文、旧报告版本和旧成长书版本不被覆盖。
+- 家庭导出仅限家庭管理员、短期私有下载，并排除密码、token、API key 和基础设施 secret。
 - 发给 AI 的数据仅限年龄段、主题、难度、允许字和目标字；不发送姓名、生日、家庭、邮箱、照片或成长笔记。
 - `system_role=admin` 只授予平台知识管理权限，不自动取得任何家庭或孩子资料。
 - 所有 `/api/v1/admin/*` 在后端统一校验系统管理员角色；普通/家庭管理员均返回 `403`。

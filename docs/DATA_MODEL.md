@@ -205,3 +205,11 @@ Phase 5 新增表的每条业务外键均显式使用 `ON DELETE RESTRICT`。派
 `experiment_media_assets` 只保存私有 MinIO 对象元数据。对象键使用 UUID，不包含姓名；读取必须重新通过孩子家庭鉴权，不返回公共 bucket URL。实验完成最多创建一组 `science_experiment_exposure` LearningRecord，不创建 AssessmentItem，也不推断孩子已经认识关联汉字。
 
 `stories`、`story_generation_runs`、`story_versions` 可选引用 `source_experiment_session_id`。实验故事 Prompt 仅接收实验模板标题、引导问题和预期现象，不发送孩子原话、媒体、姓名、家庭或家长备注。所有新增业务外键均显式 `ON DELETE RESTRICT`。
+
+## Phase 8 成长档案、报告和导出
+
+`growth_events` 是按孩子隔离的统一时间线投影。自动事件通过 `(child_id, idempotency_key)` 保证重建幂等，并保存原始实体类型/ID、最小快照和策略版本；手工事件保存真实 actor 与原文，不被重建删除或改写。`growth_media_assets` 保存私有 MinIO 元数据，读取仍需家庭成员鉴权。
+
+`growth_reports` / `growth_report_versions` 将报告身份与不可变版本分离。版本固定时间范围、真实指标、数据充分性、可解释章节及可选 AI 叙述；AI 字段不参与规范指标。`growth_books` / `growth_book_versions` 同样保留每次选择的事件、媒体和家长寄语快照，旧版本不会被后续编辑覆盖。
+
+`export_jobs` 保存家庭管理员导出的状态、范围、私有对象键、manifest 校验结果、校验和与过期时间。导出 ZIP 使用 `growth-learning-export-v1`，不会保存认证或基础设施 secret。上述表全部采用 UUID、审计时间和显式 `ON DELETE RESTRICT`，没有账户级联删除孩子多年数据的路径。

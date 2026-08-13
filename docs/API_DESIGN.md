@@ -155,3 +155,23 @@ Provider 未配置时 context 返回 `provider_configured=false`，生成返回 
 管理员接口中的 `403` 表示当前用户不是系统管理员；它不依赖家庭成员角色。
 
 所有家庭与孩子访问必须经过后端授权服务，不依赖客户端传入的角色或前端页面状态。
+
+### Growth archive, reports, books and export
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/children/{child_id}/growth-events` | 家庭成员时间线；支持年月、类别、来源和分页过滤 |
+| `GET` | `/api/v1/children/{child_id}/growth-events/recent` | 首页最近 3–5 条真实事件 |
+| `POST` | `/api/v1/children/{child_id}/growth-events` | 家庭 admin/companion 追加原文成长记录 |
+| `POST` | `.../growth-events/{event_id}/media` | 鉴权上传私有附件 |
+| `GET` | `.../growth-media/{media_id}/content` | 每次请求重新验证家庭关系后流式读取 |
+| `POST` | `/api/v1/children/{child_id}/growth-events/rebuild` | 家庭 admin 安全补齐自动投影；不删除手工事件 |
+| `POST/GET` | `/api/v1/children/{child_id}/growth-reports` | 仅家庭 admin 生成并列出月/年/自定义报告 |
+| `GET` | `/api/v1/children/{child_id}/growth-reports/{id}` | 仅家庭 admin 读取不可变报告版本 |
+| `POST/GET` | `/api/v1/children/{child_id}/growth-books` | 仅家庭 admin 创建版本并列出成长书 |
+| `GET` | `/api/v1/children/{child_id}/growth-books/{id}` | 仅家庭 admin 读取当时真实版本 |
+| `POST` | `/api/v1/families/{family_id}/exports` | 仅家庭 admin 创建私有异步语义导出任务 |
+| `GET` | `/api/v1/families/{family_id}/exports/{id}` | 仅请求管理员读取状态 |
+| `GET` | `/api/v1/families/{family_id}/exports/{id}/download` | 短期、禁止缓存、过期后 `410` |
+
+报告、成长书和导出写操作不授权给 companion。平台 system admin 不绕过 FamilyMember，跨家庭资源按 `404` 处理。AI Provider 未配置时确定性报告仍可成功，仅省略可选叙述。

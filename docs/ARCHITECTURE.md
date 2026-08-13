@@ -191,3 +191,18 @@ Versioned ScienceExperiment + household materials
 ```
 
 科学模块保持模块化单体事务：模板、版本、材料、证据和媒体元数据在 PostgreSQL，二进制对象在私有 MinIO。媒体不能依赖可分享的永久 URL；每次读取都重新检查 `FamilyMember`。实验转故事复用 Phase 6 的结构化 Provider、有限重试和程序覆盖率分析，并采用数据最小化上下文。
+
+## 15. Phase 8 长期成长档案
+
+```text
+append-only learning / reading / science evidence + parent notes
+  → deterministic GrowthEvent projector (growth-event-v1)
+  → household-authorized timeline + private media
+  → immutable deterministic report versions
+  → immutable parent-curated GrowthBook versions
+  → versioned private JSON/CSV/media export
+```
+
+GrowthEvent 投影器只读取已有事实并用稳定幂等键补齐事件，不反向修改来源。报告指标由应用服务计算；可选 AI 只生成单独标注的叙述。家庭导出在临时文件中逐条写入并在上传私有对象存储前验证 manifest 和 SHA-256，避免在内存拼装全部媒体。
+
+运维面由 `gl-backup` 生成 PostgreSQL dump、对象清单和校验材料；对象二进制由独立 volume 快照或受控镜像保存。恢复是经过隔离演练的人工流程，永不由部署脚本隐式执行。
