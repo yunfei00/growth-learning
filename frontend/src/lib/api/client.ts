@@ -1810,6 +1810,107 @@ export type CatalogRelease = {
   metadata: Record<string, string>;
 };
 
+export type ChildTodayTask = {
+  kind: "new" | "review" | "reading" | "science" | "teacher";
+  title: string;
+  description: string;
+  status: "pending" | "in_progress" | "completed" | "needs_story" | "optional";
+  count: number;
+  cta_label: string;
+  href: string;
+  source_type: string;
+  source_id: string | null;
+  urgent: boolean;
+};
+
+export type ChildToday = {
+  child_id: string;
+  plan_date: string;
+  tasks: ChildTodayTask[];
+  continue_task: ChildTodayTask | null;
+  completed_count: number;
+  total_count: number;
+  star_balance: number;
+  newly_unlocked_achievements: number;
+};
+
+export type GrowthTreeUnit = {
+  id: string;
+  title: string;
+  total: number;
+  course_completed_activities: number;
+  course_activity_count: number;
+  touched: number;
+  growing: number;
+  familiar: number;
+};
+
+export type GrowthTreeCourse = {
+  id: string;
+  title: string;
+  source_type: string;
+  course_progress_percent: number;
+  total: number;
+  touched: number;
+  growing: number;
+  familiar: number;
+  units: GrowthTreeUnit[];
+};
+
+export type GrowthTree = {
+  child_id: string;
+  projection_version: string;
+  mastery_mapping: Record<MasteryLevel, string>;
+  chinese: GrowthTreeCourse[];
+  reading: { completed: number; independent: number | null; questions: number | null };
+  science: { completed: number; independent: number | null; questions: number | null };
+};
+
+export type ChildAchievement = {
+  id: string;
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  rule_version: string;
+  evidence_source_type: string;
+  evidence_source_id: string | null;
+  evidence_snapshot: Record<string, string | number>;
+  unlocked_at: string;
+};
+
+export type StarLedgerEntry = {
+  id: string;
+  amount: number;
+  reason_type: string;
+  source_type: string;
+  source_id: string;
+  rule_version: string;
+  occurred_at: string;
+};
+
+export type RewardGoal = {
+  id: string;
+  title: string;
+  required_stars: number;
+  is_active: boolean;
+};
+
+export type AchievementSummary = {
+  child_id: string;
+  stars_enabled: boolean;
+  star_balance: number;
+  achievements: ChildAchievement[];
+  recent_ledger: StarLedgerEntry[];
+  next_reward_goal: RewardGoal | null;
+};
+
+export type RewardSettings = {
+  family_id: string;
+  stars_enabled: boolean;
+  goals: RewardGoal[];
+};
+
 export function listCourses(childId: string): Promise<Course[]> {
   return request<Course[]>(`/api/v1/courses?child_id=${encodeURIComponent(childId)}`);
 }
@@ -1905,4 +2006,41 @@ export function importChineseCatalog(): Promise<{
 
 export function listAdminCourses(): Promise<Course[]> {
   return request<Course[]>("/api/v1/admin/courses");
+}
+
+export function getChildToday(childId: string): Promise<ChildToday> {
+  return request<ChildToday>(`/api/v1/children/${childId}/experience/today`);
+}
+
+export function getGrowthTree(childId: string): Promise<GrowthTree> {
+  return request<GrowthTree>(`/api/v1/children/${childId}/growth-tree`);
+}
+
+export function getAchievements(childId: string): Promise<AchievementSummary> {
+  return request<AchievementSummary>(`/api/v1/children/${childId}/achievements`);
+}
+
+export function getRewardSettings(familyId: string): Promise<RewardSettings> {
+  return request<RewardSettings>(`/api/v1/families/${familyId}/reward-settings`);
+}
+
+export function updateRewardSettings(
+  familyId: string,
+  starsEnabled: boolean,
+): Promise<RewardSettings> {
+  return request<RewardSettings>(`/api/v1/families/${familyId}/reward-settings`, {
+    method: "PATCH",
+    body: jsonBody({ stars_enabled: starsEnabled }),
+  });
+}
+
+export function createRewardGoal(
+  familyId: string,
+  title: string,
+  requiredStars: number,
+): Promise<RewardGoal> {
+  return request<RewardGoal>(`/api/v1/families/${familyId}/reward-goals`, {
+    method: "POST",
+    body: jsonBody({ title, required_stars: requiredStars }),
+  });
 }

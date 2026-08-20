@@ -3535,3 +3535,844 @@ main {
     grid-column: 1 !important;
   }
 }
+
+/* Phase 11 parent / child experience modes */
+.desktop-mode-nav {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 auto;
+  min-height: 56px;
+  width: min(1180px, calc(100% - 48px));
+}
+
+.desktop-mode-nav a {
+  align-items: center;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  display: inline-flex;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.55rem 0.9rem;
+}
+
+.desktop-mode-nav a[aria-current="page"] {
+  background: var(--mint);
+  color: var(--forest-dark);
+  font-weight: 800;
+}
+
+.desktop-mode-nav small {
+  font-size: 0.85rem;
+}
+
+.mobile-bottom-nav {
+  display: none;
+}
+
+.parent-account-nav {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.child-mode-header {
+  border-bottom: 0;
+  min-height: 74px;
+}
+
+.child-mode-brand {
+  align-items: center;
+  display: inline-flex;
+  font-size: 1.12rem;
+  font-weight: 850;
+  gap: 0.65rem;
+}
+
+.child-mode-brand > span:first-child {
+  background: #e5f1df;
+  border-radius: 50%;
+  display: grid;
+  font-size: 1.35rem;
+  height: 42px;
+  place-items: center;
+  width: 42px;
+}
+
+.parent-mode-exit {
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+}
+
+body:has(.child-mode-header) {
+  background:
+    radial-gradient(circle at 10% 3%, rgba(215, 167, 67, 0.17), transparent 24rem),
+    radial-gradient(circle at 90% 16%, rgba(115, 167, 113, 0.18), transparent 28rem),
+    #f7f2e6;
+}
+
+body:has(.child-mode-header) .site-footer {
+  display: none;
+}
+
+.child-page {
+  display: grid;
+  gap: clamp(1.15rem, 3vw, 2rem);
+  margin: 0 auto;
+  max-width: 1060px;
+  padding: clamp(1.5rem, 4vw, 3.25rem) 24px 6rem;
+  width: 100%;
+}
+
+.child-page h1,
+.child-page h2,
+.child-page h3,
+.child-page p {
+  margin-top: 0;
+}
+
+.child-welcome,
+.child-page-heading,
+.child-page-title,
+.growth-tree-hero,
+.achievement-hero {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.child-welcome p,
+.child-page-heading p,
+.child-page-title p,
+.growth-tree-hero p,
+.achievement-hero p {
+  color: var(--forest);
+  font-size: 0.9rem;
+  font-weight: 750;
+  margin-bottom: 0.25rem;
+}
+
+.child-welcome h1,
+.child-page-heading h1,
+.child-page-title h1,
+.growth-tree-hero h1,
+.achievement-hero h1 {
+  font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
+  font-size: clamp(2rem, 6vw, 3.6rem);
+  line-height: 1.12;
+  margin-bottom: 0;
+}
+
+.child-page-heading > span,
+.child-page-title > span,
+.growth-tree-crown,
+.achievement-hero > div:first-child {
+  display: grid;
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  min-width: 4rem;
+  place-items: center;
+}
+
+.child-star-pill,
+.achievement-hero > strong {
+  background: #fff7d9;
+  border: 1px solid #ecd391;
+  border-radius: 999px;
+  color: #74561a;
+  font-size: 1.12rem;
+  padding: 0.7rem 1rem;
+  white-space: nowrap;
+}
+
+.child-today-card,
+.tree-domain,
+.reward-goals-panel,
+.reward-setting-card {
+  background: rgba(255, 253, 248, 0.94);
+  border: 1px solid rgba(74, 104, 86, 0.18);
+  border-radius: 24px;
+  box-shadow: 0 20px 55px rgba(41, 75, 58, 0.08);
+  padding: clamp(1.1rem, 3vw, 1.8rem);
+}
+
+.enter-child-mode {
+  align-items: center;
+  background: var(--forest);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-weight: 850;
+  gap: 0.5rem;
+  min-height: 46px;
+  padding: 0.65rem 1rem;
+}
+
+.parent-achievement-card {
+  align-items: center;
+  background: linear-gradient(135deg, #fff9e6, #f4f8ed);
+  border: 1px solid #e2d9ae;
+  border-radius: 20px;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1.25rem;
+}
+
+.parent-achievement-card h2,
+.parent-achievement-card p {
+  margin-bottom: 0.35rem;
+}
+
+.parent-achievement-actions {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.parent-achievement-actions a {
+  color: var(--forest);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.child-section-heading,
+.tree-domain-title {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.child-section-heading > div,
+.tree-domain-title {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+}
+
+.child-section-heading h2,
+.tree-domain-title h2 {
+  margin-bottom: 0;
+}
+
+.child-section-heading > div > span,
+.tree-domain-title > span {
+  background: var(--mint);
+  border-radius: 14px;
+  display: grid;
+  font-size: 1.35rem;
+  height: 44px;
+  place-items: center;
+  width: 44px;
+}
+
+.child-section-heading a {
+  color: var(--forest);
+  font-weight: 800;
+  min-height: 44px;
+  padding: 0.7rem 0;
+}
+
+.child-task-list,
+.child-today-stack,
+.tree-course-list,
+.tree-unit-list,
+.star-history,
+.reward-goal-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.child-task-row {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e1e6df;
+  border-radius: 18px;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 76px;
+  padding: 0.85rem 1rem;
+}
+
+.child-task-row:hover,
+.child-story-card:hover,
+.child-science-card:hover,
+.child-feature-grid a:hover {
+  border-color: #79a182;
+  transform: translateY(-2px);
+}
+
+.child-task-icon,
+.child-today-icon {
+  background: #f0f5eb;
+  border-radius: 14px;
+  display: grid;
+  font-size: 1.45rem;
+  height: 48px;
+  place-items: center;
+  width: 48px;
+}
+
+.child-task-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.child-task-copy small,
+.child-today-task p,
+.child-story-card p,
+.child-science-card p {
+  color: var(--ink-soft);
+  line-height: 1.55;
+  margin-bottom: 0;
+}
+
+.child-task-cta {
+  color: var(--forest);
+  font-size: 0.86rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.child-resume-banner,
+.next-reward-card {
+  align-items: center;
+  background: linear-gradient(135deg, #295e4b, #3c795f);
+  border-radius: 18px;
+  color: #fff;
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 1rem;
+  min-height: 70px;
+  padding: 0.95rem 1.1rem;
+}
+
+.child-resume-banner > div,
+.child-resume-banner > span:nth-child(2),
+.next-reward-card > div {
+  display: grid;
+  flex: 1;
+  gap: 0.15rem;
+}
+
+.child-resume-banner small,
+.next-reward-card small,
+.next-reward-card p {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 0;
+}
+
+.child-feature-grid,
+.child-story-grid,
+.child-science-grid,
+.achievement-grid,
+.cross-domain-trees {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.child-feature-grid a,
+.child-story-card,
+.child-science-card,
+.achievement-grid article {
+  background: rgba(255, 253, 248, 0.94);
+  border: 1px solid rgba(74, 104, 86, 0.18);
+  border-radius: 21px;
+  box-shadow: 0 14px 40px rgba(41, 75, 58, 0.06);
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: clamp(1rem, 3vw, 1.45rem);
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.child-feature-grid a > span,
+.child-story-card > span,
+.child-science-card > span,
+.achievement-grid article > span {
+  font-size: 2rem;
+}
+
+.child-feature-grid small,
+.child-story-card small,
+.child-science-card small,
+.achievement-grid small {
+  color: var(--ink-soft);
+}
+
+.child-story-card {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.child-story-card > strong {
+  color: var(--forest);
+  grid-column: 2;
+}
+
+.child-science-card > strong {
+  color: var(--forest);
+}
+
+.child-today-task {
+  align-items: center;
+  background: #fffdf8;
+  border: 1px solid #dce3dc;
+  border-radius: 21px;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  padding: 1rem;
+}
+
+.child-task-number {
+  background: var(--forest);
+  border-radius: 50%;
+  color: #fff;
+  display: grid;
+  font-weight: 850;
+  height: 36px;
+  place-items: center;
+  width: 36px;
+}
+
+.child-today-task > div h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.25rem;
+}
+
+.child-today-task > a,
+.child-primary-action,
+.child-error button {
+  background: var(--forest);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  text-align: center;
+}
+
+.child-error {
+  align-items: center;
+  background: #fff6e8;
+  border: 1px solid #efd5a5;
+  border-radius: 18px;
+  display: flex;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+
+.child-error > span {
+  font-size: 1.8rem;
+}
+
+.child-error > div {
+  flex: 1;
+}
+
+.child-error p {
+  color: var(--ink-soft);
+  margin: 0.2rem 0 0;
+}
+
+.child-state,
+.child-empty {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 42vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.child-state.compact,
+.child-empty {
+  min-height: 220px;
+}
+
+.child-state-icon,
+.child-empty > span {
+  font-size: 3rem;
+  margin-bottom: 0.75rem;
+}
+
+.child-empty p,
+.child-kind-note,
+.tree-truth-note {
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.child-kind-note,
+.tree-truth-note {
+  background: rgba(255, 253, 248, 0.7);
+  border-radius: 14px;
+  font-size: 0.88rem;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  text-align: center;
+}
+
+.tree-course-branch {
+  background: #fff;
+  border: 1px solid #dfe7df;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.tree-course-branch summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: auto minmax(0, 1fr) minmax(90px, 24%);
+  list-style: none;
+  min-height: 74px;
+  padding: 0.9rem 1rem;
+}
+
+.tree-course-branch summary::-webkit-details-marker {
+  display: none;
+}
+
+.tree-course-branch summary > span:nth-child(2) {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.tree-course-branch summary small {
+  color: var(--ink-soft);
+}
+
+.branch-icon {
+  font-size: 1.8rem;
+}
+
+.branch-progress {
+  background: #e8eee8;
+  border-radius: 999px;
+  height: 9px;
+  overflow: hidden;
+}
+
+.branch-progress i {
+  background: #70a971;
+  display: block;
+  height: 100%;
+}
+
+.tree-unit-list {
+  border-top: 1px solid #edf0ed;
+  padding: 0.9rem 1rem 1rem;
+}
+
+.tree-unit-list article {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.tree-unit-list article > div:first-child {
+  display: grid;
+}
+
+.leaf-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.leaf-stats span {
+  background: #f0f5eb;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.6rem;
+}
+
+.achievement-hero {
+  background: linear-gradient(135deg, #f7e9ae, #fff9e4);
+  border: 1px solid #ecd48c;
+  border-radius: 24px;
+  padding: clamp(1.2rem, 4vw, 2rem);
+}
+
+.achievement-grid article {
+  text-align: center;
+}
+
+.next-reward-card h2 {
+  margin-bottom: 0.2rem;
+}
+
+.star-history article,
+.reward-goal-list article {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e4e6df;
+  border-radius: 14px;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 58px;
+  padding: 0.7rem 0.9rem;
+}
+
+.star-history article > span {
+  color: #835f12;
+  font-weight: 850;
+}
+
+.settings-page {
+  display: grid;
+  gap: 1.25rem;
+  padding-block: 2.5rem 6rem;
+}
+
+.settings-page h1 {
+  font-family: "Noto Serif SC", SimSun, serif;
+  font-size: clamp(2.2rem, 6vw, 3.8rem);
+  margin: 0.25rem 0;
+}
+
+.reward-setting-card {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.reward-setting-card p,
+.reward-goals-panel > div > p {
+  color: var(--ink-soft);
+  margin-bottom: 0;
+}
+
+.setting-toggle {
+  align-items: center;
+  background: #edf0ed;
+  border: 1px solid #d6ddd7;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.45rem 0.8rem;
+}
+
+.setting-toggle span {
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(23, 35, 31, 0.2);
+  height: 24px;
+  width: 24px;
+}
+
+.setting-toggle.on {
+  background: var(--mint);
+  color: var(--forest-dark);
+}
+
+.reward-goals-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.reward-goal-form {
+  align-items: end;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(220px, 2fr) minmax(130px, 1fr) auto;
+}
+
+.reward-goal-form label {
+  display: grid;
+  font-size: 0.86rem;
+  font-weight: 750;
+  gap: 0.35rem;
+}
+
+.reward-goal-form input {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 0.6rem 0.75rem;
+}
+
+@media (min-width: 1280px) {
+  .child-feature-grid,
+  .achievement-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .child-story-grid,
+  .child-science-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .parent-account-nav a:nth-child(-n + 5) {
+    display: none;
+  }
+
+  .desktop-mode-nav {
+    display: none;
+  }
+
+  .mobile-bottom-nav {
+    align-items: stretch;
+    background: rgba(255, 253, 248, 0.96);
+    border-top: 1px solid var(--line);
+    bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    left: 0;
+    padding: 0.35rem max(0.4rem, env(safe-area-inset-right)) calc(0.35rem + env(safe-area-inset-bottom)) max(0.4rem, env(safe-area-inset-left));
+    position: fixed;
+    right: 0;
+    z-index: 20;
+  }
+
+  .mobile-bottom-nav a {
+    align-items: center;
+    border-radius: 12px;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    justify-content: center;
+    min-height: 54px;
+    min-width: 0;
+  }
+
+  .mobile-bottom-nav a[aria-current="page"] {
+    background: var(--mint);
+    color: var(--forest-dark);
+    font-weight: 850;
+  }
+
+  .mobile-bottom-nav small {
+    font-size: 0.7rem;
+  }
+
+  body {
+    padding-bottom: calc(62px + env(safe-area-inset-bottom));
+  }
+
+  .site-footer {
+    margin-bottom: calc(62px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 600px) {
+  .child-page {
+    padding-inline: 16px;
+  }
+
+  .child-mode-header {
+    width: calc(100% - 32px);
+  }
+
+  .parent-mode-exit {
+    font-size: 0.78rem;
+    padding-inline: 0.75rem;
+  }
+
+  .child-mode-brand {
+    font-size: 0.95rem;
+  }
+
+  .child-welcome,
+  .achievement-hero {
+    align-items: flex-start;
+  }
+
+  .child-star-pill,
+  .achievement-hero > strong {
+    font-size: 0.88rem;
+    padding: 0.55rem 0.7rem;
+  }
+
+  .child-feature-grid,
+  .child-story-grid,
+  .child-science-grid,
+  .achievement-grid,
+  .cross-domain-trees {
+    grid-template-columns: 1fr;
+  }
+
+  .child-task-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .child-task-cta {
+    grid-column: 2;
+  }
+
+  .child-today-task {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .child-today-task > a {
+    grid-column: 1 / -1;
+  }
+
+  .tree-course-branch summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .branch-progress {
+    grid-column: 1 / -1;
+  }
+
+  .tree-unit-list article,
+  .reward-setting-card,
+  .parent-achievement-card,
+  .child-error {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .parent-achievement-actions {
+    align-items: flex-start;
+    white-space: normal;
+  }
+
+  .reward-goal-form {
+    grid-template-columns: 1fr;
+  }
+
+  .star-history article,
+  .reward-goal-list article {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .star-history article small,
+  .reward-goal-list article small {
+    grid-column: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .child-task-row,
+  .child-story-card,
+  .child-science-card,
+  .child-feature-grid a {
+    transform: none !important;
+  }
+}

@@ -15,6 +15,8 @@ import {
   type ReadingSummary,
   type ScienceRecommendation,
   type TeacherTask,
+  type AchievementSummary,
+  getAchievements,
   getCharacterMasterySummary,
   getRecentGrowth,
   getReadingSummary,
@@ -60,6 +62,7 @@ function ParentHomeContent() {
   const [science, setScience] = useState<ScienceRecommendation[]>([]);
   const [recentGrowth, setRecentGrowth] = useState<GrowthEvent[]>([]);
   const [teacherTasks, setTeacherTasks] = useState<TeacherTask[]>([]);
+  const [achievements, setAchievements] = useState<AchievementSummary | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -76,8 +79,9 @@ function ParentHomeContent() {
       listScienceRecommendations(activeChild.id),
       getRecentGrowth(activeChild.id),
       getChildTeacherTasks(activeChild.id),
+      getAchievements(activeChild.id),
     ])
-      .then(([summaryValue, planValue, readingValue, scienceValue, growthValue, taskValue]) => {
+      .then(([summaryValue, planValue, readingValue, scienceValue, growthValue, taskValue, achievementValue]) => {
         if (!cancelled) {
           setSummary(summaryValue);
           setPlan(planValue);
@@ -85,6 +89,7 @@ function ParentHomeContent() {
           setScience(scienceValue);
           setRecentGrowth(growthValue);
           setTeacherTasks(taskValue);
+          setAchievements(achievementValue);
           setError("");
         }
       })
@@ -153,6 +158,7 @@ function ParentHomeContent() {
             setSummary(null);
             setPlan(null);
             setReadingSummary(null);
+            setAchievements(null);
             setError("");
             setActiveChildId(childId);
           }}
@@ -168,6 +174,10 @@ function ParentHomeContent() {
         <div className="profile-mark" aria-hidden="true">
           {childName.slice(0, 1)}
         </div>
+        <Link className="enter-child-mode" href="/kids">
+          <span aria-hidden="true">🌱</span>
+          进入孩子模式
+        </Link>
       </div>
 
       {error ? <p className="form-message form-error">{error}</p> : null}
@@ -264,6 +274,23 @@ function ParentHomeContent() {
             </article>
           ))}
           {recentGrowth.length === 0 ? <p>从学习、阅读、科学探索或一条家庭记录开始积累成长瞬间。</p> : null}
+        </div>
+      </section>
+
+      <section className="parent-achievement-card">
+        <div>
+          <p className="eyebrow">Positive encouragement</p>
+          <h2>最近成就</h2>
+          {achievements?.achievements[0] ? (
+            <p>{achievements.achievements[0].icon} {achievements.achievements[0].title} · {achievements.achievements[0].description}</p>
+          ) : (
+            <p>真实完成一次学习、阅读或实验后，成长时刻会出现在这里。</p>
+          )}
+        </div>
+        <div className="parent-achievement-actions">
+          {achievements?.stars_enabled ? <strong>⭐ {achievements.star_balance}</strong> : null}
+          <Link href="/kids/achievements">查看孩子成就</Link>
+          <Link href="/settings">鼓励设置</Link>
         </div>
       </section>
 
