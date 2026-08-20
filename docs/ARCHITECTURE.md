@@ -209,7 +209,7 @@ append-only learning / reading / science evidence + parent notes
 
 GrowthEvent 投影器只读取已有事实并用稳定幂等键补齐事件，不反向修改来源。报告指标由应用服务计算；可选 AI 只生成单独标注的叙述。家庭导出在临时文件中逐条写入并在上传私有对象存储前验证 manifest 和 SHA-256，避免在内存拼装全部媒体。
 
-运维面由 `gl-backup` 生成 PostgreSQL dump、对象清单和校验材料；对象二进制由独立 volume 快照或受控镜像保存。恢复是经过隔离演练的人工流程，永不由部署脚本隐式执行。
+运维面由 `gl-backup` 生成 PostgreSQL dump、对象清单、私有对象二进制归档和校验材料。恢复是经过隔离 PostgreSQL / MinIO namespace 演练的人工流程，永不由部署脚本隐式执行。`/health` 仅返回 V1 版本和 CI 构建 revision，不包含 author、配置或 secret。
 
 ## 16. Phase 10 reusable course layer
 
@@ -244,3 +244,7 @@ Parent and Child modes are route/navigation boundaries, not alternate authorizat
 one household-authorized active child and removes adult settings and private archive surfaces. API guards stay
 authoritative. Achievement rebuild reads evidence without rewriting it; reward balance is derived from a
 positive-only ledger with source idempotency. See [Phase 11 experience policy](CHILD_EXPERIENCE.md).
+
+## 18. V1 release boundary
+
+V1 固定为 `1.0.0`，Alembic head 为 `20260820_0011`。Release SHA 同时绑定 CI、前后端镜像 label、后端健康响应、生产部署、E2E 和恢复演练。角色边界见 [V1 角色与隐私矩阵](ROLE_PRIVACY_MATRIX.md)，发布/回滚门禁见 [V1 发布清单](RELEASE_CHECKLIST.md)。Phase 12 不增加第二套 mastery、课程或成长事实；未来工作进入 V2 backlog 或普通维护 release。

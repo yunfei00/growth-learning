@@ -230,3 +230,12 @@ Teacher Course 可见性不能替代 `TeacherChildRelation`；Family Admin 未�
 
 上述孩子端点不授予 Teacher 或 System Admin 隐式访问。星星账本不存在扣减接口，也不接受客户端
 提交金额；服务只从 canonical completed event 和版本化 achievement rule 生成正向条目。
+
+### V1 operator endpoints
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/health` | Liveness；只返回 `status`、`version=1.0.0` 与安全截短的 build revision |
+| `GET` | `/docs` | FastAPI OpenAPI UI；生产经 `/growth/api/docs` 有意开放用于当前自托管验收 |
+
+健康响应不返回环境、数据库、对象存储、AI 配置、author 或 secret。家庭私有 API 的权限矩阵见 [V1 角色与隐私矩阵](ROLE_PRIVACY_MATRIX.md)。

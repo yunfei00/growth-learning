@@ -1,6 +1,6 @@
 # Growth Learning
 
-Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 9 在同一真实证据体系上加入家长逐孩子授权、随时可撤销的有限教师协作。
+Growth Learning `1.0.0` 是一个面向儿童长期学习与成长记录的家庭中心平台。V1 把家庭、识字学习与复习、课程、掌握度约束阅读、科学实验、老师协作、成长档案和孩子体验建立在同一套可追溯 evidence 上；不以虚构分数、排名或第二套 mastery 取代真实记录。
 
 ## 当前用户流程
 
@@ -117,19 +117,19 @@ GROWTH_LEARNING_BIND_ADDRESS=127.0.0.1 \
   bash scripts/server-bootstrap.sh
 ```
 
-更新命令：
+常用运维命令：
 
 ```bash
+gl-start
+gl-stop
+gl-restart
+gl-status
+gl-logs backend
 gl-update
-```
-
-备份命令：
-
-```bash
 gl-backup
 ```
 
-`gl-backup` 生成 PostgreSQL custom dump、私有对象清单、服务状态、manifest 和 SHA-256 校验材料；MinIO 二进制对象仍须通过独立 volume 快照或受控镜像保存。恢复前必须按 [备份恢复手册](docs/BACKUP_RESTORE.md) 在隔离环境演练。
+所有命令只操作 `growth-learning` Compose project。`gl-stop`/`gl-restart` 保留 named volumes；生产更新不需要 stop。`gl-backup` 生成 PostgreSQL custom dump、私有对象清单与二进制归档、服务状态、manifest 和 SHA-256 校验材料。恢复前必须按 [备份恢复手册](docs/BACKUP_RESTORE.md) 在隔离数据库与 bucket 演练。
 
 `gl-update` 只允许 clean working tree，并执行 fast-forward pull。部署脚本下载 CI 为当前 commit 构建的前后端镜像，然后按以下顺序更新：
 
@@ -148,6 +148,8 @@ gl-backup
 ```
 
 流程不执行 `docker compose down`，不删除 named volumes，也不运行任何 Docker prune 命令。
+
+回滚应用时先备份，再切换到已验证 commit 与同 revision 镜像；不要在生产盲目执行 `alembic downgrade`。完整发布门禁和回滚规则见 [V1 发布清单](docs/RELEASE_CHECKLIST.md)。
 
 公网地址：
 
@@ -171,6 +173,10 @@ gl-backup
 - [Phase 11 家长/孩子双模式与正向成长体验](docs/CHILD_EXPERIENCE.md)
 - [家庭导出格式 V1](docs/EXPORT_FORMAT.md)
 - [生产备份与恢复演练](docs/BACKUP_RESTORE.md)
+- [V1 角色与隐私矩阵](docs/ROLE_PRIVACY_MATRIX.md)
+- [V1 发布清单](docs/RELEASE_CHECKLIST.md)
+- [V1 已知限制](docs/KNOWN_LIMITATIONS.md)
+- [1.0.0 变更日志](CHANGELOG.md)
 
 ## 安全边界
 
@@ -191,3 +197,7 @@ gl-backup
 - 所有正式业务外键使用 `ON DELETE RESTRICT`；当前不提供孩子物理删除。
 - Teacher 只能通过 Family Admin 对单一孩子建立的 active 外部授权关系访问有限教学 DTO，不能自动成为 `FamilyMember`；撤销实时生效。
 - 课程只引用 canonical `KnowledgePoint`；课程完成不等于掌握，兄弟复制不复制任何 mastery 或 evidence。
+
+## V1 范围与限制
+
+V1 的汉字目录/课程阶段为项目定义；AI 故事需要可选运行时 Provider；没有孩子独立账号、完整数学/英语课程、学校级 LMS、排行榜或开放聊天。Growth Book PDF 使用浏览器打印。详情见 [V1 已知限制](docs/KNOWN_LIMITATIONS.md)。后续工作进入 V2 backlog、普通 bug 或 `1.0.x` 维护版本，不创建 Phase 13。

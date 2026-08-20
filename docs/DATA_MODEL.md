@@ -263,3 +263,7 @@ session 引用。
 
 成长树与统一 Today 是查询投影，不新增平行事实表。所有新增外键使用 `ON DELETE RESTRICT`。
 规则、隐私和响应式约定见 [Phase 11 孩子体验](CHILD_EXPERIENCE.md)。
+
+## V1 schema freeze
+
+Growth Learning `1.0.0` 的唯一 Alembic head 是 `20260820_0011`。Phase 12 没有新增业务表或 destructive migration：LearningRecord、AssessmentItem、ChildKnowledgeState、历史 Story/Science/Growth 快照及原 200 字 UUID 均保持原样。备份恢复使用 PostgreSQL custom dump 与 MinIO 私有对象归档，不以 ORM 重建或覆盖历史证据。
