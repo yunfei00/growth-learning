@@ -207,7 +207,7 @@ function GrowthArchive() {
               <div className="growth-event-card">
                 <div><span>{CATEGORY_LABELS[event.category]}</span><time>{new Date(event.occurred_at).toLocaleString("zh-CN")}</time></div>
                 <h3>{event.title}</h3><p>{event.body}</p>
-                <small>{event.source_type === "system" ? "系统按真实证据生成" : `${event.actor_display_name || "家人"} 记录`}</small>
+                <small>{event.source_type === "system" ? "系统按真实证据生成" : event.source_type === "teacher" ? `${event.actor_display_name || "老师"} 教学记录` : `${event.actor_display_name || "家人"} 记录`}</small>
                 {event.media.map((media) => <div className="growth-media" key={media.id}>{media.media_kind === "image" ? <Image alt={media.original_filename} height={320} src={`${getApiBaseUrl()}${media.content_url}`} unoptimized width={420} /> : media.media_kind === "video" ? <video controls src={`${getApiBaseUrl()}${media.content_url}`} /> : <audio controls src={`${getApiBaseUrl()}${media.content_url}`} />}</div>)}
                 {event.source_url ? <Link href={event.source_url}>查看原始记录 →</Link> : null}
                 {family.current_role === "admin" ? <label className="event-select"><input checked={selectedEvents.includes(event.id)} onChange={() => setSelectedEvents((current) => current.includes(event.id) ? current.filter((id) => id !== event.id) : [...current, event.id])} type="checkbox" />选入成长册</label> : null}

@@ -38,6 +38,8 @@ export function AppHeader() {
             <Link href="/read">我的故事书</Link>
             <Link href="/science">周末科学</Link>
             <Link href="/growth">成长档案</Link>
+            <Link href="/teacher-collaboration">老师协作</Link>
+            <Link href="/teacher">教师模式</Link>
             {user?.system_role === "admin" ? <Link href="/admin">管理后台</Link> : null}
             <span className="header-user">{user?.display_name}</span>
             <button

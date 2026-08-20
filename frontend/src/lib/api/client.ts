@@ -607,7 +607,7 @@ export type GrowthEvent = {
   occurred_at: string;
   title: string;
   body: string;
-  source_type: "system" | "parent" | "companion";
+  source_type: "system" | "parent" | "companion" | "teacher";
   actor_user_id: string | null;
   actor_display_name: string | null;
   source_entity_type: string | null;
@@ -1373,4 +1373,327 @@ export async function downloadFamilyExport(job: ExportJob): Promise<void> {
   link.download = `growth-learning-export-${job.id}.zip`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+export type TeacherProfile = {
+  id: string;
+  display_name: string;
+  organization_name: string | null;
+  short_bio: string | null;
+  teacher_code: string;
+  status: "active" | "disabled";
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeacherPublicProfile = Pick<
+  TeacherProfile,
+  "id" | "display_name" | "organization_name" | "short_bio"
+>;
+
+export type TeacherClassroom = {
+  id: string;
+  name: string;
+  description: string | null;
+  class_code: string;
+  status: "active" | "archived";
+  student_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeacherAssignmentType =
+  | "character_learning"
+  | "character_review"
+  | "recognition_check"
+  | "reading"
+  | "freeform_instruction";
+
+export type AssignmentCharacter = {
+  knowledge_point_id: string;
+  character: string;
+  pinyin: string;
+  position: number;
+};
+
+export type TeacherTask = {
+  assignment_id: string;
+  teacher: TeacherPublicProfile;
+  classroom_name: string | null;
+  title: string;
+  instructions: string;
+  assignment_type: TeacherAssignmentType;
+  due_at: string | null;
+  progress_status: "pending" | "in_progress" | "completed" | "overdue";
+  completed_item_count: number;
+  total_item_count: number;
+  characters: AssignmentCharacter[];
+};
+
+export type TeacherTaskProgress = TeacherTask & {
+  learning_session_id: string | null;
+  assessment_session_id: string | null;
+  reading_session_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  completed_learning_point_ids: string[];
+  assessment_outcomes: Record<string, string>;
+};
+
+export type TeacherAssignment = {
+  id: string;
+  teacher: TeacherPublicProfile;
+  classroom_id: string | null;
+  classroom_name: string | null;
+  title: string;
+  instructions: string;
+  assignment_type: TeacherAssignmentType;
+  due_at: string | null;
+  status: "draft" | "published" | "closed" | "archived";
+  published_at: string | null;
+  characters: AssignmentCharacter[];
+  targets: Array<{
+    child_id: string;
+    child_name: string;
+    progress_status: "pending" | "in_progress" | "completed" | "overdue";
+    completed_item_count: number;
+    total_item_count: number;
+  }>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TeacherObservation = {
+  id: string;
+  teacher: TeacherPublicProfile;
+  child_id: string;
+  category: "recognition" | "reading" | "expression" | "learning_habit" | "participation" | "other";
+  original_text: string;
+  occurred_at: string;
+  classroom_id: string | null;
+  assignment_id: string | null;
+  knowledge_point_ids: string[];
+  created_at: string;
+};
+
+export type TeacherStudent = {
+  child_id: string;
+  display_name: string;
+  nickname: string | null;
+  age_band: string;
+  assignments: TeacherTask[];
+  relevant_mastery: Array<{
+    knowledge_point_id: string;
+    character: string;
+    pinyin: string;
+    mastery_level: MasteryLevel;
+    mastery_score: number;
+    is_priority: boolean;
+  }>;
+  observations: TeacherObservation[];
+};
+
+export type TeacherDashboard = {
+  profile: TeacherProfile;
+  classrooms: TeacherClassroom[];
+  students: TeacherStudent[];
+  assignments: TeacherAssignment[];
+  pending_review_count: number;
+  recent_completed_count: number;
+};
+
+export type ParentTeacherCollaboration = {
+  relations: Array<{
+    id: string;
+    child_id: string;
+    teacher: TeacherPublicProfile;
+    status: "active" | "revoked";
+    authorized_at: string;
+    revoked_at: string | null;
+    permission_version: string;
+  }>;
+  classrooms: Array<{
+    id: string;
+    classroom_id: string;
+    classroom_name: string;
+    teacher: TeacherPublicProfile;
+    status: "active" | "left";
+    joined_at: string;
+    left_at: string | null;
+  }>;
+  assignments: TeacherTask[];
+  observations: TeacherObservation[];
+};
+
+export type AssignmentAnalytics = {
+  assignment_id: string;
+  total: number;
+  pending: number;
+  in_progress: number;
+  completed: number;
+  overdue: number;
+  outcome_counts: Record<string, number>;
+  character_outcomes: Record<string, Record<string, number>>;
+  common_errors: string[];
+  ranking_enabled: false;
+};
+
+export function getTeacherProfile(): Promise<TeacherProfile> {
+  return request<TeacherProfile>("/api/v1/teacher/profile");
+}
+
+export function enableTeacherMode(payload: {
+  display_name: string;
+  organization_name?: string | null;
+  short_bio?: string | null;
+}): Promise<TeacherProfile> {
+  return request<TeacherProfile>("/api/v1/teacher/profile", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function rotateTeacherCode(): Promise<TeacherProfile> {
+  return request<TeacherProfile>("/api/v1/teacher/profile/rotate-code", { method: "POST" });
+}
+
+export function getTeacherDashboard(): Promise<TeacherDashboard> {
+  return request<TeacherDashboard>("/api/v1/teacher/dashboard");
+}
+
+export function createTeacherClassroom(payload: {
+  name: string;
+  description?: string | null;
+}): Promise<TeacherClassroom> {
+  return request<TeacherClassroom>("/api/v1/teacher/classrooms", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function resolveTeacherConnection(code: string): Promise<{
+  kind: "teacher" | "classroom";
+  teacher: TeacherPublicProfile;
+  classroom: TeacherClassroom | null;
+}> {
+  return request(`/api/v1/teacher/connections/resolve?code=${encodeURIComponent(code)}`);
+}
+
+export function connectChildTeacher(childId: string, code: string): Promise<unknown> {
+  return request(`/api/v1/children/${childId}/teacher-connections`, {
+    method: "POST",
+    body: jsonBody({ code }),
+  });
+}
+
+export function revokeChildTeacher(
+  childId: string,
+  relationId: string,
+): Promise<unknown> {
+  return request(`/api/v1/children/${childId}/teacher-connections/${relationId}/revoke`, {
+    method: "POST",
+  });
+}
+
+export function leaveTeacherClassroom(childId: string, membershipId: string): Promise<void> {
+  return request(`/api/v1/children/${childId}/teacher-classrooms/${membershipId}/leave`, {
+    method: "POST",
+  });
+}
+
+export function getParentTeacherCollaboration(
+  childId: string,
+): Promise<ParentTeacherCollaboration> {
+  return request(`/api/v1/children/${childId}/teacher-collaboration`);
+}
+
+export function createTeacherAssignment(payload: {
+  classroom_id?: string | null;
+  title: string;
+  instructions: string;
+  assignment_type: TeacherAssignmentType;
+  due_at?: string | null;
+  target_child_ids: string[];
+  knowledge_point_ids: string[];
+}): Promise<TeacherAssignment> {
+  return request<TeacherAssignment>("/api/v1/teacher/assignments", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function publishTeacherAssignment(assignmentId: string): Promise<TeacherAssignment> {
+  return request<TeacherAssignment>(`/api/v1/teacher/assignments/${assignmentId}/publish`, {
+    method: "POST",
+  });
+}
+
+export function getTeacherAssignment(assignmentId: string): Promise<TeacherAssignment> {
+  return request<TeacherAssignment>(`/api/v1/teacher/assignments/${assignmentId}`);
+}
+
+export function getTeacherAssignmentAnalytics(
+  assignmentId: string,
+): Promise<AssignmentAnalytics> {
+  return request(`/api/v1/teacher/assignments/${assignmentId}/analytics`);
+}
+
+export function getTeacherStudent(childId: string): Promise<TeacherStudent> {
+  return request(`/api/v1/teacher/students/${childId}`);
+}
+
+export function addTeacherObservation(
+  childId: string,
+  payload: {
+    category: TeacherObservation["category"];
+    original_text: string;
+    occurred_at: string;
+    classroom_id?: string | null;
+    assignment_id?: string | null;
+    knowledge_point_ids?: string[];
+  },
+): Promise<TeacherObservation> {
+  return request(`/api/v1/teacher/students/${childId}/observations`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function getChildTeacherTasks(childId: string): Promise<TeacherTask[]> {
+  return request(`/api/v1/children/${childId}/teacher-tasks`);
+}
+
+export function startTeacherTask(
+  childId: string,
+  assignmentId: string,
+): Promise<TeacherTaskProgress> {
+  return request(`/api/v1/children/${childId}/teacher-tasks/${assignmentId}/start`, {
+    method: "POST",
+  });
+}
+
+export function submitTeacherTask(
+  childId: string,
+  assignmentId: string,
+  payload: {
+    learning_point_ids?: string[];
+    assessment_items?: Array<{
+      knowledge_point_id: string;
+      outcome: "correct" | "hinted_correct" | "uncertain" | "incorrect";
+      response_time_ms?: number | null;
+    }>;
+    reading_session_id?: string | null;
+    complete?: boolean;
+  },
+): Promise<TeacherTaskProgress> {
+  return request(`/api/v1/children/${childId}/teacher-tasks/${assignmentId}/progress`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function listEnabledCharacters(search = ""): Promise<CharacterPage> {
+  const query = new URLSearchParams({ page: "1", page_size: "100" });
+  if (search) query.set("search", search);
+  return request<CharacterPage>(`/api/v1/characters?${query}`);
 }

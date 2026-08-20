@@ -14,10 +14,12 @@ import {
   type GrowthEvent,
   type ReadingSummary,
   type ScienceRecommendation,
+  type TeacherTask,
   getCharacterMasterySummary,
   getRecentGrowth,
   getReadingSummary,
   getTodayPlan,
+  getChildTeacherTasks,
   listScienceRecommendations,
 } from "@/lib/api/client";
 
@@ -57,6 +59,7 @@ function ParentHomeContent() {
   const [readingSummary, setReadingSummary] = useState<ReadingSummary | null>(null);
   const [science, setScience] = useState<ScienceRecommendation[]>([]);
   const [recentGrowth, setRecentGrowth] = useState<GrowthEvent[]>([]);
+  const [teacherTasks, setTeacherTasks] = useState<TeacherTask[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -72,14 +75,16 @@ function ParentHomeContent() {
       getReadingSummary(activeChild.id),
       listScienceRecommendations(activeChild.id),
       getRecentGrowth(activeChild.id),
+      getChildTeacherTasks(activeChild.id),
     ])
-      .then(([summaryValue, planValue, readingValue, scienceValue, growthValue]) => {
+      .then(([summaryValue, planValue, readingValue, scienceValue, growthValue, taskValue]) => {
         if (!cancelled) {
           setSummary(summaryValue);
           setPlan(planValue);
           setReadingSummary(readingValue);
           setScience(scienceValue);
           setRecentGrowth(growthValue);
+          setTeacherTasks(taskValue);
           setError("");
         }
       })
@@ -227,6 +232,24 @@ function ParentHomeContent() {
             <p>正在根据复习积压和近期表现生成今日任务…</p>
           </div>
         )}
+      </section>
+
+      <section className="teacher-tasks-home">
+        <div className="section-title-row">
+          <div><p className="eyebrow">老师任务</p><h2>家长授权的教学协作</h2></div>
+          <Link href="/teacher-collaboration">老师协作设置</Link>
+        </div>
+        <div className="teacher-task-home-list">
+          {teacherTasks.slice(0, 4).map((task) => (
+            <article key={task.assignment_id}>
+              <div><strong>{task.teacher.display_name} · {task.title}</strong><span>{task.progress_status}</span></div>
+              <p>{task.instructions}</p>
+              <small>{task.characters.map((item) => item.character).join("、") || "阅读 / 线下说明"}</small>
+              {task.progress_status !== "completed" ? <Link href={`/teacher-tasks/${task.assignment_id}/${activeChild.id}`}>开始 / 继续</Link> : <span>已完成</span>}
+            </article>
+          ))}
+          {teacherTasks.length === 0 ? <p className="empty-note">当前没有老师任务，不影响今日新字、复习、阅读或科学实验。</p> : null}
+        </div>
       </section>
 
       <section className="recent-growth-home">
