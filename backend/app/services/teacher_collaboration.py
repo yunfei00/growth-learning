@@ -1057,10 +1057,22 @@ async def submit_task_progress(
         await session.flush()
         progress.completed_item_count = len(set(existing) | submitted)
     elif assignment.assignment_type == TeacherAssignmentType.READING:
-        if payload.reading_session_id:
+        reading_session_id = payload.reading_session_id
+        if reading_session_id is None and payload.complete:
+            reading_session_id = await session.scalar(
+                select(ReadingSession.id)
+                .where(
+                    ReadingSession.child_id == child_id,
+                    ReadingSession.status == ReadingStatus.COMPLETED,
+                    ReadingSession.completed_at >= assignment.published_at,
+                )
+                .order_by(ReadingSession.completed_at.desc())
+                .limit(1)
+            )
+        if reading_session_id:
             reading = await session.scalar(
                 select(ReadingSession).where(
-                    ReadingSession.id == payload.reading_session_id,
+                    ReadingSession.id == reading_session_id,
                     ReadingSession.child_id == child_id,
                     ReadingSession.status == ReadingStatus.COMPLETED,
                 )
