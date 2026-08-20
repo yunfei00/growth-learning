@@ -12,6 +12,7 @@ from app.api.v1.learning import router as learning_router
 from app.api.v1.science import router as science_router
 from app.api.v1.science_admin import router as science_admin_router
 from app.api.v1.stories import router as stories_router
+from app.api.v1.teacher import router as teacher_router
 from app.schemas.system import ApiInfoResponse
 
 router = APIRouter(tags=["api"])
@@ -24,6 +25,7 @@ router.include_router(learning_router)
 router.include_router(science_admin_router)
 router.include_router(science_router)
 router.include_router(stories_router)
+router.include_router(teacher_router)
 router.include_router(children_router)
 
 

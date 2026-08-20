@@ -70,7 +70,7 @@ class GrowthEventResponse(BaseModel):
     occurred_at: datetime
     title: str
     body: str
-    source_type: Literal["system", "parent", "companion"]
+    source_type: Literal["system", "parent", "companion", "teacher"]
     actor_user_id: uuid.UUID | None
     actor_display_name: str | None
     source_entity_type: str | None
