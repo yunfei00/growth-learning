@@ -210,3 +210,23 @@ append-only learning / reading / science evidence + parent notes
 GrowthEvent 投影器只读取已有事实并用稳定幂等键补齐事件，不反向修改来源。报告指标由应用服务计算；可选 AI 只生成单独标注的叙述。家庭导出在临时文件中逐条写入并在上传私有对象存储前验证 manifest 和 SHA-256，避免在内存拼装全部媒体。
 
 运维面由 `gl-backup` 生成 PostgreSQL dump、对象清单和校验材料；对象二进制由独立 volume 快照或受控镜像保存。恢复是经过隔离演练的人工流程，永不由部署脚本隐式执行。
+
+## 16. Phase 10 reusable course layer
+
+```text
+versioned CatalogRelease ──> canonical KnowledgePoint
+                                  ▲
+Course ──> Unit ──> Activity ─────┘
+                        │
+ChildCourseEnrollment ──> ActivityProgress ──> canonical evidence session
+                                                    │
+                                                    └──> ChildKnowledgeState
+```
+
+课程是 knowledge/evidence 上方的编排层，不是第二套学习真相。Review V1 先计算新字容量；
+`review_planning` 只在容量大于零时依照 priority、active enrollment path/order、catalog fallback
+选择候选。家庭、老师和系统 ownership 在数据库约束与 API authorization 两层强制执行。
+
+Catalog importer 以原 character/canonical key upsert，并在建立 release membership 前比较既有
+UUID。历史 literacy sampling frame、StoryVersion 和 science links 都不参与重算。部署在数据库
+migration 后、应用容器替换前运行幂等 importer，因此失败会阻止新应用切换但不会停止旧服务。

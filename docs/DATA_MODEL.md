@@ -232,3 +232,20 @@ Phase 5 新增表的每条业务外键均显式使用 `ON DELETE RESTRICT`。派
 `growth_reports` / `growth_report_versions` 将报告身份与不可变版本分离。版本固定时间范围、真实指标、数据充分性、可解释章节及可选 AI 叙述；AI 字段不参与规范指标。`growth_books` / `growth_book_versions` 同样保留每次选择的事件、媒体和家长寄语快照，旧版本不会被后续编辑覆盖。
 
 `export_jobs` 保存家庭管理员导出的状态、范围、私有对象键、manifest 校验结果、校验和与过期时间。导出 ZIP 使用 `growth-learning-export-v1`，不会保存认证或基础设施 secret。上述表全部采用 UUID、审计时间和显式 `ON DELETE RESTRICT`，没有账户级联删除孩子多年数据的路径。
+
+## Phase 10 课程与版本化字库
+
+`catalog_releases` 保存 catalog version、来源、引用、许可、导入时间、数量和 current 标记；
+`character_catalog_entries` 将一次 release 的稳定顺序映射到既有 `KnowledgePoint`。Catalog
+导入不会替换 `knowledge_points` 或 `chinese_characters`，原 200 字 UUID 保持不变。
+
+`courses` 支持 `system`、`family`、`teacher`、`textbook_reference`，所有权由互斥约束固定；
+`course_units` 与 `learning_activities` 保存通用层级，`activity_knowledge_points` 只引用
+canonical knowledge，并记录角色和顺序。`child_course_enrollments` 保存孩子所选路径、课程
+版本、状态和顺序，`course_activity_progress` 只保存活动完成事实及其 canonical evidence
+session 引用。
+
+课程完成比例不写入 `ChildKnowledgeState`。字符学习活动完成会追加 `LearningRecord` 并调用
+统一 mastery/review 重算；识字正确性仍只能来自 `AssessmentItem`。兄弟复制不触碰任何
+掌握度、证据、复习、估算、故事、科学或成长数据。所有新增业务外键均为
+`ON DELETE RESTRICT`。完整边界见 [课程架构与 Catalog 来源](COURSE_ARCHITECTURE.md)。

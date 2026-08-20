@@ -119,6 +119,19 @@
 
 退出条件：迁移与 CI 通过；Family Admin 授权/撤销、任务 evidence、观察投影和生产公网闭环验收；Issue #9 关闭。
 
+## Phase 10：可复用课程与扩展汉字 Catalog（已实现）
+
+- Generic Course / Unit / LearningActivity 与 canonical KnowledgePoint mapping
+- 系统汉字路径：起步 100、基础 300、进阶 500、扩展 1000+
+- 1,200 字 versioned catalog、Unicode-3.0 provenance 与幂等导入
+- 原 200 UUID、旧 `/200` literacy estimate、Story/Science 历史兼容
+- 自适应复习先决定容量，课程只决定新字顺序
+- 家庭/教材参考课程、家长授权后的老师课程、兄弟路径安全复制
+- 家庭端、教师端与 System Admin 端的移动可用课程页面
+
+退出条件：additive migration、PostgreSQL/权限/历史兼容测试与 CI 通过；生产导入、系统课程、
+今日计划和真实 evidence 验收；Issue #10 关闭。Phase 11 UI/reward work 不在本阶段。
+
 ## 后续：质量、规模与持续优化
 
 - 可访问性、性能预算与安全审计

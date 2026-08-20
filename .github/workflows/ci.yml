@@ -138,6 +138,10 @@ jobs:
                   "teacher_assignment_targets", "teacher_assignment_knowledge_points",
                   "teacher_assignment_progress", "teacher_observations",
                   "teacher_observation_knowledge_points",
+                  "catalog_releases", "character_catalog_entries",
+                  "courses", "course_units", "learning_activities",
+                  "activity_knowledge_points", "child_course_enrollments",
+                  "course_activity_progress",
               }
               missing = required - tables
               if missing:

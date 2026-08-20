@@ -138,6 +138,7 @@ gl-backup
 → 启动/确认 PostgreSQL、Redis、MinIO healthy
 → alembic upgrade head
 → alembic current
+→ 幂等导入 1,200 字 versioned Chinese Catalog 与系统课程
 → 幂等导入 Starter 科学实验
 → 从原始证据重算 Review V1 日程
 → 幂等补齐 GrowthEvent V1 投影并清理过期导出
@@ -165,6 +166,7 @@ gl-backup
 - [Phase 7 科学实验数据与隐私边界](docs/DATA_MODEL.md#phase-7-周末科学实验室)
 - [Phase 8 成长档案与报告](docs/GROWTH_ARCHIVE.md)
 - [Phase 9 家长授权的老师协作](docs/TEACHER_COLLABORATION.md)
+- [Phase 10 可复用课程与 Catalog 来源](docs/COURSE_ARCHITECTURE.md)
 - [家庭导出格式 V1](docs/EXPORT_FORMAT.md)
 - [生产备份与恢复演练](docs/BACKUP_RESTORE.md)
 
@@ -186,3 +188,4 @@ gl-backup
 - 所有 `/api/v1/admin/*` 在后端统一校验系统管理员角色；普通/家庭管理员均返回 `403`。
 - 所有正式业务外键使用 `ON DELETE RESTRICT`；当前不提供孩子物理删除。
 - Teacher 只能通过 Family Admin 对单一孩子建立的 active 外部授权关系访问有限教学 DTO，不能自动成为 `FamilyMember`；撤销实时生效。
+- 课程只引用 canonical `KnowledgePoint`；课程完成不等于掌握，兄弟复制不复制任何 mastery 或 evidence。

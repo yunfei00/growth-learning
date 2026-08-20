@@ -199,3 +199,20 @@ Provider 未配置时 context 返回 `provider_configured=false`，生成返回 
 | `GET` | `/api/v1/families/{family_id}/exports/{id}/download` | 短期、禁止缓存、过期后 `410` |
 
 报告、成长书和导出写操作不授权给 companion。平台 system admin 不绕过 FamilyMember，跨家庭资源按 `404` 处理。AI Provider 未配置时确定性报告仍可成功，仅省略可选叙述。
+
+### Reusable courses and catalog
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/courses?child_id=` | 家庭鉴权后列出系统、同家庭及已授权老师课程 |
+| `GET` | `/api/v1/courses/{course_id}?child_id=` | 真实活动进度与独立 mastery 统计 |
+| `POST/PATCH` | `/api/v1/families/{family_id}/courses[...]` | Family Admin 创建/归档家庭或教材参考课程 |
+| `GET/POST/PATCH` | `/api/v1/teacher/courses[...]` | 教师只管理自己的 canonical 字表课程 |
+| `GET/POST/PATCH` | `/api/v1/children/{child_id}/course-enrollments[...]` | 路径选择、暂停、继续与顺序；修改仅 Family Admin |
+| `POST` | `/api/v1/children/{source_child_id}/course-path/copy` | 同家庭兄弟复制课程选择，不复制 mastery/history |
+| `POST` | `/api/v1/children/{child_id}/course-activities/{activity_id}/complete` | 幂等追加 canonical LearningRecord 并推进活动 |
+| `GET/POST` | `/api/v1/admin/catalog[/import]` | System Admin 查看来源或执行受控幂等导入 |
+| `GET/PATCH` | `/api/v1/admin/courses[...]` | System Admin 查看/归档系统课程，不读取孩子数据 |
+
+Teacher Course 可见性不能替代 `TeacherChildRelation`；Family Admin 未授权时不能为孩子选入。
+课程端点不会创建 parallel mastery 或 answer DTO。Catalog 历史由 version + size 同时返回。
