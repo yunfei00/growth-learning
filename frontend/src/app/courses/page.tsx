@@ -179,7 +179,11 @@ function CoursesContent() {
         ) : null}
         {family.current_role === "admin" && children.length > 1 ? (
           <div className="copy-path-control">
-            <select value={copyTarget} onChange={(event) => setCopyTarget(event.target.value)}>
+            <select
+              aria-label="复制学习路径给另一个孩子"
+              value={copyTarget}
+              onChange={(event) => setCopyTarget(event.target.value)}
+            >
               <option value="">复制路径给…</option>
               {children
                 .filter((child) => child.id !== activeChild.id)
