@@ -142,6 +142,7 @@ gl-backup
 → 幂等导入 Starter 科学实验
 → 从原始证据重算 Review V1 日程
 → 幂等补齐 GrowthEvent V1 投影并清理过期导出
+→ 幂等补齐 achievement-v1 成就与 stars-v1 正向账本
 → 更新 backend/frontend
 → 容器与 HTTP health check
 ```
@@ -167,6 +168,7 @@ gl-backup
 - [Phase 8 成长档案与报告](docs/GROWTH_ARCHIVE.md)
 - [Phase 9 家长授权的老师协作](docs/TEACHER_COLLABORATION.md)
 - [Phase 10 可复用课程与 Catalog 来源](docs/COURSE_ARCHITECTURE.md)
+- [Phase 11 家长/孩子双模式与正向成长体验](docs/CHILD_EXPERIENCE.md)
 - [家庭导出格式 V1](docs/EXPORT_FORMAT.md)
 - [生产备份与恢复演练](docs/BACKUP_RESTORE.md)
 

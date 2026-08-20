@@ -216,3 +216,17 @@ Provider 未配置时 context 返回 `provider_configured=false`，生成返回 
 
 Teacher Course 可见性不能替代 `TeacherChildRelation`；Family Admin 未授权时不能为孩子选入。
 课程端点不会创建 parallel mastery 或 answer DTO。Catalog 历史由 version + size 同时返回。
+
+### Child experience and positive encouragement
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/children/{child_id}/experience/today` | 聚合真实今日/进行中任务，不创建学习或答题证据 |
+| `GET` | `/api/v1/children/{child_id}/growth-tree` | 课程活动进度与 mastery 分离的分支摘要 |
+| `GET` | `/api/v1/children/{child_id}/achievements` | 幂等补齐成就与正向账本后返回孩子摘要 |
+| `POST` | `/api/v1/children/{child_id}/achievements/rebuild` | 家庭成员触发确定性规则重建 |
+| `GET/PATCH` | `/api/v1/families/{family_id}/reward-settings` | 成员查看；仅 Family Admin 修改星星展示 |
+| `POST/PATCH` | `/api/v1/families/{family_id}/reward-goals[...]` | 仅 Family Admin 管理线下家庭小目标 |
+
+上述孩子端点不授予 Teacher 或 System Admin 隐式访问。星星账本不存在扣减接口，也不接受客户端
+提交金额；服务只从 canonical completed event 和版本化 achievement rule 生成正向条目。

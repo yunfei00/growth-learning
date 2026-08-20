@@ -130,7 +130,20 @@
 - 家庭端、教师端与 System Admin 端的移动可用课程页面
 
 退出条件：additive migration、PostgreSQL/权限/历史兼容测试与 CI 通过；生产导入、系统课程、
-今日计划和真实 evidence 验收；Issue #10 关闭。Phase 11 UI/reward work 不在本阶段。
+今日计划和真实 evidence 验收；Issue #10 关闭。
+
+## Phase 11：家长/孩子双模式与正向成长体验（已实现）
+
+- 清晰分离的 Parent / Child 导航，孩子模式固定 active child 且不暴露成人设置
+- 基于既有 Daily Plan、阅读、科学、老师任务的统一 Today 与可恢复入口
+- 课程进度和 canonical mastery 分离的 Chinese / Reading / Science 成长树
+- `achievement-v1` 确定性、可解释、证据绑定且幂等的成长成就
+- `stars-v1` 正向-only 家庭鼓励账本与可选线下家庭目标；无扣星、排名或按题奖励
+- 390 / 768 / 1280 响应式导航、44px 触控目标、键盘焦点与 reduced-motion 支持
+- 兄弟、跨家庭、Teacher、Companion 管理权与 System Admin 隐私专项测试
+
+退出条件：additive migration、后端/前端/CI 全绿，公网双模式、刷新恢复、真实成就和权限边界验收；
+Issue #11 关闭。Phase 12 不在本阶段。
 
 ## 后续：质量、规模与持续优化
 

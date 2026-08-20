@@ -230,3 +230,17 @@ ChildCourseEnrollment ──> ActivityProgress ──> canonical evidence sessio
 Catalog importer 以原 character/canonical key upsert，并在建立 release membership 前比较既有
 UUID。历史 literacy sampling frame、StoryVersion 和 science links 都不参与重算。部署在数据库
 migration 后、应用容器替换前运行幂等 importer，因此失败会阻止新应用切换但不会停止旧服务。
+
+## 17. Phase 11 child experience projection
+
+```text
+canonical evidence + Daily Plan + Teacher Assignment
+  ├──> unified child Today (presentation only)
+  ├──> growth-tree-v1 summary (course progress != mastery)
+  └──> achievement-v1 rules ──> immutable unlock ──> positive stars-v1 ledger
+```
+
+Parent and Child modes are route/navigation boundaries, not alternate authorization systems. Child mode keeps
+one household-authorized active child and removes adult settings and private archive surfaces. API guards stay
+authoritative. Achievement rebuild reads evidence without rewriting it; reward balance is derived from a
+positive-only ledger with source idempotency. See [Phase 11 experience policy](CHILD_EXPERIENCE.md).

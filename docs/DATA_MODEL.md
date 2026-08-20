@@ -249,3 +249,17 @@ session 引用。
 统一 mastery/review 重算；识字正确性仍只能来自 `AssessmentItem`。兄弟复制不触碰任何
 掌握度、证据、复习、估算、故事、科学或成长数据。所有新增业务外键均为
 `ON DELETE RESTRICT`。完整边界见 [课程架构与 Catalog 来源](COURSE_ARCHITECTURE.md)。
+
+## Phase 11 孩子体验、成就与家庭鼓励
+
+`achievement_definitions` 保存带 `rule_version` 的确定性规则；`child_achievements` 以
+`(child_id, achievement_definition_id)` 唯一，并保存来源类型/ID与当时规则计数快照。
+成就是原始证据的追加式投影，重复重建不会重复解锁。
+
+`star_ledger` 是正数-only 的追加账本，余额始终实时 `SUM(amount)`，不保存可直接覆盖的余额字段。
+唯一来源/规则约束阻止重复奖励，数据库 `CHECK amount > 0` 禁止扣星。奖励只针对完整事件和成就，
+绝不按每一道 AssessmentItem 加星。`family_reward_settings` 与 `family_reward_goals` 只承载家庭
+管理员选择的展示开关和线下约定，不改变 `ChildKnowledgeState`。
+
+成长树与统一 Today 是查询投影，不新增平行事实表。所有新增外键使用 `ON DELETE RESTRICT`。
+规则、隐私和响应式约定见 [Phase 11 孩子体验](CHILD_EXPERIENCE.md)。
