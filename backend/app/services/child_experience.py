@@ -600,12 +600,12 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
     if plan.review_count or in_progress_assessment:
         review_count = max(plan.review_count, 1 if in_progress_assessment else 0)
         status = (
-            "completed"
-            if plan.review_count and plan.review_completed_count >= plan.review_count
+            "in_progress"
+            if in_progress_assessment
             else (
-                "in_progress"
-                if in_progress_assessment or plan.review_completed_count
-                else "pending"
+                "completed"
+                if plan.review_count and plan.review_completed_count >= plan.review_count
+                else ("in_progress" if plan.review_completed_count else "pending")
             )
         )
         tasks.append(

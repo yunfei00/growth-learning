@@ -15,6 +15,7 @@ from app.models import (
     AssessmentSession,
     ChildAchievement,
     ChineseCharacter,
+    DailyLearningPlan,
     FamilyMember,
     FamilyRole,
     LearningRecord,
@@ -103,7 +104,18 @@ async def test_today_aggregates_without_fake_or_duplicate_evidence(
         user = await register(parent, "today-parent@example.com", "今日家长")
         _, child, _ = await family_and_children(parent, "今日")
         await starter_point_ids(session_factory, 20)
+        assert (
+            await parent.get(f"/api/v1/children/{child['id']}/experience/today")
+        ).status_code == 200
         async with session_factory() as session:
+            plan = await session.scalar(
+                select(DailyLearningPlan).where(
+                    DailyLearningPlan.child_id == uuid.UUID(child["id"])
+                )
+            )
+            assert plan is not None
+            plan.review_count = 1
+            plan.review_completed_count = 1
             assessment = AssessmentSession(
                 child_id=uuid.UUID(child["id"]),
                 evaluator_user_id=uuid.UUID(user["id"]),
