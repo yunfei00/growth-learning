@@ -14,7 +14,20 @@ async def test_health_endpoint() -> None:
         response = await client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "version": "1.0.0", "revision": "unknown"}
+
+
+@pytest.mark.anyio
+async def test_health_exposes_safe_short_revision() -> None:
+    settings = Settings(
+        app_environment="test",
+        app_revision="0123456789abcdef0123456789abcdef01234567",
+    )
+    transport = httpx.ASGITransport(app=create_app(settings))
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/health")
+
+    assert response.json()["revision"] == "0123456789ab"
 
 
 @pytest.mark.anyio

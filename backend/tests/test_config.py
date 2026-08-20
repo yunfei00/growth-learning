@@ -34,3 +34,17 @@ def test_secret_values_are_not_exposed_in_repr() -> None:
 def test_minio_client_requires_credentials() -> None:
     with pytest.raises(ObjectStorageConfigurationError):
         build_minio_client(Settings(minio_access_key="", minio_secret_key=""))
+
+
+def test_production_rejects_placeholder_or_short_auth_secret() -> None:
+    with pytest.raises(ValueError, match="AUTH_SECRET"):
+        Settings(app_environment="production")
+    with pytest.raises(ValueError, match="AUTH_SECRET"):
+        Settings(app_environment="production", auth_secret="too-short")
+
+
+def test_cookie_and_cors_security_combinations_are_validated() -> None:
+    with pytest.raises(ValueError, match="SameSite=None"):
+        Settings(app_environment="test", auth_cookie_samesite="none", auth_cookie_secure=False)
+    with pytest.raises(ValueError, match="Wildcard CORS"):
+        Settings(app_environment="test", cors_origins="*")

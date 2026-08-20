@@ -35,19 +35,50 @@ async def test_media_validation_accepts_supported_kinds_and_rejects_unsafe(
 ) -> None:
     settings = test_app.state.settings
     assert (
-        validate_media(settings=settings, filename="a.jpg", mime_type="image/jpeg", content=b"a")[0]
+        validate_media(
+            settings=settings,
+            filename="a.jpg",
+            mime_type="image/jpeg",
+            content=b"\xff\xd8\xffimage",
+        )[0]
         == "image"
     )
     assert (
-        validate_media(settings=settings, filename="a.mp4", mime_type="video/mp4", content=b"a")[0]
+        validate_media(
+            settings=settings,
+            filename="a.mp4",
+            mime_type="video/mp4",
+            content=b"\x00\x00\x00\x18ftypmp42",
+        )[0]
         == "video"
     )
     assert (
-        validate_media(settings=settings, filename="a.ogg", mime_type="audio/ogg", content=b"a")[0]
+        validate_media(
+            settings=settings,
+            filename="a.ogg",
+            mime_type="audio/ogg",
+            content=b"OggSaudio",
+        )[0]
         == "audio"
     )
     with pytest.raises(ValueError, match="仅支持"):
         validate_media(settings=settings, filename="a.svg", mime_type="image/svg+xml", content=b"a")
+    with pytest.raises(ValueError, match="内容"):
+        validate_media(
+            settings=settings,
+            filename="spoofed.jpg",
+            mime_type="image/jpeg",
+            content=b"not-a-jpeg",
+        )
+    assert (
+        validate_media(
+            settings=settings,
+            filename="..\\..\\private.jpg",
+            mime_type="image/jpeg",
+            content=b"\xff\xd8\xffimage",
+        )[2]
+        == "private.jpg"
+    )
 
 
 class FakePrivateStorage(PrivateObjectStorage):
@@ -283,13 +314,19 @@ async def test_resumable_science_evidence_media_completion_and_privacy(
 
         uploaded = await companion.post(
             f"/api/v1/children/{child['id']}/experiment-sessions/{experiment_session['id']}/media",
-            files={"file": ("observation.jpg", b"private-image-bytes", "image/jpeg")},
+            files={
+                "file": (
+                    "observation.jpg",
+                    b"\xff\xd8\xffprivate-image-bytes",
+                    "image/jpeg",
+                )
+            },
         )
         assert uploaded.status_code == 201, uploaded.text
         media = uploaded.json()["media"][0]
         streamed = await companion.get(media["content_url"])
         assert streamed.status_code == 200
-        assert streamed.content == b"private-image-bytes"
+        assert streamed.content == b"\xff\xd8\xffprivate-image-bytes"
         invalid = await companion.post(
             f"/api/v1/children/{child['id']}/experiment-sessions/{experiment_session['id']}/media",
             files={"file": ("unsafe.svg", b"<svg/>", "image/svg+xml")},

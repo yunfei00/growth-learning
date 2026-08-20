@@ -1,7 +1,6 @@
 """Validated private media persistence for one authorized experiment session."""
 
 import uuid
-from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +26,40 @@ class ScienceMediaValidationError(ValueError):
     pass
 
 
+def _matches_declared_media_type(mime_type: str, content: bytes) -> bool:
+    """Apply bounded magic-byte checks before private object persistence."""
+    if mime_type == "image/jpeg":
+        return content.startswith(b"\xff\xd8\xff")
+    if mime_type == "image/png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if mime_type == "image/webp":
+        return len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    if mime_type == "video/mp4":
+        return len(content) >= 12 and content[4:8] == b"ftyp"
+    if mime_type in {"video/webm", "audio/webm"}:
+        return content.startswith(b"\x1aE\xdf\xa3")
+    if mime_type == "audio/mpeg":
+        return content.startswith(b"ID3") or (
+            len(content) >= 2 and content[0] == 0xFF and content[1] & 0xE0 == 0xE0
+        )
+    if mime_type == "audio/wav":
+        return len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WAVE"
+    if mime_type == "audio/ogg":
+        return content.startswith(b"OggS")
+    return False
+
+
+def _safe_original_filename(filename: str | None, extension: str) -> str:
+    candidate = (filename or f"experiment{extension}").replace("\\", "/").split("/")[-1]
+    candidate = "".join(
+        character for character in candidate if character >= " " and character != "\x7f"
+    )
+    candidate = candidate.strip(" .")[:180]
+    if candidate in {"", ".", ".."}:
+        return f"experiment{extension}"
+    return candidate
+
+
 def media_limit(settings: Settings, kind: str) -> int:
     if kind == ExperimentMediaKind.IMAGE:
         return settings.science_image_max_bytes
@@ -47,9 +80,9 @@ def validate_media(
         raise ScienceMediaValidationError("媒体文件不能为空")
     if len(content) > media_limit(settings, kind):
         raise ScienceMediaValidationError("媒体文件超过允许大小")
-    original_filename = Path(filename or f"experiment{extension}").name[:255]
-    if not original_filename:
-        original_filename = f"experiment{extension}"
+    if not _matches_declared_media_type(normalized_type, content):
+        raise ScienceMediaValidationError("媒体文件内容与声明类型不一致")
+    original_filename = _safe_original_filename(filename, extension)
     return kind, extension, original_filename
 
 

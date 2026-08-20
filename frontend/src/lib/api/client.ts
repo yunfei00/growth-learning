@@ -94,6 +94,8 @@ export type Child = {
 
 export type HealthResponse = {
   status: "ok";
+  version: string;
+  revision: string;
 };
 
 export type MasteryLevel =

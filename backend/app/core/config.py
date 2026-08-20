@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Growth Learning API"
-    app_version: str = "0.1.0"
+    app_version: str = "1.0.0"
+    app_revision: str = "unknown"
     app_environment: Literal["development", "test", "production"] = "development"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
@@ -60,6 +61,22 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         """Return normalized origins from the comma-separated environment value."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @model_validator(mode="after")
+    def validate_security_configuration(self) -> "Settings":
+        """Reject known unsafe production authentication and CORS combinations."""
+        secret = self.auth_secret.get_secret_value()
+        unsafe_secrets = {
+            "development-only-auth-secret-change-before-production",
+            "local-only-auth-secret-change-me-please",
+        }
+        if self.app_environment == "production" and (secret in unsafe_secrets or len(secret) < 32):
+            raise ValueError("Production AUTH_SECRET must be unique and at least 32 characters")
+        if self.auth_cookie_samesite == "none" and not self.auth_cookie_secure:
+            raise ValueError("SameSite=None requires a Secure authentication cookie")
+        if "*" in self.cors_origin_list:
+            raise ValueError("Wildcard CORS is not allowed with credentialed browser sessions")
+        return self
 
 
 @lru_cache

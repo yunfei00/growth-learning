@@ -58,7 +58,8 @@ else
   printf 'Preserved existing %s/.env.\n' "$APP_DIR"
 fi
 
-if ! grep -q '^AUTH_SECRET=.' .env; then
+auth_secret_value="$(awk -F= '$1 == "AUTH_SECRET" {sub(/^[^=]*=/, ""); print; exit}' .env)"
+if [[ -z "$auth_secret_value" || "$auth_secret_value" == "local-only-auth-secret-change-me-please" || "$auth_secret_value" == "development-only-auth-secret-change-before-production" ]]; then
   set_env_value AUTH_SECRET "$(openssl rand -hex 32)"
 fi
 

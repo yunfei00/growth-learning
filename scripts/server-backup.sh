@@ -43,8 +43,38 @@ objects = [
 print(json.dumps({"bucket": settings.minio_bucket, "objects": objects}, sort_keys=True))
 PY
 
+"${compose[@]}" exec -T backend python - <<'PY' >"${backup_dir}/object-storage-objects.tar"
+import sys
+import tarfile
+from pathlib import PurePosixPath
+
+from app.core.config import get_settings
+from app.integrations.object_storage import build_minio_client
+
+settings = get_settings()
+client = build_minio_client(settings)
+with tarfile.open(fileobj=sys.stdout.buffer, mode="w|") as archive:
+    for item in client.list_objects(settings.minio_bucket, recursive=True):
+        object_name = item.object_name
+        path = PurePosixPath(object_name)
+        if path.is_absolute() or ".." in path.parts:
+            raise RuntimeError("Unsafe object key in private storage")
+        response = client.get_object(settings.minio_bucket, object_name)
+        try:
+            info = tarfile.TarInfo(name=f"objects/{object_name}")
+            info.size = item.size
+            info.mode = 0o600
+            info.mtime = 0
+            archive.addfile(info, response)
+        finally:
+            response.close()
+            response.release_conn()
+PY
+test -s "${backup_dir}/object-storage-objects.tar"
+
 db_sha="$(sha256sum "${backup_dir}/postgres.dump" | awk '{print $1}')"
 objects_sha="$(sha256sum "${backup_dir}/object-storage-manifest.json" | awk '{print $1}')"
+objects_archive_sha="$(sha256sum "${backup_dir}/object-storage-objects.tar" | awk '{print $1}')"
 commit_sha="$(git rev-parse HEAD)"
 "${compose[@]}" ps >"${backup_dir}/service-status.txt"
 services_sha="$(sha256sum "${backup_dir}/service-status.txt" | awk '{print $1}')"
@@ -55,14 +85,15 @@ cat >"${backup_dir}/manifest.json" <<EOF
   "git_commit": "${commit_sha}",
   "postgres_dump": {"path": "postgres.dump", "sha256": "${db_sha}"},
   "object_storage_manifest": {"path": "object-storage-manifest.json", "sha256": "${objects_sha}"},
+  "object_storage_archive": {"path": "object-storage-objects.tar", "sha256": "${objects_archive_sha}"},
   "service_status": {"path": "service-status.txt", "sha256": "${services_sha}"},
-  "object_storage_note": "Media objects remain in the private MinIO volume; copy that volume or mirror the listed objects before disaster recovery."
+  "object_storage_note": "Private objects are stored in object-storage-objects.tar and must only be restored into an isolated private bucket during a drill."
 }
 EOF
 chmod 600 "${backup_dir}"/*
 (
   cd "$backup_dir"
-  sha256sum postgres.dump object-storage-manifest.json service-status.txt manifest.json >checksums.sha256
+  sha256sum postgres.dump object-storage-manifest.json object-storage-objects.tar service-status.txt manifest.json >checksums.sha256
 )
 chmod 600 "${backup_dir}/checksums.sha256"
 

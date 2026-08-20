@@ -182,11 +182,11 @@ async def test_growth_archive_reports_books_export_and_privacy(
         assert manual.json()["body"] == exact_text
         media = await parent.post(
             f"/api/v1/children/{child['id']}/growth/events/{manual.json()['id']}/media",
-            files={"file": ("moment.jpg", b"private-growth-image", "image/jpeg")},
+            files={"file": ("moment.jpg", b"\xff\xd8\xffprivate-growth-image", "image/jpeg")},
         )
         assert media.status_code == 201
         content_url = media.json()["media"][0]["content_url"]
-        assert (await companion.get(content_url)).content == b"private-growth-image"
+        assert (await companion.get(content_url)).content == b"\xff\xd8\xffprivate-growth-image"
         assert (await outsider.get(content_url)).status_code == 404
 
         first_rebuild = await parent.post(f"/api/v1/children/{child['id']}/growth/rebuild")

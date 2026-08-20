@@ -20,7 +20,10 @@ export function BackendHealth() {
       const response = await getHealth();
       setHealth({
         kind: response.status === "ok" ? "online" : "offline",
-        message: response.status === "ok" ? "后端服务正常" : "后端返回未知状态",
+        message:
+          response.status === "ok"
+            ? `后端服务正常 · v${response.version} · ${response.revision}`
+            : "后端返回未知状态",
       });
     } catch (error) {
       setHealth({
@@ -40,7 +43,10 @@ export function BackendHealth() {
         if (!cancelled) {
           setHealth({
             kind: response.status === "ok" ? "online" : "offline",
-            message: response.status === "ok" ? "后端服务正常" : "后端返回未知状态",
+            message:
+              response.status === "ok"
+                ? `后端服务正常 · v${response.version} · ${response.revision}`
+                : "后端返回未知状态",
           });
         }
       })

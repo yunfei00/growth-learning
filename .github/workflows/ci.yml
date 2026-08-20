@@ -224,6 +224,8 @@ jobs:
         run: |
           docker build \
             --target runtime \
+            --build-arg APP_VERSION=1.0.0 \
+            --build-arg "APP_REVISION=${GITHUB_SHA}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --tag growth-learning-backend:latest \
             backend
