@@ -177,7 +177,10 @@ function TeacherPageContent() {
     <section className="teacher-page section-shell">
       <div className="teacher-hero teacher-hero-row">
         <div><p className="eyebrow">教师模式</p><h1>{dashboard.profile.display_name}的教学工作台</h1><p>只显示家长明确授权的孩子和你自己布置的教学证据。</p></div>
-        <Link className="button button-secondary" href="/home">切换到家长模式</Link>
+        <div className="inline-actions">
+          <Link className="button button-secondary" href="/teacher/courses">教师课程</Link>
+          <Link className="button button-secondary" href="/home">切换到家长模式</Link>
+        </div>
       </div>
       {error ? <p className="form-message form-error">{error}</p> : null}
       {message ? <p className="form-message form-success">{message}</p> : null}

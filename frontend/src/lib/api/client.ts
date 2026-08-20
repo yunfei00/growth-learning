@@ -258,6 +258,7 @@ export type PlannedAssessment = {
   sampling_method: string;
   sampling_version: string;
   eligible_catalog_size: number;
+  catalog_version: string;
   started_at: string;
   completed_at: string | null;
   total_items: number;
@@ -282,6 +283,7 @@ export type LiteracyEstimate = {
   id: string | null;
   assessment_session_id: string | null;
   catalog_size: number;
+  catalog_version: string;
   sample_size: number;
   known_count: number;
   unknown_count: number;
@@ -1696,4 +1698,211 @@ export function listEnabledCharacters(search = ""): Promise<CharacterPage> {
   const query = new URLSearchParams({ page: "1", page_size: "100" });
   if (search) query.set("search", search);
   return request<CharacterPage>(`/api/v1/characters?${query}`);
+}
+
+export type CoursePoint = {
+  knowledge_point_id: string;
+  character: string;
+  pinyin: string;
+  role: "primary" | "review" | "optional" | "prerequisite";
+  order_index: number;
+  mastery_level: MasteryLevel;
+};
+
+export type CourseActivity = {
+  id: string;
+  title: string;
+  activity_type:
+    | "character_learning"
+    | "character_review"
+    | "recognition_check"
+    | "reading"
+    | "science_reference"
+    | "offline_instruction";
+  instructions: string | null;
+  order_index: number;
+  status: "draft" | "enabled" | "archived";
+  progress_status: "pending" | "in_progress" | "completed";
+  points: CoursePoint[];
+};
+
+export type CourseUnit = {
+  id: string;
+  title: string;
+  description: string | null;
+  order_index: number;
+  status: "draft" | "enabled" | "archived";
+  activity_count: number;
+  completed_activities: number;
+  introduced_count: number;
+  stable_count: number;
+  unlearned_count: number;
+  activities: CourseActivity[];
+};
+
+export type Course = {
+  id: string;
+  subject: "chinese";
+  title: string;
+  description: string | null;
+  source_type: "system" | "family" | "teacher" | "textbook_reference";
+  status: "draft" | "enabled" | "archived";
+  version: number;
+  recommended_age_min: number | null;
+  recommended_age_max: number | null;
+  reference_metadata: Record<string, string>;
+  enrollment_id: string | null;
+  enrollment_status: "planned" | "active" | "paused" | "completed" | "archived" | null;
+  path_order: number | null;
+  activity_count: number;
+  completed_activities: number;
+  progress_percent: number;
+  introduced_count: number;
+  stable_count: number;
+  unlearned_count: number;
+  units: CourseUnit[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type CourseInput = {
+  title: string;
+  description?: string | null;
+  source_type: "family" | "teacher" | "textbook_reference";
+  reference_metadata?: Record<string, string>;
+  units: Array<{
+    title: string;
+    description?: string | null;
+    activities: Array<{
+      title: string;
+      activity_type: CourseActivity["activity_type"];
+      instructions?: string | null;
+      knowledge_points: Array<{
+        knowledge_point_id: string;
+        role: CoursePoint["role"];
+      }>;
+    }>;
+  }>;
+};
+
+export type CourseEnrollment = {
+  id: string;
+  child_id: string;
+  course_id: string;
+  course_title: string;
+  course_version: number;
+  status: "planned" | "active" | "paused" | "completed" | "archived";
+  path_order: number;
+  started_at: string | null;
+  completed_at: string | null;
+  progress_percent: number;
+};
+
+export type CatalogRelease = {
+  catalog_version: string;
+  item_count: number;
+  source_type: string;
+  source_name: string;
+  source_reference: string | null;
+  license: string | null;
+  imported_at: string;
+  is_current: boolean;
+  metadata: Record<string, string>;
+};
+
+export function listCourses(childId: string): Promise<Course[]> {
+  return request<Course[]>(`/api/v1/courses?child_id=${encodeURIComponent(childId)}`);
+}
+
+export function getCourse(courseId: string, childId: string): Promise<Course> {
+  return request<Course>(
+    `/api/v1/courses/${courseId}?child_id=${encodeURIComponent(childId)}`,
+  );
+}
+
+export function createFamilyCourse(familyId: string, payload: CourseInput): Promise<Course> {
+  return request<Course>(`/api/v1/families/${familyId}/courses`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function createTeacherCourse(payload: CourseInput): Promise<Course> {
+  return request<Course>("/api/v1/teacher/courses", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function listTeacherCourses(): Promise<Course[]> {
+  return request<Course[]>("/api/v1/teacher/courses");
+}
+
+export function enrollCourse(
+  childId: string,
+  courseId: string,
+  pathOrder = 0,
+): Promise<CourseEnrollment> {
+  return request<CourseEnrollment>(`/api/v1/children/${childId}/course-enrollments`, {
+    method: "POST",
+    body: jsonBody({ course_id: courseId, path_order: pathOrder, status: "active" }),
+  });
+}
+
+export function updateCourseEnrollment(
+  childId: string,
+  enrollmentId: string,
+  status: CourseEnrollment["status"],
+): Promise<CourseEnrollment> {
+  return request<CourseEnrollment>(
+    `/api/v1/children/${childId}/course-enrollments/${enrollmentId}`,
+    { method: "PATCH", body: jsonBody({ status }) },
+  );
+}
+
+export function copyCoursePath(sourceChildId: string, targetChildId: string): Promise<{
+  copied_enrollments: number;
+  mastery_copied: false;
+  history_copied: false;
+}> {
+  return request(`/api/v1/children/${sourceChildId}/course-path/copy`, {
+    method: "POST",
+    body: jsonBody({ target_child_id: targetChildId }),
+  });
+}
+
+export function completeCourseActivity(
+  childId: string,
+  activityId: string,
+): Promise<{
+  activity_id: string;
+  progress_status: "completed";
+  learning_session_id: string;
+  learning_records_created: number;
+  mastery_directly_modified: false;
+}> {
+  return request(`/api/v1/children/${childId}/course-activities/${activityId}/complete`, {
+    method: "POST",
+  });
+}
+
+export function getAdminCatalog(): Promise<CatalogRelease> {
+  return request<CatalogRelease>("/api/v1/admin/catalog");
+}
+
+export function importChineseCatalog(): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  preserved: number;
+  catalog_version: string;
+  catalog_size: number;
+  course_created: boolean;
+  errors: string[];
+}> {
+  return request("/api/v1/admin/catalog/import", { method: "POST" });
+}
+
+export function listAdminCourses(): Promise<Course[]> {
+  return request<Course[]>("/api/v1/admin/courses");
 }

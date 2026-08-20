@@ -35,6 +35,7 @@ export function AppHeader() {
           <>
             <Link href="/home">家长首页</Link>
             <Link href="/learn/characters">识字学习</Link>
+            <Link href="/courses">课程</Link>
             <Link href="/read">我的故事书</Link>
             <Link href="/science">周末科学</Link>
             <Link href="/growth">成长档案</Link>
