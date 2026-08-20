@@ -10,22 +10,29 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    ActivityKnowledgePoint,
     AssessmentItem,
     AssessmentOutcome,
     AssessmentSession,
     AssessmentSessionPlan,
     AssessmentSessionTarget,
     AssessmentSource,
+    CatalogRelease,
+    ChildCourseEnrollment,
     ChildKnowledgeState,
     ChildLearningSettings,
     ChildReviewSchedule,
     ChineseCharacter,
+    Course,
+    CourseUnit,
     DailyLearningPlan,
     DailyPlanItem,
     DailyPlanItemKind,
     DailyPlanStatus,
     KnowledgePoint,
+    KnowledgePointRole,
     KnowledgeStatus,
+    LearningActivity,
     LearningRecord,
     LiteracyEstimate,
     MasteryLevel,
@@ -230,6 +237,15 @@ async def _enabled_catalog_size(session: AsyncSession) -> int:
     )
 
 
+async def _current_catalog_frame(session: AsyncSession) -> tuple[str, int]:
+    release = await session.scalar(
+        select(CatalogRelease).where(CatalogRelease.is_current.is_(True))
+    )
+    if release is not None:
+        return release.catalog_version, release.item_count
+    return "growth-starter-v1", await _enabled_catalog_size(session)
+
+
 async def _review_rows(
     session: AsyncSession, child_id: uuid.UUID, now: datetime
 ) -> list[tuple[ChildReviewSchedule, ChildKnowledgeState | None, KnowledgePoint, ChineseCharacter]]:
@@ -380,12 +396,91 @@ def recommend_new_load(
 
 async def _new_character_rows(
     session: AsyncSession, child_id: uuid.UUID, limit: int
-) -> list[tuple[KnowledgePoint, ChineseCharacter]]:
+) -> list[tuple[KnowledgePoint, ChineseCharacter, str]]:
+    if limit <= 0:
+        return []
     learned = select(LearningRecord.id).where(
         LearningRecord.child_id == child_id,
         LearningRecord.knowledge_point_id == KnowledgePoint.id,
     )
-    return list(
+    selected: list[tuple[KnowledgePoint, ChineseCharacter, str]] = []
+    selected_ids: set[uuid.UUID] = set()
+
+    priority_rows = list(
+        (
+            await session.execute(
+                select(KnowledgePoint, ChineseCharacter)
+                .join(ChineseCharacter)
+                .join(
+                    ChildKnowledgeState,
+                    and_(
+                        ChildKnowledgeState.knowledge_point_id == KnowledgePoint.id,
+                        ChildKnowledgeState.child_id == child_id,
+                    ),
+                )
+                .where(
+                    KnowledgePoint.status == KnowledgeStatus.ACTIVE,
+                    ChineseCharacter.is_enabled.is_(True),
+                    ChildKnowledgeState.is_priority.is_(True),
+                    ~learned.exists(),
+                )
+                .order_by(ChineseCharacter.created_at, ChineseCharacter.character)
+                .limit(limit)
+            )
+        ).all()
+    )
+    for point, character in priority_rows:
+        selected.append((point, character, "priority_not_introduced"))
+        selected_ids.add(point.id)
+
+    course_rows = list(
+        (
+            await session.execute(
+                select(KnowledgePoint, ChineseCharacter)
+                .join(ChineseCharacter)
+                .join(
+                    ActivityKnowledgePoint,
+                    ActivityKnowledgePoint.knowledge_point_id == KnowledgePoint.id,
+                )
+                .join(
+                    LearningActivity,
+                    LearningActivity.id == ActivityKnowledgePoint.activity_id,
+                )
+                .join(CourseUnit, CourseUnit.id == LearningActivity.course_unit_id)
+                .join(Course, Course.id == CourseUnit.course_id)
+                .join(
+                    ChildCourseEnrollment,
+                    ChildCourseEnrollment.course_id == Course.id,
+                )
+                .where(
+                    ChildCourseEnrollment.child_id == child_id,
+                    ChildCourseEnrollment.status == "active",
+                    Course.status == "enabled",
+                    CourseUnit.status == "enabled",
+                    LearningActivity.status == "enabled",
+                    LearningActivity.activity_type == "character_learning",
+                    ActivityKnowledgePoint.role == KnowledgePointRole.PRIMARY,
+                    KnowledgePoint.status == KnowledgeStatus.ACTIVE,
+                    ChineseCharacter.is_enabled.is_(True),
+                    ~learned.exists(),
+                )
+                .order_by(
+                    ChildCourseEnrollment.path_order,
+                    CourseUnit.order_index,
+                    LearningActivity.order_index,
+                    ActivityKnowledgePoint.order_index,
+                )
+            )
+        ).all()
+    )
+    for point, character in course_rows:
+        if point.id not in selected_ids:
+            selected.append((point, character, "active_course_order"))
+            selected_ids.add(point.id)
+        if len(selected) >= limit:
+            return selected
+
+    fallback_rows = list(
         (
             await session.execute(
                 select(KnowledgePoint, ChineseCharacter)
@@ -394,12 +489,17 @@ async def _new_character_rows(
                     KnowledgePoint.status == KnowledgeStatus.ACTIVE,
                     ChineseCharacter.is_enabled.is_(True),
                     ~learned.exists(),
+                    KnowledgePoint.id.not_in(selected_ids),
                 )
                 .order_by(ChineseCharacter.created_at, ChineseCharacter.character)
-                .limit(limit)
+                .limit(limit - len(selected))
             )
         ).all()
     )
+    selected.extend(
+        (point, character, "fallback_canonical_order") for point, character in fallback_rows
+    )
+    return selected
 
 
 async def _period_status(
@@ -482,14 +582,14 @@ async def get_or_create_daily_plan(
         session.add(plan)
         await session.flush()
         for position, row in enumerate(new_rows):
-            point, _ = row
+            point, _, selection_reason = row
             session.add(
                 DailyPlanItem(
                     daily_plan_id=plan.id,
                     knowledge_point_id=point.id,
                     item_kind=DailyPlanItemKind.NEW,
                     position=position,
-                    selection_reason="catalog_order_not_introduced",
+                    selection_reason=selection_reason,
                 )
             )
         for position, row in enumerate(selected_reviews):
@@ -765,6 +865,7 @@ async def _session_response(
         sampling_method=plan.sampling_method,
         sampling_version=plan.sampling_version,
         eligible_catalog_size=plan.eligible_catalog_size,
+        catalog_version=plan.catalog_version,
         started_at=assessment.started_at,
         completed_at=assessment.completed_at,
         total_items=len(rows),
@@ -893,13 +994,15 @@ async def start_or_resume_assessment(
     )
     session.add(assessment)
     await session.flush()
+    catalog_version, catalog_size = await _current_catalog_frame(session)
     session.add(
         AssessmentSessionPlan(
             assessment_session_id=assessment.id,
             daily_plan_id=daily_plan.id if daily_plan else None,
             sampling_method=sampling_method,
             sampling_version=SAMPLING_VERSION,
-            eligible_catalog_size=await _enabled_catalog_size(session),
+            eligible_catalog_size=catalog_size,
+            catalog_version=catalog_version,
         )
     )
     for position, (point_id, sampling_class) in enumerate(targets):
@@ -968,6 +1071,7 @@ async def _create_literacy_estimate(
         child_id=assessment.child_id,
         assessment_session_id=assessment.id,
         catalog_size=plan.eligible_catalog_size,
+        catalog_version=plan.catalog_version,
         sample_size=sample_size,
         known_count=known,
         unknown_count=sample_size - known,
@@ -1162,11 +1266,14 @@ async def get_planned_assessment(
     return await _session_response(session, assessment)
 
 
-def literacy_response(row: LiteracyEstimate | None, catalog_size: int) -> LiteracyEstimateResponse:
+def literacy_response(
+    row: LiteracyEstimate | None, catalog_version: str, catalog_size: int
+) -> LiteracyEstimateResponse:
     return LiteracyEstimateResponse(
         id=row.id if row else None,
         assessment_session_id=row.assessment_session_id if row else None,
         catalog_size=row.catalog_size if row else catalog_size,
+        catalog_version=row.catalog_version if row else catalog_version,
         sample_size=row.sample_size if row else 0,
         known_count=row.known_count if row else 0,
         unknown_count=row.unknown_count if row else 0,
@@ -1190,7 +1297,8 @@ async def latest_literacy_estimate(
         .where(LiteracyEstimate.child_id == child_id)
         .order_by(LiteracyEstimate.created_at.desc())
     )
-    return literacy_response(row, await _enabled_catalog_size(session))
+    catalog_version, catalog_size = await _current_catalog_frame(session)
+    return literacy_response(row, catalog_version, catalog_size)
 
 
 async def literacy_history(
@@ -1205,5 +1313,5 @@ async def literacy_history(
             )
         ).all()
     )
-    catalog_size = await _enabled_catalog_size(session)
-    return [literacy_response(row, catalog_size) for row in rows]
+    catalog_version, catalog_size = await _current_catalog_frame(session)
+    return [literacy_response(row, catalog_version, catalog_size) for row in rows]

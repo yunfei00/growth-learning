@@ -1,6 +1,23 @@
 """SQLAlchemy business model registry used by Alembic and application code."""
 
 from app.db.base import Base
+from app.models.course import (
+    ActivityKnowledgePoint,
+    ActivityProgressStatus,
+    ActivityType,
+    CatalogRelease,
+    CharacterCatalogEntry,
+    ChildCourseEnrollment,
+    Course,
+    CourseActivityProgress,
+    CourseSourceType,
+    CourseStatus,
+    CourseSubject,
+    CourseUnit,
+    EnrollmentStatus,
+    KnowledgePointRole,
+    LearningActivity,
+)
 from app.models.family import Child, Family, FamilyMember, FamilyRole
 from app.models.growth import (
     ExportJob,
@@ -108,6 +125,21 @@ from app.models.teacher import (
 
 __all__ = [
     "Base",
+    "ActivityKnowledgePoint",
+    "ActivityProgressStatus",
+    "ActivityType",
+    "CatalogRelease",
+    "CharacterCatalogEntry",
+    "ChildCourseEnrollment",
+    "Course",
+    "CourseActivityProgress",
+    "CourseSourceType",
+    "CourseStatus",
+    "CourseSubject",
+    "CourseUnit",
+    "EnrollmentStatus",
+    "KnowledgePointRole",
+    "LearningActivity",
     "Child",
     "Family",
     "FamilyMember",

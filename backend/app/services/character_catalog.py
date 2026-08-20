@@ -4,6 +4,7 @@ import json
 import math
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import func, or_, select
@@ -11,15 +12,27 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    ActivityKnowledgePoint,
+    ActivityType,
+    CatalogRelease,
+    CharacterCatalogEntry,
     ChineseCharacter,
+    Course,
+    CourseSourceType,
+    CourseStatus,
+    CourseSubject,
+    CourseUnit,
     KnowledgePoint,
+    KnowledgePointRole,
     KnowledgeRelation,
     KnowledgeStatus,
     KnowledgeType,
+    LearningActivity,
 )
 from app.schemas.knowledge import CharacterCreate, CharacterPage, CharacterResponse
 
 STARTER_DATASET = Path(__file__).resolve().parents[2] / "data" / "chinese_characters_v1.json"
+EXPANDED_DATASET = Path(__file__).resolve().parents[2] / "data" / "chinese_characters_v2.json"
 
 
 def to_response(point: KnowledgePoint, character: ChineseCharacter) -> CharacterResponse:
@@ -150,6 +163,14 @@ class ImportResult:
     errors: list[str] = field(default_factory=list)
 
 
+@dataclass
+class CatalogImportResult(ImportResult):
+    preserved: int = 0
+    catalog_version: str = ""
+    catalog_size: int = 0
+    course_created: bool = False
+
+
 async def import_characters(session: AsyncSession, items: list[CharacterCreate]) -> ImportResult:
     result = ImportResult()
     for index, payload in enumerate(items, start=1):
@@ -221,6 +242,183 @@ def load_starter_dataset() -> list[CharacterCreate]:
         )
         for item in payload["items"]
     ]
+
+
+def load_expanded_dataset() -> tuple[dict, list[CharacterCreate]]:
+    payload = json.loads(EXPANDED_DATASET.read_text(encoding="utf-8"))
+    if payload.get("version") != "2.0" or not payload.get("catalog_version"):
+        raise ValueError("Unsupported expanded catalog version")
+    items = [CharacterCreate.model_validate(item) for item in payload["items"]]
+    if len({item.character for item in items}) != len(items):
+        raise ValueError("Expanded catalog contains duplicate characters")
+    return payload, items
+
+
+async def _seed_system_course(
+    session: AsyncSession, release: CatalogRelease, point_ids: list[uuid.UUID]
+) -> bool:
+    course = await session.scalar(
+        select(Course).where(Course.system_key == "system-chinese-path-v1")
+    )
+    if course is not None:
+        return False
+    course = Course(
+        subject=CourseSubject.CHINESE,
+        title="系统汉字学习路径",
+        description=(
+            "Growth Learning 项目内部学习路径，按当前 canonical 字库组织；"
+            "不是官方教育标准或教材字表。"
+        ),
+        source_type=CourseSourceType.SYSTEM,
+        status=CourseStatus.ENABLED,
+        version=1,
+        system_key="system-chinese-path-v1",
+        recommended_age_min=3,
+        recommended_age_max=10,
+        reference_metadata={"catalog_version": release.catalog_version},
+    )
+    session.add(course)
+    await session.flush()
+    stages = [
+        ("起步 100", "先接触项目路径中的前 100 个常用字。", 0, 100),
+        ("基础 300", "继续扩展到累计 300 个字。", 100, 300),
+        ("进阶 500", "继续扩展到累计 500 个字。", 300, 500),
+        ("扩展 1000+", "在当前版本字库内持续扩展。", 500, len(point_ids)),
+    ]
+    for unit_order, (title, description, start, end) in enumerate(stages):
+        unit = CourseUnit(
+            course_id=course.id,
+            title=title,
+            description=description,
+            order_index=unit_order,
+            status=CourseStatus.ENABLED,
+        )
+        session.add(unit)
+        await session.flush()
+        for offset in range(start, end, 10):
+            activity = LearningActivity(
+                course_unit_id=unit.id,
+                activity_type=ActivityType.CHARACTER_LEARNING,
+                title=f"识字 {offset + 1}–{min(offset + 10, end)}",
+                instructions="按顺序接触新字；复习积压时今日计划可能暂停新字。",
+                order_index=(offset - start) // 10,
+                status=CourseStatus.ENABLED,
+                content_metadata={"catalog_version": release.catalog_version},
+            )
+            session.add(activity)
+            await session.flush()
+            for position, point_id in enumerate(point_ids[offset : min(offset + 10, end)]):
+                session.add(
+                    ActivityKnowledgePoint(
+                        activity_id=activity.id,
+                        knowledge_point_id=point_id,
+                        role=KnowledgePointRole.PRIMARY,
+                        order_index=position,
+                    )
+                )
+    return True
+
+
+async def import_expanded_catalog(session: AsyncSession) -> CatalogImportResult:
+    """Upsert the catalog without replacing canonical knowledge-point IDs."""
+
+    payload, items = load_expanded_dataset()
+    existing_ids = dict(
+        (
+            await session.execute(
+                select(ChineseCharacter.character, ChineseCharacter.knowledge_point_id).where(
+                    ChineseCharacter.character.in_([item.character for item in items])
+                )
+            )
+        ).all()
+    )
+    imported = await import_characters(session, items)
+    result = CatalogImportResult(
+        created=imported.created,
+        updated=imported.updated,
+        skipped=imported.skipped,
+        errors=imported.errors,
+        preserved=len(existing_ids),
+        catalog_version=payload["catalog_version"],
+        catalog_size=len(items),
+    )
+    if result.errors:
+        return result
+
+    current_ids = dict(
+        (
+            await session.execute(
+                select(ChineseCharacter.character, ChineseCharacter.knowledge_point_id).where(
+                    ChineseCharacter.character.in_([item.character for item in items])
+                )
+            )
+        ).all()
+    )
+    changed_ids = [
+        character
+        for character, point_id in existing_ids.items()
+        if current_ids.get(character) != point_id
+    ]
+    if changed_ids:
+        await session.rollback()
+        result.errors.append("Canonical knowledge-point IDs changed during import")
+        return result
+
+    provenance = payload["provenance"]
+    release = await session.scalar(
+        select(CatalogRelease).where(CatalogRelease.catalog_version == payload["catalog_version"])
+    )
+    if release is None:
+        release = CatalogRelease(
+            catalog_version=payload["catalog_version"],
+            source_type=provenance["source_type"],
+            source_name=provenance["source_name"],
+            source_reference=provenance["source_reference"],
+            license=provenance["license"],
+            imported_at=datetime.now(UTC),
+            item_count=len(items),
+            is_current=True,
+            metadata_json={
+                "notice": payload["notice"],
+                "selection_method": provenance["selection_method"],
+            },
+        )
+        session.add(release)
+        await session.flush()
+    else:
+        release.item_count = len(items)
+        release.is_current = True
+    other_releases = list(
+        (await session.scalars(select(CatalogRelease).where(CatalogRelease.id != release.id))).all()
+    )
+    for other in other_releases:
+        other.is_current = False
+
+    existing_entries = set(
+        (
+            await session.scalars(
+                select(CharacterCatalogEntry.knowledge_point_id).where(
+                    CharacterCatalogEntry.catalog_release_id == release.id
+                )
+            )
+        ).all()
+    )
+    point_ids: list[uuid.UUID] = []
+    for position, item in enumerate(items):
+        point_id = current_ids[item.character]
+        point_ids.append(point_id)
+        if point_id not in existing_entries:
+            session.add(
+                CharacterCatalogEntry(
+                    catalog_release_id=release.id,
+                    knowledge_point_id=point_id,
+                    order_index=position,
+                    source_reference=item.source_reference,
+                )
+            )
+    result.course_created = await _seed_system_course(session, release, point_ids)
+    await session.commit()
+    return result
 
 
 async def import_starter_relations(session: AsyncSession) -> ImportResult:

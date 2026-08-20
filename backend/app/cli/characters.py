@@ -6,6 +6,7 @@ import asyncio
 from app.db.session import session_scope
 from app.services.character_catalog import (
     import_characters,
+    import_expanded_catalog,
     import_starter_relations,
     load_starter_dataset,
 )
@@ -27,12 +28,28 @@ async def import_starter() -> int:
     return 1 if result.errors or (relations and relations.errors) else 0
 
 
+async def import_catalog() -> int:
+    async with session_scope() as session:
+        result = await import_expanded_catalog(session)
+    print(
+        f"catalog_version={result.catalog_version} catalog_size={result.catalog_size} "
+        f"created={result.created} updated={result.updated} skipped={result.skipped} "
+        f"preserved={result.preserved} course_created={result.course_created} "
+        f"errors={len(result.errors)}"
+    )
+    return 1 if result.errors else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Manage the Chinese-character catalog")
-    parser.add_subparsers(dest="command", required=True).add_parser("import-starter")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("import-starter")
+    commands.add_parser("import-chinese-catalog")
     args = parser.parse_args()
     if args.command == "import-starter":
         return asyncio.run(import_starter())
+    if args.command == "import-chinese-catalog":
+        return asyncio.run(import_catalog())
     return 2
 
 

@@ -201,6 +201,9 @@ class AssessmentSessionPlan(TimestampMixin, Base):
     sampling_method: Mapped[str] = mapped_column(String(60), nullable=False)
     sampling_version: Mapped[str] = mapped_column(String(20), nullable=False)
     eligible_catalog_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    catalog_version: Mapped[str] = mapped_column(
+        String(80), default="growth-starter-v1", server_default="growth-starter-v1", nullable=False
+    )
 
 
 class AssessmentSessionTarget(TimestampMixin, Base):
@@ -254,6 +257,9 @@ class LiteracyEstimate(TimestampMixin, Base):
         nullable=False,
     )
     catalog_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    catalog_version: Mapped[str] = mapped_column(
+        String(80), default="growth-starter-v1", server_default="growth-starter-v1", nullable=False
+    )
     sample_size: Mapped[int] = mapped_column(Integer, nullable=False)
     known_count: Mapped[int] = mapped_column(Integer, nullable=False)
     unknown_count: Mapped[int] = mapped_column(Integer, nullable=False)

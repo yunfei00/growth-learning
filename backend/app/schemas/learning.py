@@ -258,6 +258,7 @@ class PlannedAssessmentResponse(BaseModel):
     sampling_method: str
     sampling_version: str
     eligible_catalog_size: int
+    catalog_version: str
     started_at: datetime
     completed_at: datetime | None
     total_items: int
@@ -298,6 +299,7 @@ class LiteracyEstimateResponse(BaseModel):
     id: uuid.UUID | None
     assessment_session_id: uuid.UUID | None
     catalog_size: int
+    catalog_version: str
     sample_size: int
     known_count: int
     unknown_count: int
