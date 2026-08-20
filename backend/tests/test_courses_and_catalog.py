@@ -42,6 +42,7 @@ from app.services.character_catalog import (
     import_expanded_catalog,
     load_starter_dataset,
 )
+from app.services.review_planning import latest_literacy_estimate
 
 pytestmark = pytest.mark.anyio
 PASSWORD = "course-catalog-tests-only"
@@ -281,6 +282,18 @@ async def test_catalog_import_is_idempotent_preserves_ids_and_historical_links(
         assert (old_estimate.catalog_size, old_estimate.catalog_version) == (
             200,
             "growth-starter-v1",
+        )
+        new_child = Child(
+            family_id=family.id,
+            display_name="新目录孩子",
+            birth_date=date(2022, 1, 1),
+        )
+        session.add(new_child)
+        await session.commit()
+        new_frame = await latest_literacy_estimate(session, new_child.id)
+        assert (new_frame.catalog_size, new_frame.catalog_version) == (
+            1200,
+            "growth-chinese-v2-unihan-2026",
         )
         persisted_version = await session.get(StoryVersion, version.id)
         assert persisted_version is not None
