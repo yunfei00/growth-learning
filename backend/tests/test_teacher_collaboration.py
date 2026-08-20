@@ -180,10 +180,7 @@ async def test_parent_authorized_teacher_assignment_evidence_and_revocation(
         assert class_resolve.status_code == 200
         assert class_resolve.json()["kind"] == "classroom"
         async with session_factory() as session:
-            assert (
-                await session.scalar(select(func.count()).select_from(ClassroomMembership))
-                == 0
-            )
+            assert await session.scalar(select(func.count()).select_from(ClassroomMembership)) == 0
         assert (await teacher.get(f"/api/v1/teacher/students/{child_b['id']}")).status_code == 404
         joined = await parent.post(
             f"/api/v1/children/{child_a['id']}/teacher-connections",
