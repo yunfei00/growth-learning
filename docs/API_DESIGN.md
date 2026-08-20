@@ -41,7 +41,31 @@
 | `GET` | `/api/v1/children/{child_id}` | 所属家庭成员 |
 | `PATCH` | `/api/v1/children/{child_id}` | 所属家庭 `admin` |
 
-当前不提供家庭成员邀请、孩子删除或 Teacher 端点。
+当前不提供家庭成员邮件邀请或孩子删除。
+
+### Parent-authorized teacher collaboration
+
+| Method | Path | 权限与说明 |
+| --- | --- | --- |
+| `POST/GET/PATCH` | `/api/v1/teacher/profile` | 登录用户开启/读取/更新独立教师模式；不自动获得孩子权限 |
+| `POST` | `/api/v1/teacher/profile/rotate-code` | 教师轮换 opaque 连接码 |
+| `GET` | `/api/v1/teacher/dashboard` | 教师自己的班级、授权学生、任务和真实计数 |
+| `POST/GET/PATCH` | `/api/v1/teacher/classrooms[/{id}]` | 教师自己的轻量班级；其他老师统一拒绝 |
+| `GET` | `/api/v1/teacher/connections/resolve?code=...` | 登录用户查询连接码的最少必要资料，不产生授权 |
+| `POST` | `/api/v1/children/{id}/teacher-connections` | Family Admin 以 teacher/class code 明确授权单一孩子 |
+| `POST` | `/api/v1/children/{id}/teacher-connections/{relation_id}/revoke` | Family Admin 立即撤销；历史 evidence 保留 |
+| `POST` | `/api/v1/children/{id}/teacher-classrooms/{membership_id}/leave` | Family Admin 让孩子退出班级 |
+| `GET` | `/api/v1/children/{id}/teacher-collaboration` | 家庭成员查看该孩子的授权、班级、任务和观察历史 |
+| `POST/GET` | `/api/v1/teacher/assignments` | 教师创建/查看自己的任务，只能选择 active 授权孩子 |
+| `POST` | `/api/v1/teacher/assignments/{id}/publish` | 发布前再次验证授权与家长确认的班级成员资格 |
+| `GET` | `/api/v1/teacher/assignments/{id}/analytics` | scoped aggregate；固定禁止 ranking |
+| `GET` | `/api/v1/teacher/students[/{child_id}]` | teacher-specific DTO，不返回家庭私人 DTO |
+| `POST` | `/api/v1/teacher/students/{child_id}/observations` | active 老师保存原文观察；不直接修改 mastery |
+| `GET` | `/api/v1/children/{id}/teacher-tasks` | 家庭成员或 active 授权老师查看已发布任务 |
+| `POST` | `/api/v1/children/{id}/teacher-tasks/{assignment_id}/start` | 开始/恢复 canonical learning 或 assessment session |
+| `POST` | `/api/v1/children/{id}/teacher-tasks/{assignment_id}/progress` | 事务性、幂等追加 evidence 并完成任务 |
+
+Companion 可陪孩子执行任务，但不能授权、撤销或入班。System Admin 无隐式教师或家庭权限。撤销后的下一次教师请求立即失败。
 
 ### System administration
 

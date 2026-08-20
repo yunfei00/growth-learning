@@ -1,11 +1,12 @@
 # Growth Learning
 
-Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 7 把周末线下科学探索纳入同一真实证据体系：版本化实验、家庭材料、孩子原话、私有媒体、成长卡和受掌握度约束的实验故事。
+Growth Learning 是一个面向儿童长期学习与成长记录的家庭中心平台。Phase 9 在同一真实证据体系上加入家长逐孩子授权、随时可撤销的有限教师协作。
 
 ## 当前用户流程
 
 ```text
 注册 → 登录 → 创建家庭 → 添加孩子 → 今日识字/复习 → 适读故事 → 周末科学实验 → 长期成长证据
+                                                    ↘ 家长授权老师 → 老师任务/观察
 ```
 
 再次登录后，应用通过 HttpOnly Cookie 获取当前用户，从 PostgreSQL 加载家庭和孩子。家长首页的识字数字来自真实 LearningRecord、AssessmentItem 与 ChildKnowledgeState，不展示虚构统计。
@@ -37,6 +38,8 @@ Set-Location ..
 | Character Learning | <http://localhost:3000/learn/characters> |
 | My Storybook | <http://localhost:3000/read> |
 | Weekend Science Lab | <http://localhost:3000/science> |
+| Teacher Workspace | <http://localhost:3000/teacher> |
+| Parent Teacher Collaboration | <http://localhost:3000/teacher-collaboration> |
 | Backend health | <http://localhost:8000/health> |
 | Backend OpenAPI | <http://localhost:8000/docs> |
 
@@ -75,6 +78,12 @@ docker compose exec backend python -m app.cli.review --child-id CHILD_UUID
 ```
 
 `create-admin` 可重复执行且不会重复创建账户；已有普通账户必须显式执行 `promote-admin`。项目自有 Starter 数据位于 `backend/data/chinese_characters_v1.json` 和 `backend/data/science_experiments_v1.json`；科学数据是项目自编的家庭实验起始集，不复制商业课程，也不宣称官方标准。
+
+## 老师协作
+
+登录用户可在 `/teacher` 主动开启独立教师模式并获得不可预测的 Teacher Code。该动作不授予任何孩子权限；Family Admin 必须在 `/teacher-collaboration` 查看最少必要教师/班级信息，并对当前孩子明确确认。Companion 只能陪孩子完成任务，System Admin 也没有隐式家庭或教师权限。
+
+识字学习与复习任务复用 `LearningRecord`，认字检测复用逐项 `AssessmentItem`，阅读任务复用 `ReadingSession`；不存在教师专属掌握度或排行榜。撤销后下一次教师请求立即拒绝，历史 evidence 和老师原文观察仍保留给家庭。完整权限与数据边界见 [家长授权的老师协作](docs/TEACHER_COLLABORATION.md)。
 
 ## AI 故事运行时配置
 
@@ -155,6 +164,7 @@ gl-backup
 - [Phase 6 AI 故事与汉字覆盖策略](docs/AI_STORY_POLICY.md)
 - [Phase 7 科学实验数据与隐私边界](docs/DATA_MODEL.md#phase-7-周末科学实验室)
 - [Phase 8 成长档案与报告](docs/GROWTH_ARCHIVE.md)
+- [Phase 9 家长授权的老师协作](docs/TEACHER_COLLABORATION.md)
 - [家庭导出格式 V1](docs/EXPORT_FORMAT.md)
 - [生产备份与恢复演练](docs/BACKUP_RESTORE.md)
 
@@ -175,4 +185,4 @@ gl-backup
 - `system_role=admin` 只授予平台知识管理权限，不自动取得任何家庭或孩子资料。
 - 所有 `/api/v1/admin/*` 在后端统一校验系统管理员角色；普通/家庭管理员均返回 `403`。
 - 所有正式业务外键使用 `ON DELETE RESTRICT`；当前不提供孩子物理删除。
-- Teacher 将通过家庭外部授权关系访问指定孩子，不能自动成为 `FamilyMember`。
+- Teacher 只能通过 Family Admin 对单一孩子建立的 active 外部授权关系访问有限教学 DTO，不能自动成为 `FamilyMember`；撤销实时生效。

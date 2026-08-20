@@ -34,7 +34,7 @@ app/core          配置、日志、安全等横切能力
 
 依赖方向从外向内：路由调用服务；服务依赖领域接口/仓储；集成适配器实现外部接口。Phase 1 只建立必要骨架，不引入仓储基类、事件总线或复杂依赖注入框架。
 
-### 业务模块边界（规划）
+### 业务模块边界
 
 - `identity`：用户身份与会话
 - `administration`：独立系统管理员 Guard、CLI 和真实系统计数
@@ -45,6 +45,7 @@ app/core          配置、日志、安全等横切能力
 - `reading`：故事生成、规则校验、阅读会话
 - `science`：实验课程与实验会话
 - `growth`：时间线、媒体、报告和导出
+- `teacher`：独立教师身份、家长逐孩子授权、轻量班级、任务和受限教学 DTO
 
 模块之间通过稳定的服务契约和标识符协作；在模块化单体内共享一个数据库和事务能力。
 
@@ -77,6 +78,9 @@ LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
 - 服务层是强制授权边界；前端隐藏按钮只改善体验，不构成安全控制。
 - `User.system_role` 表达平台权限；`FamilyMember.role` 表达单一家庭内权限。两套权限不互相提升。
 - 系统管理员 API 只能管理系统知识与平台概览；访问家庭/孩子仍必须拥有对应 `FamilyMember`。
+- 教师授权以 active `TeacherChildRelation` 为实时强制边界；连接码只用于发现，不能绕过 Family Admin 确认。
+- 教师任务复用 `LearningRecord`、`AssessmentItem` 与 `ReadingSession`，不建立第二套学习事实；教师观察单向投影到家长时间线。
+- 教师端响应使用专用最小 DTO，排除家庭成员、兄弟姐妹、私人媒体、完整时间线、故事书、报告、成长册和导出。
 
 ## 5.1 系统知识与孩子状态分离
 

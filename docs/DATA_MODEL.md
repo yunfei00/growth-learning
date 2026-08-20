@@ -1,6 +1,6 @@
 # Growth Learning 数据模型
 
-本文记录已落地的数据模型与后续边界。Phase 7 在既有学习与阅读证据之上加入版本化科学实验目录、家庭材料、可恢复实验会话、孩子原话和私有媒体；不包含能力分数、教师或开放式聊天。
+本文记录已落地的数据模型与后续边界。Phase 9 在既有家庭、学习、阅读、科学与成长证据之上加入家长明确授权的教师协作；不包含学校管理、排行榜或开放式聊天。
 
 ## 通用约定
 
@@ -60,6 +60,25 @@
 
 Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/拒绝、邮箱验证、撤销和审计，不使用“输入邮箱即加入”的临时实现。
 
+### 教师协作（Phase 9）
+
+`TeacherProfile` 是用户自愿开启的独立教师身份，既不是 `FamilyMember`，也不是 `System Admin`。`TeacherChildRelation` 记录家庭管理员对单一孩子的 active/revoked 授权，不把同一家庭的兄弟姐妹隐式包含在内。
+
+| 表 | 作用 |
+| --- | --- |
+| `teacher_profiles` | 教师显示资料和 opaque、唯一、可轮换的 `teacher_code` |
+| `teacher_child_relations` | 老师与单一孩子的家长授权、撤销和审计时间 |
+| `classrooms` | 老师拥有的轻量班级及 opaque `class_code` |
+| `classroom_memberships` | 家长确认的孩子入班/退出历史 |
+| `teacher_assignments` | draft/published/closed/archived 任务及类型、截止时间 |
+| `teacher_assignment_targets` | 任务目标孩子及创建时使用的授权关系 |
+| `teacher_assignment_knowledge_points` | 按顺序引用 canonical `KnowledgePoint` |
+| `teacher_assignment_progress` | pending/in_progress/completed 进度和 canonical session 引用 |
+| `teacher_observations` | 老师原文、分类、时间及可选班级/任务关系 |
+| `teacher_observation_knowledge_points` | 观察关联的 canonical `KnowledgePoint` |
+
+教师任务不会建立 `TeacherMastery` 或平行分数。识字学习继续追加 `LearningRecord(source=teacher_assignment)`；认字检测继续追加四类 `AssessmentItem` 并记录 evaluator；阅读任务引用现有 `ReadingSession`。掌握度只由统一算法从这些原始 evidence 派生。教学观察只投影为 `GrowthEvent(source_type=teacher)`，不会直接改写 `ChildKnowledgeState`。
+
 ### `children`
 
 家庭内的孩子成长档案。
@@ -112,9 +131,9 @@ Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/�
 - 对跨家庭资源统一返回 `404`，避免泄露资源是否存在；权限存在但角色不足返回 `403`。
 - 前端隐藏按钮不是权限措施，所有规则由后端重复验证。
 
-## 后续教师模型边界
+## 教师权限查询约束
 
-教师是家庭外部授权角色，不能自动成为 `FamilyMember`。后续阶段使用类似 `TeacherChildRelation` 的独立关系，把指定孩子、权限范围、有效期、授权人和撤销状态绑定在一起。Phase 2 不创建 Teacher 表或教师授权接口。
+教师是家庭外部授权角色，不能自动成为 `FamilyMember`。每次教师访问都必须验证当前用户的 active `TeacherProfile` 和目标孩子的 active `TeacherChildRelation`；撤销后立即失败。Class Code 只用于发现班级，必须经 Family Admin 确认才建立授权与成员资格。
 
 ## 系统知识目录
 
