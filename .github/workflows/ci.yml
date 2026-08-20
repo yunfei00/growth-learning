@@ -142,6 +142,8 @@ jobs:
                   "courses", "course_units", "learning_activities",
                   "activity_knowledge_points", "child_course_enrollments",
                   "course_activity_progress",
+                  "achievement_definitions", "child_achievements", "star_ledger",
+                  "family_reward_settings", "family_reward_goals",
               }
               missing = required - tables
               if missing:

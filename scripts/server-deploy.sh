@@ -93,6 +93,7 @@ wait_for_services "${INFRA_SERVICES[@]}"
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.science import-starter
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.review
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.growth rebuild-growth-events
+"${compose[@]}" run --rm --no-deps backend python -m app.cli.experience rebuild-achievements
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.growth cleanup-exports
 
 "${compose[@]}" up -d --no-build "${APP_SERVICES[@]}"

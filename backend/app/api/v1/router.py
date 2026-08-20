@@ -7,6 +7,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.characters import router as characters_router
 from app.api.v1.children import router as children_router
 from app.api.v1.courses import router as courses_router
+from app.api.v1.experience import router as experience_router
 from app.api.v1.families import router as families_router
 from app.api.v1.growth import router as growth_router
 from app.api.v1.learning import router as learning_router
@@ -21,6 +22,7 @@ router.include_router(auth_router)
 router.include_router(admin_router)
 router.include_router(characters_router)
 router.include_router(courses_router)
+router.include_router(experience_router)
 router.include_router(families_router)
 router.include_router(growth_router)
 router.include_router(learning_router)

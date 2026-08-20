@@ -18,6 +18,13 @@ from app.models.course import (
     KnowledgePointRole,
     LearningActivity,
 )
+from app.models.experience import (
+    AchievementDefinition,
+    ChildAchievement,
+    FamilyRewardGoal,
+    FamilyRewardSettings,
+    StarLedger,
+)
 from app.models.family import Child, Family, FamilyMember, FamilyRole
 from app.models.growth import (
     ExportJob,
@@ -144,6 +151,11 @@ __all__ = [
     "Family",
     "FamilyMember",
     "FamilyRole",
+    "AchievementDefinition",
+    "ChildAchievement",
+    "FamilyRewardGoal",
+    "FamilyRewardSettings",
+    "StarLedger",
     "SystemRole",
     "User",
     "GrowthEvent",
