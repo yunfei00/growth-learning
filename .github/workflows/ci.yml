@@ -133,6 +133,11 @@ jobs:
                   "growth_events", "growth_media_assets",
                   "growth_reports", "growth_report_versions",
                   "growth_books", "growth_book_versions", "export_jobs",
+                  "teacher_profiles", "teacher_child_relations", "classrooms",
+                  "classroom_memberships", "teacher_assignments",
+                  "teacher_assignment_targets", "teacher_assignment_knowledge_points",
+                  "teacher_assignment_progress", "teacher_observations",
+                  "teacher_observation_knowledge_points",
               }
               missing = required - tables
               if missing:
