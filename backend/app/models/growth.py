@@ -49,6 +49,7 @@ class GrowthSourceType(StrEnum):
     SYSTEM = "system"
     PARENT = "parent"
     COMPANION = "companion"
+    TEACHER = "teacher"
 
 
 class GrowthReportPeriod(StrEnum):
@@ -88,7 +89,7 @@ class GrowthEvent(TimestampMixin, Base):
             name="ck_growth_events_category",
         ),
         CheckConstraint(
-            "source_type IN ('system', 'parent', 'companion')",
+            "source_type IN ('system', 'parent', 'companion', 'teacher')",
             name="ck_growth_events_source",
         ),
     )
