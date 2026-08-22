@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
 import { ProtectedPage } from "@/components/protected-page";
-import { ApiClientError, type ScienceExperiment, getScienceExperiment, startExperimentSession } from "@/lib/api/client";
+import { ApiClientError, type ScienceExperiment, createClientKey, getScienceExperiment, startExperimentSession } from "@/lib/api/client";
 
 function ExperimentDetail() {
   const params = useParams<{ experimentId: string }>();
@@ -15,9 +15,30 @@ function ExperimentDetail() {
   const [experiment, setExperiment] = useState<ScienceExperiment | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+  const startRequestKey = useRef<string | null>(null);
   useEffect(() => { if (params.experimentId) getScienceExperiment(params.experimentId).then(setExperiment).catch((reason) => setError(reason instanceof ApiClientError ? reason.message : "无法加载实验")); }, [params.experimentId]);
   if (!activeChild || !experiment) return <section className="center-state section-shell">{error ? <p className="form-message form-error">{error}</p> : <><span className="loading-spinner" /><p>正在打开实验卡…</p></>}</section>;
-  const start = async () => { setWorking(true); try { const session = await startExperimentSession(activeChild.id, experiment.id); router.push(`/science/session/${session.id}`); } catch (reason) { setError(reason instanceof ApiClientError ? reason.message : "无法开始实验"); setWorking(false); } };
+  const start = async () => {
+    setWorking(true);
+    setError("");
+    try {
+      startRequestKey.current ??= createClientKey();
+      const session = await startExperimentSession(
+        activeChild.id,
+        experiment.id,
+        startRequestKey.current,
+      );
+      router.push(`/science/session/${session.id}`);
+    } catch (reason) {
+      console.error("Failed to start science experiment", {
+        status: reason instanceof ApiClientError ? reason.status : undefined,
+        response: reason instanceof ApiClientError ? reason.response : undefined,
+        error: reason,
+      });
+      setError("实验暂时无法开始，请稍后重试。");
+      setWorking(false);
+    }
+  };
   return <section className="science-detail section-shell">
     <Link href="/science">← 返回实验室</Link>
     <header><p className="eyebrow">{experiment.age_min}–{experiment.age_max ?? "不限"} 岁 · {experiment.estimated_duration_minutes} 分钟</p><h1>{experiment.title}</h1><p>{experiment.description}</p></header>

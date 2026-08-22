@@ -6,6 +6,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -298,6 +299,24 @@ async def _latest_experiment_version(
     )
 
 
+async def _active_experiment_session(
+    session: AsyncSession,
+    *,
+    child_id: uuid.UUID,
+    experiment_id: uuid.UUID,
+) -> ExperimentSession | None:
+    return await session.scalar(
+        select(ExperimentSession)
+        .where(
+            ExperimentSession.child_id == child_id,
+            ExperimentSession.experiment_id == experiment_id,
+            ExperimentSession.status.in_(["planned", "in_progress"]),
+        )
+        .order_by(ExperimentSession.created_at)
+        .limit(1)
+    )
+
+
 async def create_or_resume_experiment_session(
     session: AsyncSession,
     *,
@@ -326,12 +345,10 @@ async def create_or_resume_experiment_session(
     )
     if experiment is None:
         raise LookupError("Science experiment not found")
-    active = await session.scalar(
-        select(ExperimentSession).where(
-            ExperimentSession.child_id == child.id,
-            ExperimentSession.experiment_id == experiment.id,
-            ExperimentSession.status.in_(["planned", "in_progress"]),
-        )
+    active = await _active_experiment_session(
+        session,
+        child_id=child.id,
+        experiment_id=experiment.id,
     )
     if active is not None:
         return active
@@ -357,7 +374,18 @@ async def create_or_resume_experiment_session(
         started_at=now if payload.start_immediately else None,
     )
     session.add(experiment_session)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        active = await _active_experiment_session(
+            session,
+            child_id=child.id,
+            experiment_id=experiment.id,
+        )
+        if active is not None:
+            return active
+        raise
     await session.refresh(experiment_session)
     return experiment_session
 

@@ -11,11 +11,13 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -250,6 +252,14 @@ class ExperimentSession(TimestampMixin, Base):
             "current_step IN ('question', 'prediction', 'materials', 'experiment', "
             "'observation', 'explanation', 'follow_up', 'summary', 'complete')",
             name="ck_experiment_sessions_step",
+        ),
+        Index(
+            "uq_experiment_sessions_unfinished",
+            "child_id",
+            "experiment_id",
+            unique=True,
+            postgresql_where=text("status IN ('planned', 'in_progress')"),
+            sqlite_where=text("status IN ('planned', 'in_progress')"),
         ),
     )
 

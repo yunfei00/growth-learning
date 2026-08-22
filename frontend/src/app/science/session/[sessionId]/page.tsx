@@ -14,6 +14,7 @@ import {
   type ExperimentSession,
   addExperimentEvidence,
   completeExperiment,
+  createClientKey,
   generateExperimentStory,
   getApiBaseUrl,
   getExperimentGrowthCard,
@@ -64,7 +65,7 @@ function ExperimentRunner() {
   const snapshot = session.experiment_snapshot;
   const title = String(snapshot.title ?? "科学实验");
   const move = async (step: ExperimentSession["current_step"]) => { setWorking(true); try { setSession(await updateExperimentSession(activeChild.id, session.id, { action: "advance", current_step: step })); setMessage("进度已保存，可以随时离开后继续。"); } catch (reason) { setError(messageFrom(reason, "进度保存失败")); } finally { setWorking(false); } };
-  const record = async () => { if (!text.trim()) return; setWorking(true); try { const config = EVIDENCE.find((item) => item.value === type)!; await addExperimentEvidence(activeChild.id, session.id, [{ evidence_type: type, original_text: text.trim(), capability_tags: config.tags, client_key: crypto.randomUUID() }]); setText(""); await load(); setMessage("孩子的原话已原样保存。"); } catch (reason) { setError(messageFrom(reason, "记录保存失败")); } finally { setWorking(false); } };
+  const record = async () => { if (!text.trim()) return; setWorking(true); try { const config = EVIDENCE.find((item) => item.value === type)!; await addExperimentEvidence(activeChild.id, session.id, [{ evidence_type: type, original_text: text.trim(), capability_tags: config.tags, client_key: createClientKey() }]); setText(""); await load(); setMessage("孩子的原话已原样保存。"); } catch (reason) { setError(messageFrom(reason, "记录保存失败")); } finally { setWorking(false); } };
   const upload = async (file?: File) => { if (!file) return; setWorking(true); try { setSession(await uploadExperimentMedia(activeChild.id, session.id, file)); setMessage("媒体已保存到家庭私有空间。"); } catch (reason) { setError(messageFrom(reason, "媒体上传失败")); } finally { setWorking(false); } };
   const finish = async () => { setWorking(true); try { const completed = await completeExperiment(activeChild.id, session.id, parentNote); setSession(completed); setGrowth(await getExperimentGrowthCard(activeChild.id, session.id)); setMessage("实验完成。只记录接触证据，没有自动产生认字答对记录。"); } catch (reason) { setError(messageFrom(reason, "无法完成实验")); } finally { setWorking(false); } };
   const story = async () => { setWorking(true); try { const result = await generateExperimentStory(activeChild.id, session.id); router.push(`/read/${result.version.id}`); } catch (reason) { setError(messageFrom(reason, "实验故事暂时无法生成")); setWorking(false); } };

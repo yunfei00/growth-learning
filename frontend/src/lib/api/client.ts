@@ -709,10 +709,31 @@ export class ApiClientError extends Error {
   constructor(
     message: string,
     public readonly status?: number,
+    public readonly response?: ErrorPayload | null,
   ) {
     super(message);
     this.name = "ApiClientError";
   }
+}
+
+export function createClientKey(): string {
+  const runtimeCrypto = globalThis.crypto;
+  if (typeof runtimeCrypto?.randomUUID === "function") {
+    return runtimeCrypto.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (typeof runtimeCrypto?.getRandomValues === "function") {
+    runtimeCrypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }
 
 export function getApiBaseUrl(): string {
@@ -769,6 +790,7 @@ async function request<T>(
       throw new ApiClientError(
         errorMessage(payload, `请求失败（HTTP ${response.status}）`),
         response.status,
+        payload,
       );
     }
 
@@ -1167,13 +1189,14 @@ export function updateFamilyMaterials(
 export function startExperimentSession(
   childId: string,
   experimentId: string,
+  requestKey = createClientKey(),
 ): Promise<ExperimentSession> {
   return request<ExperimentSession>(`/api/v1/children/${childId}/experiment-sessions`, {
     method: "POST",
     body: jsonBody({
       experiment_id: experimentId,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai",
-      request_key: crypto.randomUUID(),
+      request_key: requestKey,
       start_immediately: true,
     }),
   });
@@ -1236,7 +1259,7 @@ export function generateExperimentStory(
 ): Promise<StoryGenerationResult> {
   return request<StoryGenerationResult>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}/generate-story`, {
     method: "POST",
-    body: jsonBody({ difficulty, request_key: crypto.randomUUID() }),
+    body: jsonBody({ difficulty, request_key: createClientKey() }),
   }, 90_000);
 }
 

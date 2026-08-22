@@ -13,6 +13,7 @@ import {
   type ReadingSummary,
   type StoryDifficulty,
   type StoryPage,
+  createClientKey,
   generateStory,
   getReadingContext,
   getReadingSummary,
@@ -124,7 +125,7 @@ function ReadingLibrary() {
         theme,
         custom_theme: customTheme.trim() || undefined,
         target_knowledge_point_ids: manualTargets ? selectedTargets : undefined,
-        request_key: crypto.randomUUID(),
+        request_key: createClientKey(),
       });
       router.push(`/read/${result.version.id}`);
     } catch (requestError) {
