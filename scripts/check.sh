@@ -10,7 +10,7 @@ cd "$PROJECT_ROOT/backend"
 ../.venv/bin/python -m pytest
 
 cd "$PROJECT_ROOT/frontend"
+pnpm test
 pnpm lint
 pnpm typecheck
 pnpm build
-

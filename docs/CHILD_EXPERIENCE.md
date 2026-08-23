@@ -1,4 +1,4 @@
-# Phase 11 Parent / Child Experience
+# Parent / Child Experience
 
 Phase 11 adds two explicit presentation modes over the same canonical household and evidence data.
 Parent mode keeps planning, settings, metrics, reports, teacher collaboration, and child switching.
@@ -70,6 +70,29 @@ Family Admin may enable/disable display and define plain-text offline goals. Com
 cannot change settings. Disabling stars preserves history. There are no negative rewards, marketplace,
 competition, leaderboard, streak punishment, or sibling comparison.
 
+## Unified character learning experience
+
+Every learnable character entry now opens the same `/learn/characters/{knowledge_point_id}` page.
+The entry supplies a small, refresh-safe context (`source`, `returnTo`, sequence type, and at most one
+plan/session/activity ID); it never serializes the 1,200 UUID catalog into the URL. Explicit `returnTo`
+wins, browser history is the fallback, and the literacy home is the final safe fallback.
+
+The current `CatalogRelease` and `CharacterCatalogEntry.order_index` are the sole authority for the
+system path's global index, ten-character group, previous character, and next character. Groups remain
+a directory and progress aid only: navigation crosses 10/11 and 90/91 without returning to the course
+page. Today, mastery lists, learning-history sessions, assessment sessions, and course activities each
+resolve their own deterministic sequence on the server.
+
+The child learning page keeps one large character on the left and explanation, words, sentence, and
+parent tip on the right. Browser speech synthesis is a progressive enhancement: character, word, and
+sentence audio controls stop their click event and never create evidence or navigate. AI explanation,
+free practice, and repeat viewing remain auxiliary and never change mastery.
+
+`CharacterLearningHistoryPage` is intentionally different from mastery. It is rooted at
+`LearningSession -> LearningRecord`; an assessment-only `ChildKnowledgeState` is therefore absent.
+Sessions and repeated records remain visible as an append-oriented learning timeline. Assessment
+evidence stays in test history.
+
 ## Authorization and privacy
 
 All child projections call the existing household authorization guard. Cross-family users, unrelated
@@ -79,9 +102,9 @@ switching, private notes/media, exports, teacher administration, account control
 
 ## Responsive and accessibility checklist
 
-- 390 px: single-column task/cards, fixed five-item bottom navigation, no horizontal overflow.
-- 768 px: bottom navigation and two-column child cards where space allows.
-- 1280 px: centered content, desktop mode navigation, up to four summary cards.
+- 390 px: single-column task/cards and a compact one-row child header, with no page overflow.
+- 768 px: one-row child identity/navigation/parent-mode exit and two-column cards where space allows.
+- 1280 px: centered content, a 64 px one-row child header, and up to four summary cards.
 - All interactive controls have at least a 44 px target and visible keyboard focus.
 - Emoji decoration is `aria-hidden`; data-bearing stars have an accessible label.
 - Loading, empty, error/retry, and success states use text and not color alone.

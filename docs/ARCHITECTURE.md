@@ -245,6 +245,24 @@ one household-authorized active child and removes adult settings and private arc
 authoritative. Achievement rebuild reads evidence without rewriting it; reward balance is derived from a
 positive-only ledger with source idempotency. See [Phase 11 experience policy](CHILD_EXPERIENCE.md).
 
-## 18. V1 release boundary
+## 18. Unified character learning read models
 
-V1 固定为 `1.0.0`，Alembic head 为 `20260820_0011`。Release SHA 同时绑定 CI、前后端镜像 label、后端健康响应、生产部署、E2E 和恢复演练。角色边界见 [V1 角色与隐私矩阵](ROLE_PRIVACY_MATRIX.md)，发布/回滚门禁见 [V1 发布清单](RELEASE_CHECKLIST.md)。Phase 12 不增加第二套 mastery、课程或成长事实；未来工作进入 V2 backlog 或普通维护 release。
+```text
+current CatalogRelease -> CharacterCatalogEntry.order_index
+                              └──> system path index/group/previous/next
+
+LearningSession -> LearningRecord -> KnowledgePoint -> ChineseCharacter
+                              └──> paged learning-history timeline
+
+AssessmentSession -> AssessmentItem -> ChildKnowledgeState
+                              └──> test history/mastery (not learning history)
+```
+
+Character entry URLs carry only the sequence type and one optional plan/session/activity ID. The
+server reconstructs deterministic neighbors after refresh. Mastery remains the complete 1,200-point
+projection, while the learning-history read model starts at `LearningRecord`; this prevents an
+assessment-only state from being mislabeled as something the child formally learned.
+
+## 19. V1 release boundary
+
+V1 固定为 `1.0.0`，Alembic head 为 `20260823_0013`。Release SHA 同时绑定 CI、前后端镜像 label、后端健康响应、生产部署、E2E 和恢复演练。角色边界见 [V1 角色与隐私矩阵](ROLE_PRIVACY_MATRIX.md)，发布/回滚门禁见 [V1 发布清单](RELEASE_CHECKLIST.md)。后续功能不增加第二套 mastery、课程或成长事实；未来工作进入 V2 backlog 或普通维护 release。

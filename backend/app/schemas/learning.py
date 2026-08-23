@@ -146,6 +146,53 @@ class CharacterMasteryDetail(BaseModel):
     timeline: list[TimelineItem]
 
 
+class CharacterLearningHistoryRecord(BaseModel):
+    record_id: uuid.UUID
+    knowledge_point_id: uuid.UUID
+    character: str
+    pinyin: str
+    activity_type: str
+    source: str
+    learned_at: datetime
+    mastery_level: MasteryLevelValue
+    is_priority: bool
+
+
+class CharacterLearningHistorySession(BaseModel):
+    session_id: uuid.UUID
+    source: str
+    status: SessionStatusValue
+    started_at: datetime
+    completed_at: datetime | None
+    records: list[CharacterLearningHistoryRecord]
+
+
+class CharacterLearningHistoryPage(BaseModel):
+    items: list[CharacterLearningHistorySession]
+    page: int
+    page_size: int
+    total_sessions: int
+    total_records: int
+    pages: int
+    distinct_characters: int
+    this_week_first_learned: int
+
+
+class CharacterNavigationItem(BaseModel):
+    knowledge_point_id: uuid.UUID
+    character: str
+
+
+class CharacterNavigationResponse(BaseModel):
+    sequence: str
+    position: int
+    total: int
+    group: int | None = None
+    group_size: int | None = None
+    previous: CharacterNavigationItem | None = None
+    next: CharacterNavigationItem | None = None
+
+
 class CharacterAIAssistanceResponse(BaseModel):
     simple_explanation: str
     words: list[str]

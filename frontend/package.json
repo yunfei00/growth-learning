@@ -2,6 +2,7 @@
   "name": "growth-learning-frontend",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@11.16.0",
   "engines": {
     "node": ">=24.0.0"
@@ -10,6 +11,7 @@
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
+    "test": "node --test tests/*.test.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },

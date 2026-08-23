@@ -230,6 +230,15 @@ Provider 未配置时 context 返回 `provider_configured=false`，生成返回 
 | `GET/POST` | `/api/v1/admin/catalog[/import]` | System Admin 查看来源或执行受控幂等导入 |
 | `GET/PATCH` | `/api/v1/admin/courses[...]` | System Admin 查看/归档系统课程，不读取孩子数据 |
 
+统一识字学习新增两个家庭鉴权 read model：
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/children/{child_id}/character-learning-history` | 只从 `LearningSession/LearningRecord` 返回分页学习批次；支持搜索和时间边界，不包含 assessment-only 汉字 |
+| `GET` | `/api/v1/children/{child_id}/characters/{point_id}/navigation` | 按 system path、today、mastery、learning/assessment session 或 course activity 解析稳定前后字；URL 只携带轻量上下文 |
+
+`system_path` 导航只使用 current `CatalogRelease` 的 `CharacterCatalogEntry.order_index`；前端不得另按 Unicode、创建时间或本地数组重排。
+
 Teacher Course 可见性不能替代 `TeacherChildRelation`；Family Admin 未授权时不能为孩子选入。
 课程端点不会创建 parallel mastery 或 answer DTO。Catalog 历史由 version + size 同时返回。
 

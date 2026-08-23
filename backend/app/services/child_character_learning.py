@@ -2,16 +2,22 @@
 
 import math
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    ActivityKnowledgePoint,
     AssessmentItem,
     AssessmentSession,
+    AssessmentSessionTarget,
+    CatalogRelease,
+    CharacterCatalogEntry,
     ChildKnowledgeState,
     ChineseCharacter,
+    DailyLearningPlan,
+    DailyPlanItem,
     KnowledgePoint,
     KnowledgeStatus,
     LearningRecord,
@@ -21,10 +27,15 @@ from app.models import (
 )
 from app.schemas.learning import (
     AssessmentSessionCreate,
+    CharacterLearningHistoryPage,
+    CharacterLearningHistoryRecord,
+    CharacterLearningHistorySession,
     CharacterMasteryDetail,
     CharacterMasteryPage,
     CharacterMasteryState,
     CharacterMasterySummary,
+    CharacterNavigationItem,
+    CharacterNavigationResponse,
     CharacterRecommendation,
     EvidenceSessionResponse,
     LearningSessionCreate,
@@ -218,6 +229,337 @@ async def list_character_mastery(
         page_size=page_size,
         total=total,
         pages=max(1, math.ceil(total / page_size)),
+    )
+
+
+async def list_character_learning_history(
+    session: AsyncSession,
+    child_id: uuid.UUID,
+    *,
+    search: str | None,
+    learned_from: datetime | None,
+    learned_to: datetime | None,
+    page: int,
+    page_size: int,
+) -> CharacterLearningHistoryPage:
+    """Return only real learning evidence, grouped without collapsing repeated sessions."""
+
+    record_query = (
+        select(LearningRecord.id)
+        .join(KnowledgePoint, KnowledgePoint.id == LearningRecord.knowledge_point_id)
+        .join(ChineseCharacter, ChineseCharacter.knowledge_point_id == KnowledgePoint.id)
+        .where(LearningRecord.child_id == child_id)
+    )
+    if search:
+        pattern = f"%{search.strip()}%"
+        record_query = record_query.where(
+            or_(
+                ChineseCharacter.character.ilike(pattern),
+                ChineseCharacter.pinyin.ilike(pattern),
+            )
+        )
+    if learned_from is not None:
+        record_query = record_query.where(LearningRecord.learned_at >= learned_from)
+    if learned_to is not None:
+        record_query = record_query.where(LearningRecord.learned_at < learned_to)
+
+    filtered_records = record_query.subquery()
+    total_records = int(
+        await session.scalar(select(func.count()).select_from(filtered_records)) or 0
+    )
+    session_ids_query = (
+        select(LearningRecord.session_id)
+        .where(LearningRecord.id.in_(select(filtered_records.c.id)))
+        .distinct()
+    )
+    total_sessions = int(
+        await session.scalar(select(func.count()).select_from(session_ids_query.subquery())) or 0
+    )
+    session_rows = list(
+        (
+            await session.scalars(
+                select(LearningSession)
+                .where(LearningSession.id.in_(session_ids_query))
+                .order_by(
+                    func.coalesce(
+                        LearningSession.completed_at,
+                        LearningSession.started_at,
+                    ).desc(),
+                    LearningSession.id.desc(),
+                )
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+        ).all()
+    )
+    selected_session_ids = [item.id for item in session_rows]
+    records_by_session: dict[uuid.UUID, list[CharacterLearningHistoryRecord]] = {
+        item.id: [] for item in session_rows
+    }
+    if selected_session_ids:
+        record_rows = (
+            await session.execute(
+                select(
+                    LearningRecord,
+                    KnowledgePoint,
+                    ChineseCharacter,
+                    ChildKnowledgeState,
+                )
+                .join(KnowledgePoint, KnowledgePoint.id == LearningRecord.knowledge_point_id)
+                .join(ChineseCharacter, ChineseCharacter.knowledge_point_id == KnowledgePoint.id)
+                .outerjoin(
+                    ChildKnowledgeState,
+                    and_(
+                        ChildKnowledgeState.child_id == child_id,
+                        ChildKnowledgeState.knowledge_point_id == KnowledgePoint.id,
+                    ),
+                )
+                .where(
+                    LearningRecord.id.in_(select(filtered_records.c.id)),
+                    LearningRecord.session_id.in_(selected_session_ids),
+                )
+                .order_by(
+                    LearningRecord.learned_at,
+                    LearningRecord.created_at,
+                    LearningRecord.id,
+                )
+            )
+        ).all()
+        for record, point, character, state in record_rows:
+            records_by_session[record.session_id].append(
+                CharacterLearningHistoryRecord(
+                    record_id=record.id,
+                    knowledge_point_id=point.id,
+                    character=character.character,
+                    pinyin=character.pinyin,
+                    activity_type=record.activity_type,
+                    source=record.source,
+                    learned_at=record.learned_at,
+                    mastery_level=state.mastery_level if state else MasteryLevel.UNLEARNED,
+                    is_priority=state.is_priority if state else False,
+                )
+            )
+
+    distinct_characters = int(
+        await session.scalar(
+            select(func.count(func.distinct(LearningRecord.knowledge_point_id))).where(
+                LearningRecord.child_id == child_id
+            )
+        )
+        or 0
+    )
+    now = datetime.now(UTC)
+    week_start = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    first_learning = (
+        select(
+            LearningRecord.knowledge_point_id,
+            func.min(LearningRecord.learned_at).label("first_learned_at"),
+        )
+        .where(LearningRecord.child_id == child_id)
+        .group_by(LearningRecord.knowledge_point_id)
+        .subquery()
+    )
+    this_week_first_learned = int(
+        await session.scalar(
+            select(func.count())
+            .select_from(first_learning)
+            .where(first_learning.c.first_learned_at >= week_start)
+        )
+        or 0
+    )
+    return CharacterLearningHistoryPage(
+        items=[
+            CharacterLearningHistorySession(
+                session_id=item.id,
+                source=item.source,
+                status=item.status,
+                started_at=item.started_at,
+                completed_at=item.completed_at,
+                records=records_by_session[item.id],
+            )
+            for item in session_rows
+        ],
+        page=page,
+        page_size=page_size,
+        total_sessions=total_sessions,
+        total_records=total_records,
+        pages=max(1, math.ceil(total_sessions / page_size)),
+        distinct_characters=distinct_characters,
+        this_week_first_learned=this_week_first_learned,
+    )
+
+
+async def get_character_navigation(
+    session: AsyncSession,
+    child_id: uuid.UUID,
+    knowledge_point_id: uuid.UUID,
+    *,
+    sequence: str,
+    context_id: uuid.UUID | None,
+    item_kind: str | None,
+    mastery_level: str | None,
+    priority: bool | None,
+    sort_by: str,
+    sort_order: str,
+) -> CharacterNavigationResponse | None:
+    """Resolve stable previous/next links from a small, refresh-safe sequence context."""
+
+    base = (
+        select(KnowledgePoint.id, ChineseCharacter.character)
+        .join(ChineseCharacter, ChineseCharacter.knowledge_point_id == KnowledgePoint.id)
+        .where(
+            KnowledgePoint.status == KnowledgeStatus.ACTIVE,
+            ChineseCharacter.is_enabled.is_(True),
+        )
+    )
+    if sequence == "system_path":
+        release_id = await session.scalar(
+            select(CatalogRelease.id)
+            .where(CatalogRelease.is_current.is_(True))
+            .order_by(CatalogRelease.imported_at.desc(), CatalogRelease.id.desc())
+            .limit(1)
+        )
+        if release_id is None:
+            rows = (
+                await session.execute(base.order_by(ChineseCharacter.created_at, KnowledgePoint.id))
+            ).all()
+        else:
+            rows = (
+                await session.execute(
+                    base.join(
+                        CharacterCatalogEntry,
+                        CharacterCatalogEntry.knowledge_point_id == KnowledgePoint.id,
+                    )
+                    .where(CharacterCatalogEntry.catalog_release_id == release_id)
+                    .order_by(CharacterCatalogEntry.order_index)
+                )
+            ).all()
+    elif sequence == "today":
+        if context_id is None:
+            raise ValueError("A daily plan is required for today navigation")
+        query = (
+            base.join(DailyPlanItem, DailyPlanItem.knowledge_point_id == KnowledgePoint.id)
+            .join(DailyLearningPlan, DailyLearningPlan.id == DailyPlanItem.daily_plan_id)
+            .where(
+                DailyLearningPlan.id == context_id,
+                DailyLearningPlan.child_id == child_id,
+            )
+        )
+        if item_kind:
+            query = query.where(DailyPlanItem.item_kind == item_kind)
+        rows = (await session.execute(query.order_by(DailyPlanItem.position))).all()
+    elif sequence == "mastery":
+        query = _enabled_character_query(child_id)
+        if mastery_level == MasteryLevel.UNLEARNED:
+            query = query.where(
+                or_(
+                    ChildKnowledgeState.id.is_(None),
+                    ChildKnowledgeState.mastery_level == MasteryLevel.UNLEARNED,
+                )
+            )
+        elif mastery_level:
+            query = query.where(ChildKnowledgeState.mastery_level == mastery_level)
+        if priority is True:
+            query = query.where(ChildKnowledgeState.is_priority.is_(True))
+        sort_columns = {
+            "learning_time": ChildKnowledgeState.last_learning_at,
+            "recent_review": ChildKnowledgeState.last_assessed_at,
+            "character": ChineseCharacter.character,
+        }
+        sort_column = sort_columns[sort_by]
+        ordered = sort_column.asc() if sort_order == "asc" else sort_column.desc()
+        mastery_rows = (
+            await session.execute(
+                query.order_by(
+                    ChildKnowledgeState.is_priority.desc(),
+                    ordered.nulls_last(),
+                    ChineseCharacter.character,
+                )
+            )
+        ).all()
+        rows = [(point.id, character.character) for point, character, _ in mastery_rows]
+    elif sequence == "learning_session":
+        if context_id is None:
+            raise ValueError("A learning session is required for history navigation")
+        rows = (
+            await session.execute(
+                base.join(LearningRecord, LearningRecord.knowledge_point_id == KnowledgePoint.id)
+                .join(LearningSession, LearningSession.id == LearningRecord.session_id)
+                .where(
+                    LearningSession.id == context_id,
+                    LearningSession.child_id == child_id,
+                )
+                .order_by(
+                    LearningRecord.learned_at,
+                    LearningRecord.created_at,
+                    LearningRecord.id,
+                )
+            )
+        ).all()
+    elif sequence == "assessment_session":
+        if context_id is None:
+            raise ValueError("An assessment session is required for assessment navigation")
+        rows = (
+            await session.execute(
+                base.join(
+                    AssessmentSessionTarget,
+                    AssessmentSessionTarget.knowledge_point_id == KnowledgePoint.id,
+                )
+                .join(
+                    AssessmentSession,
+                    AssessmentSession.id == AssessmentSessionTarget.assessment_session_id,
+                )
+                .where(
+                    AssessmentSession.id == context_id,
+                    AssessmentSession.child_id == child_id,
+                )
+                .order_by(AssessmentSessionTarget.position)
+            )
+        ).all()
+    elif sequence == "course_activity":
+        if context_id is None:
+            raise ValueError("A course activity is required for course navigation")
+        rows = (
+            await session.execute(
+                base.join(
+                    ActivityKnowledgePoint,
+                    ActivityKnowledgePoint.knowledge_point_id == KnowledgePoint.id,
+                )
+                .where(ActivityKnowledgePoint.activity_id == context_id)
+                .order_by(ActivityKnowledgePoint.order_index)
+            )
+        ).all()
+    else:
+        raise ValueError("Unknown character navigation sequence")
+
+    normalized_rows = [(row[0], row[1]) for row in rows]
+    current_index = next(
+        (
+            index
+            for index, (point_id, _) in enumerate(normalized_rows)
+            if point_id == knowledge_point_id
+        ),
+        None,
+    )
+    if current_index is None:
+        return None
+
+    def navigation_item(index: int) -> CharacterNavigationItem:
+        point_id, character = normalized_rows[index]
+        return CharacterNavigationItem(knowledge_point_id=point_id, character=character)
+
+    return CharacterNavigationResponse(
+        sequence=sequence,
+        position=current_index + 1,
+        total=len(normalized_rows),
+        group=current_index // 10 + 1 if sequence == "system_path" else None,
+        group_size=10 if sequence == "system_path" else None,
+        previous=navigation_item(current_index - 1) if current_index > 0 else None,
+        next=(
+            navigation_item(current_index + 1) if current_index + 1 < len(normalized_rows) else None
+        ),
     )
 
 

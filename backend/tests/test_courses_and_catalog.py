@@ -42,6 +42,7 @@ from app.services.character_catalog import (
     import_expanded_catalog,
     load_starter_dataset,
 )
+from app.services.child_character_learning import get_character_navigation
 from app.services.review_planning import latest_literacy_estimate
 
 pytestmark = pytest.mark.anyio
@@ -308,6 +309,52 @@ async def test_catalog_import_is_idempotent_preserves_ids_and_historical_links(
         assert second.course_created is False
         assert await session.scalar(select(func.count()).select_from(CatalogRelease)) == 1
         assert await session.scalar(select(func.count()).select_from(Course)) == 1
+
+        current_release_id = await session.scalar(
+            select(CatalogRelease.id).where(CatalogRelease.is_current.is_(True))
+        )
+        assert current_release_id is not None
+        ordered_point_ids = list(
+            (
+                await session.scalars(
+                    select(CharacterCatalogEntry.knowledge_point_id)
+                    .where(CharacterCatalogEntry.catalog_release_id == current_release_id)
+                    .order_by(CharacterCatalogEntry.order_index)
+                )
+            ).all()
+        )
+        assert len(ordered_point_ids) == 1200
+
+        async def system_navigation(position: int):
+            result = await get_character_navigation(
+                session,
+                child.id,
+                ordered_point_ids[position - 1],
+                sequence="system_path",
+                context_id=None,
+                item_kind=None,
+                mastery_level=None,
+                priority=None,
+                sort_by="character",
+                sort_order="asc",
+            )
+            assert result is not None
+            return result
+
+        ninth = await system_navigation(9)
+        tenth = await system_navigation(10)
+        eleventh = await system_navigation(11)
+        ninetieth = await system_navigation(90)
+        first_character = await system_navigation(1)
+        last_character = await system_navigation(1200)
+        assert ninth.next and ninth.next.knowledge_point_id == ordered_point_ids[9]
+        assert tenth.previous and tenth.previous.knowledge_point_id == ordered_point_ids[8]
+        assert tenth.next and tenth.next.knowledge_point_id == ordered_point_ids[10]
+        assert eleventh.previous and eleventh.previous.knowledge_point_id == ordered_point_ids[9]
+        assert ninetieth.next and ninetieth.next.knowledge_point_id == ordered_point_ids[90]
+        assert (tenth.group, eleventh.group, ninetieth.group) == (1, 2, 9)
+        assert first_character.previous is None
+        assert last_character.next is None
 
 
 async def test_family_course_order_progress_copy_and_companion_boundary(

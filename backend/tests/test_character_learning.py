@@ -157,6 +157,78 @@ async def test_learning_and_assessment_create_raw_evidence_and_mastery(
     assert {item["character"] for item in sorted_characters.json()["items"]} == {"人", "山"}
 
 
+async def test_learning_history_uses_learning_records_and_preserves_repeated_sessions(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await register_and_login(client, "learning-history@example.com")
+    _, child = await create_family_and_child(client, "记录")
+    never_learned_id = await seed_character(session_factory, "未", "wèi")
+    assessed_only_id = await seed_character(session_factory, "测", "cè")
+    learned_id = await seed_character(session_factory, "学", "xué")
+
+    assessed = await client.post(
+        f"/api/v1/children/{child['id']}/assessment-sessions",
+        json={
+            "items": [
+                {
+                    "knowledge_point_id": assessed_only_id,
+                    "outcome": "incorrect",
+                }
+            ]
+        },
+    )
+    assert assessed.status_code == 201
+
+    empty_history = await client.get(f"/api/v1/children/{child['id']}/character-learning-history")
+    assert empty_history.status_code == 200
+    assert empty_history.json()["items"] == []
+    assert empty_history.json()["total_records"] == 0
+
+    for source in ("today_new", "parent_assisted"):
+        learned = await client.post(
+            f"/api/v1/children/{child['id']}/learning-sessions",
+            json={
+                "source": source,
+                "items": [
+                    {
+                        "knowledge_point_id": learned_id,
+                        "activity_type": "introduced" if source == "today_new" else "relearned",
+                    }
+                ],
+            },
+        )
+        assert learned.status_code == 201
+
+    history = await client.get(
+        f"/api/v1/children/{child['id']}/character-learning-history?page_size=50"
+    )
+    assert history.status_code == 200
+    body = history.json()
+    assert body["total_sessions"] == 2
+    assert body["total_records"] == 2
+    assert body["distinct_characters"] == 1
+    assert [
+        record["knowledge_point_id"] for item in body["items"] for record in item["records"]
+    ] == [
+        learned_id,
+        learned_id,
+    ]
+    history_ids = {
+        record["knowledge_point_id"] for item in body["items"] for record in item["records"]
+    }
+    assert never_learned_id not in history_ids
+    assert assessed_only_id not in history_ids
+
+    assessment_detail = await client.get(
+        f"/api/v1/children/{child['id']}/characters/{assessed_only_id}"
+    )
+    assert assessment_detail.status_code == 200
+    assert [item["evidence_type"] for item in assessment_detail.json()["timeline"]] == [
+        "assessment"
+    ]
+
+
 async def test_mastery_recompute_is_deterministic_and_preserves_all_evidence(
     client: httpx.AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],
@@ -380,6 +452,9 @@ async def test_cross_family_and_system_admin_without_membership_are_denied(
 async def test_character_learning_routes_require_authentication(client: httpx.AsyncClient) -> None:
     child_id = uuid.uuid4()
     assert (await client.get(f"/api/v1/children/{child_id}/characters/summary")).status_code == 401
+    assert (
+        await client.get(f"/api/v1/children/{child_id}/character-learning-history")
+    ).status_code == 401
     assert (
         await client.post(f"/api/v1/children/{child_id}/learning-sessions", json={"items": []})
     ).status_code == 401

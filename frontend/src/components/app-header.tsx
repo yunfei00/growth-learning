@@ -100,27 +100,20 @@ export function AppHeader() {
 
   if (status === "authenticated" && childMode) {
     return (
-      <>
-        <header className="site-header child-mode-header">
-          <Link className="child-mode-brand" href="/kids" aria-label="孩子模式今天">
-            <span aria-hidden="true">🌱</span>
-            <span>{activeChild?.nickname || activeChild?.display_name || "成长学习"}</span>
-          </Link>
-          <button className="parent-mode-exit" onClick={exitChildMode} type="button">
-            返回家长模式
-          </button>
-        </header>
+      <header className="site-header child-mode-header">
+        <Link className="child-mode-brand" href="/kids" aria-label="孩子模式今天">
+          <span aria-hidden="true">🌱</span>
+          <span>{activeChild?.nickname || activeChild?.display_name || "成长学习"}</span>
+        </Link>
         <NavLinks
-          className="desktop-mode-nav child-nav"
+          className="child-inline-nav child-nav"
           items={CHILD_PRIMARY}
           pathname={pathname}
         />
-        <NavLinks
-          className="mobile-bottom-nav child-nav"
-          items={CHILD_PRIMARY}
-          pathname={pathname}
-        />
-      </>
+        <button className="parent-mode-exit" onClick={exitChildMode} type="button">
+          <span aria-hidden="true">🔒</span> 家长模式
+        </button>
+      </header>
     );
   }
 

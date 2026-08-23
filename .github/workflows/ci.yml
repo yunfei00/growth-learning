@@ -185,6 +185,9 @@ jobs:
       - name: Check peer dependencies
         run: pnpm peers check
 
+      - name: Test
+        run: pnpm test
+
       - name: Lint
         run: pnpm lint
 

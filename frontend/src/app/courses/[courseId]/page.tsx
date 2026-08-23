@@ -21,11 +21,24 @@ function CourseDetailContent() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState(1);
 
   const load = useCallback(async () => {
     if (!activeChild) return;
     try {
-      setCourse(await getCourse(params.courseId, activeChild.id));
+      const value = await getCourse(params.courseId, activeChild.id);
+      if (value.source_type === "system") {
+        const requestedGroup = Math.max(
+          1,
+          Number(new URLSearchParams(window.location.search).get("group") ?? "1") || 1,
+        );
+        const totalGroups = value.units.reduce(
+          (count, unit) => count + unit.activities.length,
+          0,
+        );
+        setSelectedGroup(Math.min(requestedGroup, Math.max(1, totalGroups)));
+      }
+      setCourse(value);
       setError("");
     } catch (requestError) {
       setError(requestError instanceof ApiClientError ? requestError.message : "课程加载失败");
@@ -54,6 +67,88 @@ function CourseDetailContent() {
   if (!course) {
     return <main className="center-state section-shell">{error || "正在加载课程…"}</main>;
   }
+  const systemActivities = course.units.flatMap((unit) => unit.activities);
+  const currentSystemActivity = systemActivities[selectedGroup - 1];
+  const changeSystemGroup = (group: number) => {
+    const nextGroup = Math.min(Math.max(1, group), systemActivities.length);
+    setSelectedGroup(nextGroup);
+    const url = new URL(window.location.href);
+    url.searchParams.set("group", String(nextGroup));
+    window.history.replaceState(window.history.state, "", url);
+  };
+
+  if (course.source_type === "system" && currentSystemActivity) {
+    const returnTo = `/courses/${course.id}?group=${selectedGroup}`;
+    return (
+      <main className="course-detail-page system-character-path section-shell">
+        <Link href="/courses">← 返回课程</Link>
+        <header>
+          <p className="eyebrow">1200 字连续学习路径</p>
+          <h1>{course.title}</h1>
+          <p>10 个字只用于目录定位；进入学习页后，上一个/下一个会沿完整字库连续前进。</p>
+        </header>
+        {error ? <p className="form-message form-error">{error}</p> : null}
+        {message ? <p className="form-message form-success">{message}</p> : null}
+        <section className="system-path-focus">
+          <header>
+            <div>
+              <p className="eyebrow">学习目录</p>
+              <h2>第 {selectedGroup} 组 · {currentSystemActivity.title}</h2>
+            </div>
+            <label>
+              快速定位
+              <select value={selectedGroup} onChange={(event) => changeSystemGroup(Number(event.target.value))}>
+                {systemActivities.map((activity, index) => (
+                  <option key={activity.id} value={index + 1}>第 {index + 1} 组 · {activity.title}</option>
+                ))}
+              </select>
+            </label>
+          </header>
+          <div className="system-path-primary-character">
+            <CharacterLink
+              context={{ source: "system_path", returnTo, sequence: "system_path" }}
+              knowledgePointId={currentSystemActivity.points[0].knowledge_point_id}
+              speakText={currentSystemActivity.points[0].character}
+            >
+              <span>从本组开始</span>
+              <strong>{currentSystemActivity.points[0].character}</strong>
+              <small>进入后一次专注学习一个字</small>
+            </CharacterLink>
+          </div>
+          <div className="system-path-directory" aria-label={`第${selectedGroup}组汉字目录`}>
+            {currentSystemActivity.points.map((point, index) => (
+              <CharacterLink
+                context={{ source: "system_path", returnTo, sequence: "system_path" }}
+                key={point.knowledge_point_id}
+                knowledgePointId={point.knowledge_point_id}
+                speakText={point.character}
+              >
+                <small>{(selectedGroup - 1) * 10 + index + 1}</small>
+                <strong>{point.character}</strong>
+                <span className={`mastery-dot ${point.mastery_level}`}>{point.mastery_level === "unlearned" ? "待学习" : point.mastery_level === "stable" ? "稳定掌握" : "已学习"}</span>
+              </CharacterLink>
+            ))}
+          </div>
+          <footer>
+            <button disabled={selectedGroup <= 1} onClick={() => changeSystemGroup(selectedGroup - 1)} type="button">← 上一组</button>
+            <span>{selectedGroup} / {systemActivities.length} 组</span>
+            <button disabled={selectedGroup >= systemActivities.length} onClick={() => changeSystemGroup(selectedGroup + 1)} type="button">下一组 →</button>
+          </footer>
+          {course.enrollment_status === "active" ? (
+            <button
+              className="button button-secondary system-path-complete"
+              disabled={currentSystemActivity.progress_status === "completed" || busy === currentSystemActivity.id}
+              onClick={() => void complete(currentSystemActivity.id)}
+              type="button"
+            >
+              {currentSystemActivity.progress_status === "completed" ? "本组已完成 ✓" : "完成本组并保存学习记录"}
+            </button>
+          ) : null}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="course-detail-page section-shell">
       <Link href="/courses">← 返回课程</Link>
@@ -91,8 +186,15 @@ function CourseDetailContent() {
                     {activity.points.map((point) => (
                       <CharacterLink
                         className={point.mastery_level === "stable" ? "stable" : ""}
+                        context={{
+                          source: "course",
+                          returnTo: `/courses/${course.id}`,
+                          sequence: "course_activity",
+                          contextId: activity.id,
+                        }}
                         key={point.knowledge_point_id}
                         knowledgePointId={point.knowledge_point_id}
+                        speakText={point.character}
                       >
                         {point.character}
                         <small>{point.pinyin}</small>

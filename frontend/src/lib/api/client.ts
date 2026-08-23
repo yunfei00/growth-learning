@@ -175,6 +175,66 @@ export type CharacterMasteryDetail = {
   timeline: TimelineItem[];
 };
 
+export type CharacterLearningHistoryRecord = {
+  record_id: string;
+  knowledge_point_id: string;
+  character: string;
+  pinyin: string;
+  activity_type: string;
+  source: string;
+  learned_at: string;
+  mastery_level: MasteryLevel;
+  is_priority: boolean;
+};
+
+export type CharacterLearningHistorySession = {
+  session_id: string;
+  source: string;
+  status: "in_progress" | "completed" | "abandoned";
+  started_at: string;
+  completed_at: string | null;
+  records: CharacterLearningHistoryRecord[];
+};
+
+export type CharacterLearningHistoryPage = {
+  items: CharacterLearningHistorySession[];
+  page: number;
+  page_size: number;
+  total_sessions: number;
+  total_records: number;
+  pages: number;
+  distinct_characters: number;
+  this_week_first_learned: number;
+};
+
+export type CharacterNavigationSequence =
+  | "system_path"
+  | "today"
+  | "mastery"
+  | "learning_session"
+  | "assessment_session"
+  | "course_activity";
+
+export type CharacterNavigationOptions = {
+  sequence: CharacterNavigationSequence;
+  contextId?: string;
+  itemKind?: "new" | "review";
+  masteryLevel?: MasteryLevel;
+  priority?: boolean;
+  sortBy?: "learning_time" | "recent_review" | "character";
+  sortOrder?: "asc" | "desc";
+};
+
+export type CharacterNavigation = {
+  sequence: CharacterNavigationSequence;
+  position: number;
+  total: number;
+  group: number | null;
+  group_size: number | null;
+  previous: { knowledge_point_id: string; character: string } | null;
+  next: { knowledge_point_id: string; character: string } | null;
+};
+
 export type CharacterAIAssistance = {
   simple_explanation: string;
   words: string[];
@@ -976,6 +1036,45 @@ export function getCharacterMasteryDetail(
   );
 }
 
+export function getCharacterLearningHistory(
+  childId: string,
+  filters: {
+    search?: string;
+    learnedFrom?: string;
+    learnedTo?: string;
+    page?: number;
+    pageSize?: number;
+  } = {},
+): Promise<CharacterLearningHistoryPage> {
+  const query = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 10),
+  });
+  if (filters.search) query.set("search", filters.search);
+  if (filters.learnedFrom) query.set("learned_from", filters.learnedFrom);
+  if (filters.learnedTo) query.set("learned_to", filters.learnedTo);
+  return request<CharacterLearningHistoryPage>(
+    `/api/v1/children/${childId}/character-learning-history?${query.toString()}`,
+  );
+}
+
+export function getCharacterNavigation(
+  childId: string,
+  knowledgePointId: string,
+  options: CharacterNavigationOptions,
+): Promise<CharacterNavigation> {
+  const query = new URLSearchParams({ sequence: options.sequence });
+  if (options.contextId) query.set("context_id", options.contextId);
+  if (options.itemKind) query.set("item_kind", options.itemKind);
+  if (options.masteryLevel) query.set("mastery_level", options.masteryLevel);
+  if (options.priority !== undefined) query.set("priority", String(options.priority));
+  if (options.sortBy) query.set("sort_by", options.sortBy);
+  if (options.sortOrder) query.set("sort_order", options.sortOrder);
+  return request<CharacterNavigation>(
+    `/api/v1/children/${childId}/characters/${knowledgePointId}/navigation?${query.toString()}`,
+  );
+}
+
 export function generateCharacterAIAssistance(
   childId: string,
   knowledgePointId: string,
@@ -1000,12 +1099,13 @@ export function getCharacterRecommendations(
 export function createLearningSession(
   childId: string,
   knowledgePointIds: string[],
+  source = "parent_assisted",
 ): Promise<EvidenceSession> {
   return request<EvidenceSession>(`/api/v1/children/${childId}/learning-sessions`, {
     method: "POST",
     body: jsonBody({
       status: "completed",
-      source: "parent_assisted",
+      source,
       items: knowledgePointIds.map((knowledge_point_id) => ({
         knowledge_point_id,
         activity_type: "introduced",

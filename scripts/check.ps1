@@ -26,6 +26,8 @@ finally {
 
 Push-Location (Join-Path $projectRoot "frontend")
 try {
+    & pnpm test
+    if ($LASTEXITCODE -ne 0) { throw "Frontend tests failed." }
     & pnpm lint
     if ($LASTEXITCODE -ne 0) { throw "Frontend lint failed." }
     & pnpm typecheck
@@ -36,4 +38,3 @@ try {
 finally {
     Pop-Location
 }
-

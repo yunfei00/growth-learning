@@ -13,8 +13,7 @@ import {
   type AssessmentHistoryEntry,
   type AssessmentOutcome,
   type AssessmentSource,
-  type CharacterMasteryDetail,
-  type CharacterMasteryPage,
+  type CharacterLearningHistoryPage,
   type CharacterMasterySummary,
   type CharacterRecommendation,
   type DailyPlan,
@@ -25,21 +24,20 @@ import {
   createAssessmentSession,
   createLearningSession,
   getAssessmentHistory,
-  getCharacterMasteryDetail,
+  getCharacterLearningHistory,
   getCharacterMasterySummary,
   getCharacterRecommendations,
   getLearningSettings,
   getLiteracyEstimate,
   getPlannedAssessment,
   getTodayPlan,
-  listCharacterMastery,
   startPlannedAssessment,
   submitPlannedAssessment,
-  updateCharacterPriority,
   updateLearningSettings,
 } from "@/lib/api/client";
 
 type View = "today" | "overview" | "new" | "quick" | "session" | "records" | "assessments" | "settings";
+type HistoryPeriod = "all" | "today" | "week" | "month";
 
 const LEVEL_LABELS: Record<MasteryLevel, string> = {
   unlearned: "未学习",
@@ -63,6 +61,15 @@ const OUTCOME_LABELS: Record<AssessmentOutcome, string> = {
   incorrect: "不认识",
 };
 
+const LEARNING_SOURCE_LABELS: Record<string, string> = {
+  today_new: "今日任务",
+  parent_assisted: "家长陪伴学习",
+  course: "课程学习",
+  teacher_assignment: "老师任务",
+  story_reading: "故事识字",
+  science_experiment: "科学活动",
+};
+
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof ApiClientError ? error.message : fallback;
 }
@@ -72,6 +79,37 @@ function formatTime(value: string | null): string {
   return new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(
     new Date(value),
   );
+}
+
+function learningHistoryRange(period: HistoryPeriod): { learnedFrom?: string; learnedTo?: string } {
+  if (period === "all") return {};
+  const now = new Date();
+  let start: Date;
+  if (period === "today") {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (period === "week") {
+    const mondayOffset = (now.getDay() + 6) % 7;
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset);
+  } else {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  const end =
+    period === "today"
+      ? new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1)
+      : undefined;
+  return { learnedFrom: start.toISOString(), learnedTo: end?.toISOString() };
+}
+
+function formatLearningDay(value: string): string {
+  const date = new Date(value);
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  const formatted = new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(date);
+  return isToday ? `今天 · ${formatted}` : formatted;
 }
 
 function CharacterLearningContent() {
@@ -93,11 +131,9 @@ function CharacterLearningContent() {
   const [recommendations, setRecommendations] = useState<CharacterRecommendation[]>([]);
   const [session, setSession] = useState<PlannedAssessment | null>(null);
   const [history, setHistory] = useState<AssessmentHistoryEntry[]>([]);
-  const [masteryHistory, setMasteryHistory] = useState<CharacterMasteryPage | null>(null);
-  const [detail, setDetail] = useState<CharacterMasteryDetail | null>(null);
-  const [search, setSearch] = useState("");
-  const [level, setLevel] = useState<MasteryLevel | "">("");
-  const [priorityOnly, setPriorityOnly] = useState(false);
+  const [learningHistory, setLearningHistory] = useState<CharacterLearningHistoryPage | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>("all");
   const [quickIndex, setQuickIndex] = useState(0);
   const [quickAnswers, setQuickAnswers] = useState<
     Array<{
@@ -134,17 +170,20 @@ function CharacterLearningContent() {
     }
   }, [childId]);
 
-  const loadMasteryHistory = useCallback(async (page = 1) => {
+  const loadLearningHistory = useCallback(async (
+    page = 1,
+    period: HistoryPeriod = historyPeriod,
+    searchValue = historySearch,
+  ) => {
     if (!childId) return;
     setIsLoading(true);
     try {
-      setMasteryHistory(
-        await listCharacterMastery(childId, {
-          search,
-          masteryLevel: level || undefined,
-          priority: priorityOnly ? true : undefined,
+      setLearningHistory(
+        await getCharacterLearningHistory(childId, {
+          search: searchValue || undefined,
+          ...learningHistoryRange(period),
           page,
-          pageSize: 12,
+          pageSize: 8,
         }),
       );
       setError("");
@@ -153,7 +192,7 @@ function CharacterLearningContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [childId, level, priorityOnly, search]);
+  }, [childId, historyPeriod, historySearch]);
 
   useEffect(() => {
     if (status === "ready" && (!family || !activeChild)) router.replace("/onboarding");
@@ -169,24 +208,35 @@ function CharacterLearningContent() {
     setMessage("");
   };
 
+  const showView = (nextView: View, extra: Record<string, string> = {}) => {
+    setView(nextView);
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("view", nextView);
+    for (const [key, value] of Object.entries(extra)) {
+      if (value) url.searchParams.set(key, value);
+    }
+    url.hash = "";
+    window.history.replaceState(window.history.state, "", url);
+  };
+
   const switchChild = (nextChildId: string) => {
     initialTaskHandled.current = false;
     setActiveChildId(nextChildId);
-    setView("today");
+    showView("today");
     setSummary(null);
     setPlan(null);
     setSettings(null);
     setEstimate(null);
     setSession(null);
     setRecommendations([]);
-    setMasteryHistory(null);
-    setDetail(null);
+    setLearningHistory(null);
     resetFeedback();
   };
 
   const startNewLearning = async () => {
     if (!childId || !plan) return;
-    setView("new");
+    showView("new");
     setIsLoading(true);
     resetFeedback();
     try {
@@ -227,7 +277,7 @@ function CharacterLearningContent() {
     }
     setIsLoading(true);
     try {
-      await createLearningSession(childId, idsToRecord);
+      await createLearningSession(childId, idsToRecord, "today_new");
       setRecommendations([]);
       setMessage("今天的新字已经记入成长档案。");
       await loadCore();
@@ -247,7 +297,7 @@ function CharacterLearningContent() {
     try {
       const value = await startPlannedAssessment(childId, source);
       setSession(value);
-      setView("session");
+      showView("session");
       setAnswerVisible(false);
       questionStartedAt.current = performance.now();
       if (value.status === "completed") setMessage(`${SOURCE_LABELS[value.source]}已经完成。`);
@@ -257,23 +307,6 @@ function CharacterLearningContent() {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!plan || initialTaskHandled.current) return;
-    const timer = window.setTimeout(() => {
-      const task = new URLSearchParams(window.location.search).get("task");
-      if (task === "new") {
-        initialTaskHandled.current = true;
-        void startNewLearning();
-      } else if (task === "review") {
-        initialTaskHandled.current = true;
-        void beginPlannedSession("daily_review");
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  // The URL task is intentionally handled once after today's persisted plan loads.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan]);
 
   const recordPlannedOutcome = async (outcome: AssessmentOutcome) => {
     if (!childId || !session) return;
@@ -309,7 +342,7 @@ function CharacterLearningContent() {
 
   const startQuickTest = async () => {
     if (!childId) return;
-    setView("quick");
+    showView("quick");
     setIsLoading(true);
     resetFeedback();
     try {
@@ -357,14 +390,15 @@ function CharacterLearningContent() {
     }
   };
 
-  const openAssessmentHistory = async () => {
+  const openAssessmentHistory = async (assessmentId?: string) => {
     if (!childId) return;
-    setView("assessments");
+    showView("assessments", assessmentId ? { assessmentId } : {});
     setSession(null);
     setIsLoading(true);
     resetFeedback();
     try {
       setHistory(await getAssessmentHistory(childId));
+      if (assessmentId) setSession(await getPlannedAssessment(childId, assessmentId));
     } catch (requestError) {
       setError(messageFrom(requestError, "测试历史加载失败"));
     } finally {
@@ -376,6 +410,7 @@ function CharacterLearningContent() {
     if (!childId) return;
     setIsLoading(true);
     try {
+      showView("assessments", { assessmentId: sessionId });
       setSession(await getPlannedAssessment(childId, sessionId));
     } catch (requestError) {
       setError(messageFrom(requestError, "测试详情加载失败"));
@@ -384,28 +419,60 @@ function CharacterLearningContent() {
     }
   };
 
-  const openRecords = async () => {
-    setView("records");
-    setDetail(null);
+  const openRecords = async (
+    period: HistoryPeriod = historyPeriod,
+    searchValue = historySearch,
+    page = 1,
+  ) => {
+    setHistoryPeriod(period);
+    setHistorySearch(searchValue);
+    showView("records", {
+      period,
+      search: searchValue,
+      page: String(page),
+    });
     resetFeedback();
-    await loadMasteryHistory();
+    await loadLearningHistory(page, period, searchValue);
   };
 
-  const togglePriority = async (knowledgePointId: string, value: boolean) => {
-    if (!childId) return;
-    setIsLoading(true);
-    try {
-      await updateCharacterPriority(childId, knowledgePointId, value);
-      await Promise.all([loadMasteryHistory(masteryHistory?.page ?? 1), loadCore()]);
-      if (detail?.state.knowledge_point_id === knowledgePointId) {
-        setDetail(await getCharacterMasteryDetail(childId, knowledgePointId));
+  useEffect(() => {
+    if (!plan || initialTaskHandled.current) return;
+    const timer = window.setTimeout(() => {
+      const query = new URLSearchParams(window.location.search);
+      const task = query.get("task");
+      const requestedView = query.get("view") as View | null;
+      if (task === "new" || requestedView === "new") {
+        initialTaskHandled.current = true;
+        void startNewLearning();
+      } else if (task === "review") {
+        initialTaskHandled.current = true;
+        void beginPlannedSession("daily_review");
+      } else if (requestedView === "records") {
+        initialTaskHandled.current = true;
+        const periodValue = query.get("period");
+        const period: HistoryPeriod =
+          periodValue === "today" || periodValue === "week" || periodValue === "month"
+            ? periodValue
+            : "all";
+        const searchValue = query.get("search") ?? "";
+        const pageValue = Math.max(1, Number(query.get("page") ?? "1") || 1);
+        void openRecords(period, searchValue, pageValue);
+      } else if (requestedView === "assessments") {
+        initialTaskHandled.current = true;
+        void openAssessmentHistory(query.get("assessmentId") ?? undefined);
+      } else if (
+        requestedView === "today" ||
+        requestedView === "overview" ||
+        requestedView === "settings"
+      ) {
+        initialTaskHandled.current = true;
+        showView(requestedView);
       }
-    } catch (requestError) {
-      setError(messageFrom(requestError, "重点复习设置失败"));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    }, 0);
+    return () => window.clearTimeout(timer);
+  // The URL task is intentionally handled once after today's persisted plan loads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan]);
 
   const saveSettings = async () => {
     if (!childId || !settings) return;
@@ -464,11 +531,11 @@ function CharacterLearningContent() {
       </header>
 
       <nav className="learning-tabs" aria-label="识字学习功能">
-        <button className={view === "today" ? "active" : ""} onClick={() => setView("today")} type="button">今日任务</button>
-        <button className={view === "overview" ? "active" : ""} onClick={() => setView("overview")} type="button">识字总览</button>
+        <button className={view === "today" ? "active" : ""} onClick={() => showView("today")} type="button">今日任务</button>
+        <button className={view === "overview" ? "active" : ""} onClick={() => showView("overview")} type="button">识字总览</button>
         <button className={view === "records" ? "active" : ""} onClick={() => void openRecords()} type="button">识字记录</button>
         <button className={view === "assessments" ? "active" : ""} onClick={() => void openAssessmentHistory()} type="button">测试历史</button>
-        <button className={view === "settings" ? "active" : ""} onClick={() => setView("settings")} type="button">学习设置</button>
+        <button className={view === "settings" ? "active" : ""} onClick={() => showView("settings")} type="button">学习设置</button>
       </nav>
 
       {error ? <p className="form-message form-error learning-message" role="alert">{error}</p> : null}
@@ -510,19 +577,108 @@ function CharacterLearningContent() {
       ) : null}
 
       {view === "new" ? (
-        <section className="learning-workspace"><header><div><p className="eyebrow">今日新字</p><h2>{recommendations.length} 个新字</h2></div><span>{newTaskCompleted ? "已完成 ✓ · 仍可继续打开学习" : "由 Daily Plan V1 固定选择"}</span></header>{isLoading ? <div className="center-state compact"><span className="loading-spinner" /></div> : recommendations.length ? <><div className="new-character-grid">{recommendations.map((item) => <article className={!pendingNewIds.has(item.id) ? "completed" : ""} key={item.id}><CharacterLink className="new-character-link" knowledgePointId={item.id}><strong>{item.character}</strong><p className="character-pinyin">{item.pinyin}</p><p>{item.common_words.join(" · ") || "暂无常用词"}</p><small>{item.simple_meaning || "暂无简释"}</small>{!pendingNewIds.has(item.id) ? <span>已完成 ✓</span> : null}</CharacterLink></article>)}</div>{pendingNewIds.size ? <button className="button button-primary workspace-submit" onClick={() => void completeLearning()} disabled={isLoading} type="button">完成今日新字并保存</button> : <p className="completed-task-note">今日任务已完成。你仍可点击任何汉字再次学习、朗读或练习；系统不会重复计算完成数或创建学习记录。</p>}</> : <div className="empty-learning-state"><h3>今天不安排新字</h3><p>{plan?.recommendation_reason}</p><button className="button button-secondary" onClick={() => setView("today")} type="button">返回今日任务</button></div>}</section>
+        <section className="learning-workspace"><header><div><p className="eyebrow">今日新字</p><h2>{recommendations.length} 个新字</h2></div><span>{newTaskCompleted ? "已完成 ✓ · 仍可继续打开学习" : "由 Daily Plan V1 固定选择"}</span></header>{isLoading ? <div className="center-state compact"><span className="loading-spinner" /></div> : recommendations.length ? <><div className="new-character-grid">{recommendations.map((item) => <article className={!pendingNewIds.has(item.id) ? "completed" : ""} key={item.id}><CharacterLink className="new-character-link" context={{ source: "today", returnTo: "/learn/characters?view=new", sequence: "today", contextId: plan?.id, itemKind: "new" }} knowledgePointId={item.id} speakText={item.character}><strong>{item.character}</strong><p className="character-pinyin">{item.pinyin}</p><p>{item.common_words.join(" · ") || "暂无常用词"}</p><small>{item.simple_meaning || "暂无简释"}</small>{!pendingNewIds.has(item.id) ? <span>已完成 ✓</span> : null}</CharacterLink></article>)}</div>{pendingNewIds.size ? <button className="button button-primary workspace-submit" onClick={() => void completeLearning()} disabled={isLoading} type="button">完成今日新字并保存</button> : <p className="completed-task-note">今日任务已完成。你仍可点击任何汉字再次学习、朗读或练习；系统不会重复计算完成数或创建学习记录。</p>}</> : <div className="empty-learning-state"><h3>今天不安排新字</h3><p>{plan?.recommendation_reason}</p><button className="button button-secondary" onClick={() => showView("today")} type="button">返回今日任务</button></div>}</section>
       ) : null}
 
       {view === "session" && session ? (
-        <section className="learning-workspace assessment-workspace"><header><div><p className="eyebrow">{SOURCE_LABELS[session.source]}</p><h2>{session.status === "completed" ? "完成啦 🎉" : `${session.completed_items + 1} / ${session.total_items}`}</h2></div><span>{session.sampling_method} · {session.sampling_version}</span></header>{session.status === "completed" ? <div className="session-result"><h3>{SOURCE_LABELS[session.source]}完成</h3><div className="result-count-grid">{(Object.keys(OUTCOME_LABELS) as AssessmentOutcome[]).map((outcome) => <article key={outcome}><span>{OUTCOME_LABELS[outcome]}</span><strong>{resultCounts?.[outcome] ?? 0}</strong></article>)}</div><div className="completed-review-characters">{session.targets.map((target) => <CharacterLink knowledgePointId={target.knowledge_point_id} key={target.knowledge_point_id}><strong>{target.character}</strong><span>{target.pinyin}</span><small>再次查看、朗读或练习</small></CharacterLink>)}</div><p>没有分数或排名；再次打开汉字不会重复提交结果或修改掌握度。</p><button className="button button-primary" onClick={() => setView("today")} type="button">回到今日任务</button></div> : currentPlannedTarget ? <div className="recognition-card"><strong className="recognition-glyph">{currentPlannedTarget.character}</strong>{answerVisible ? <div className="recognition-answer"><p>{currentPlannedTarget.pinyin}</p><small>看到提示后，请选择“提示后认识”</small></div> : <p className="answer-hidden">拼音和答案默认隐藏</p>}<div className="outcome-grid"><button onClick={() => void recordPlannedOutcome("correct")} disabled={isLoading} type="button">认识</button><button onClick={() => { setAnswerVisible(true); }} className="hint-button" disabled={isLoading} type="button">查看提示</button><button onClick={() => void recordPlannedOutcome("hinted_correct")} disabled={!answerVisible || isLoading} type="button">提示后认识</button><button onClick={() => void recordPlannedOutcome("uncertain")} disabled={isLoading} type="button">不确定</button><button onClick={() => void recordPlannedOutcome("incorrect")} disabled={isLoading} type="button">不认识</button></div></div> : null}</section>
+        <section className="learning-workspace assessment-workspace" id={`assessment-session-${session.id}`}><header><div><p className="eyebrow">{SOURCE_LABELS[session.source]}</p><h2>{session.status === "completed" ? "完成啦 🎉" : `${session.completed_items + 1} / ${session.total_items}`}</h2></div><span>{session.sampling_method} · {session.sampling_version}</span></header>{session.status === "completed" ? <div className="session-result"><h3>{SOURCE_LABELS[session.source]}完成</h3><div className="result-count-grid">{(Object.keys(OUTCOME_LABELS) as AssessmentOutcome[]).map((outcome) => <article key={outcome}><span>{OUTCOME_LABELS[outcome]}</span><strong>{resultCounts?.[outcome] ?? 0}</strong></article>)}</div><div className="completed-review-characters">{session.targets.map((target) => <CharacterLink context={{ source: "review", returnTo: `/learn/characters?view=assessments#assessment-session-${session.id}`, sequence: "assessment_session", contextId: session.id }} knowledgePointId={target.knowledge_point_id} key={target.knowledge_point_id} speakText={target.character}><strong>{target.character}</strong><span>{target.pinyin}</span><small>再次查看、朗读或练习</small></CharacterLink>)}</div><p>没有分数或排名；再次打开汉字不会重复提交结果或修改掌握度。</p><button className="button button-primary" onClick={() => showView("today")} type="button">回到今日任务</button></div> : currentPlannedTarget ? <div className="recognition-card"><strong className="recognition-glyph">{currentPlannedTarget.character}</strong>{answerVisible ? <div className="recognition-answer"><p>{currentPlannedTarget.pinyin}</p><small>看到提示后，请选择“提示后认识”</small></div> : <p className="answer-hidden">拼音和答案默认隐藏</p>}<div className="outcome-grid"><button onClick={() => void recordPlannedOutcome("correct")} disabled={isLoading} type="button">认识</button><button onClick={() => { setAnswerVisible(true); }} className="hint-button" disabled={isLoading} type="button">查看提示</button><button onClick={() => void recordPlannedOutcome("hinted_correct")} disabled={!answerVisible || isLoading} type="button">提示后认识</button><button onClick={() => void recordPlannedOutcome("uncertain")} disabled={isLoading} type="button">不确定</button><button onClick={() => void recordPlannedOutcome("incorrect")} disabled={isLoading} type="button">不认识</button></div></div> : null}</section>
       ) : null}
 
       {view === "quick" ? (
-        <section className="learning-workspace assessment-workspace"><header><div><p className="eyebrow">临时检查</p><h2>快速认字</h2></div><span>不会替代每日复习队列</span></header>{quickQuestion ? <div className="recognition-card"><strong className="recognition-glyph">{quickQuestion.character}</strong>{answerVisible ? <div className="recognition-answer"><p>{quickQuestion.pinyin}</p><small>{quickQuestion.simple_meaning}</small></div> : <p className="answer-hidden">答案默认隐藏</p>}<div className="outcome-grid"><button onClick={() => void recordQuickOutcome("correct")} type="button">认识</button><button className="hint-button" onClick={() => setAnswerVisible(true)} type="button">查看提示</button><button disabled={!answerVisible} onClick={() => void recordQuickOutcome("hinted_correct")} type="button">提示后认识</button><button onClick={() => void recordQuickOutcome("uncertain")} type="button">不确定</button><button onClick={() => void recordQuickOutcome("incorrect")} type="button">不认识</button></div></div> : <div className="empty-learning-state"><h3>暂无可检查的已学汉字</h3><button className="button button-secondary" onClick={() => setView("overview")} type="button">返回总览</button></div>}</section>
+        <section className="learning-workspace assessment-workspace"><header><div><p className="eyebrow">临时检查</p><h2>快速认字</h2></div><span>不会替代每日复习队列</span></header>{quickQuestion ? <div className="recognition-card"><strong className="recognition-glyph">{quickQuestion.character}</strong>{answerVisible ? <div className="recognition-answer"><p>{quickQuestion.pinyin}</p><small>{quickQuestion.simple_meaning}</small></div> : <p className="answer-hidden">答案默认隐藏</p>}<div className="outcome-grid"><button onClick={() => void recordQuickOutcome("correct")} type="button">认识</button><button className="hint-button" onClick={() => setAnswerVisible(true)} type="button">查看提示</button><button disabled={!answerVisible} onClick={() => void recordQuickOutcome("hinted_correct")} type="button">提示后认识</button><button onClick={() => void recordQuickOutcome("uncertain")} type="button">不确定</button><button onClick={() => void recordQuickOutcome("incorrect")} type="button">不认识</button></div></div> : <div className="empty-learning-state"><h3>暂无可检查的已学汉字</h3><button className="button button-secondary" onClick={() => showView("overview")} type="button">返回总览</button></div>}</section>
       ) : null}
 
       {view === "records" ? (
-        <section className="learning-workspace"><header><div><p className="eyebrow">可追溯证据</p><h2>识字记录</h2></div><span>搜索、掌握状态和重点复习</span></header><form className="history-filters" onSubmit={(event) => { event.preventDefault(); void loadMasteryHistory(); }}><label>搜索<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="汉字或拼音" /></label><label>掌握状态<select value={level} onChange={(event) => setLevel(event.target.value as MasteryLevel | "")}><option value="">全部</option>{Object.entries(LEVEL_LABELS).map(([value, labelValue]) => <option key={value} value={value}>{labelValue}</option>)}</select></label><label className="priority-filter"><input type="checkbox" checked={priorityOnly} onChange={(event) => setPriorityOnly(event.target.checked)} />只看重点</label><button className="button button-secondary" type="submit">查询</button></form>{masteryHistory ? <div className="character-table-wrap"><table className="catalog-table"><thead><tr><th>字</th><th>拼音</th><th>状态</th><th>证据</th><th>操作</th></tr></thead><tbody>{masteryHistory.items.map((item) => <tr key={item.knowledge_point_id}><td className="character-cell">{item.character}{item.is_priority ? <span className="priority-badge static">重点</span> : null}</td><td>{item.pinyin}</td><td><span className={`mastery-pill ${item.mastery_level}`}>{LEVEL_LABELS[item.mastery_level]}</span></td><td>{item.correct_count} 认识 · {item.incorrect_count} 不认识</td><td><button className="table-action" onClick={() => void getCharacterMasteryDetail(childId, item.knowledge_point_id).then(setDetail)} type="button">详情</button>{family.current_role === "admin" ? <button className="table-action" onClick={() => void togglePriority(item.knowledge_point_id, !item.is_priority)} type="button">{item.is_priority ? "取消重点" : "设为重点"}</button> : null}</td></tr>)}</tbody></table></div> : isLoading ? <div className="center-state compact"><span className="loading-spinner" /></div> : null}{detail ? <div className="mastery-detail"><header><div><strong>{detail.state.character}</strong><div><h3>{detail.state.pinyin}</h3><span className={`mastery-pill ${detail.state.mastery_level}`}>{LEVEL_LABELS[detail.state.mastery_level]}</span></div></div><button onClick={() => setDetail(null)} type="button">关闭</button></header><div className="detail-stats"><span>认识 {detail.state.correct_count}</span><span>提示 {detail.state.hinted_correct_count}</span><span>不确定 {detail.state.uncertain_count}</span><span>不认识 {detail.state.incorrect_count}</span></div><ol>{detail.timeline.map((item) => <li key={item.id}><time>{formatTime(item.occurred_at)}</time><strong>{item.evidence_type === "learning" ? "学习" : "测评"}</strong><span>{item.value}</span><small>{item.response_time_ms == null ? "" : `${item.response_time_ms} ms`}</small></li>)}</ol></div> : null}</section>
+        <section className="learning-workspace learning-history-workspace">
+          <header>
+            <div><p className="eyebrow">真实学习证据</p><h2>识字记录</h2></div>
+            <span>只显示真正产生过 LearningRecord 的学习</span>
+          </header>
+          {learningHistory ? (
+            <div className="learning-history-summary">
+              <span>已学习 <strong>{learningHistory.distinct_characters}</strong> 个字</span>
+              <span>本周新增 <strong>{learningHistory.this_week_first_learned}</strong> 个</span>
+              <span>共 <strong>{learningHistory.total_records}</strong> 条学习证据</span>
+            </div>
+          ) : null}
+          <form
+            className="learning-history-filters"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void openRecords(historyPeriod, historySearch, 1);
+            }}
+          >
+            <div className="history-period-tabs" role="group" aria-label="学习记录时间范围">
+              {(["all", "today", "week", "month"] as HistoryPeriod[]).map((period) => (
+                <button
+                  className={historyPeriod === period ? "active" : ""}
+                  key={period}
+                  onClick={() => void openRecords(period, historySearch, 1)}
+                  type="button"
+                >
+                  {{ all: "全部", today: "今天", week: "本周", month: "本月" }[period]}
+                </button>
+              ))}
+            </div>
+            <label>
+              <span className="sr-only">搜索汉字</span>
+              <input
+                placeholder="搜索汉字"
+                value={historySearch}
+                onChange={(event) => setHistorySearch(event.target.value)}
+              />
+            </label>
+            <button className="button button-secondary" type="submit">搜索</button>
+          </form>
+          {isLoading && !learningHistory ? (
+            <div className="center-state compact"><span className="loading-spinner" /></div>
+          ) : learningHistory?.items.length ? (
+            <div className="learning-history-timeline">
+              {learningHistory.items.map((learningSession) => {
+                const returnQuery = new URLSearchParams({
+                  view: "records",
+                  period: historyPeriod,
+                  page: String(learningHistory.page),
+                });
+                if (historySearch) returnQuery.set("search", historySearch);
+                const returnTo = `/learn/characters?${returnQuery.toString()}#learning-session-${learningSession.session_id}`;
+                return (
+                  <article id={`learning-session-${learningSession.session_id}`} key={learningSession.session_id}>
+                    <header>
+                      <div>
+                        <h3>{formatLearningDay(learningSession.completed_at ?? learningSession.started_at)}</h3>
+                        <p>{LEARNING_SOURCE_LABELS[learningSession.source] ?? "识字学习"} · 学习 {learningSession.records.length} 个字</p>
+                      </div>
+                      <time>{new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date(learningSession.completed_at ?? learningSession.started_at))}</time>
+                    </header>
+                    <div className="learning-history-characters">
+                      {learningSession.records.map((record) => (
+                        <CharacterLink
+                          context={{ source: "records", returnTo, sequence: "learning_session", contextId: learningSession.session_id }}
+                          key={record.record_id}
+                          knowledgePointId={record.knowledge_point_id}
+                          speakText={record.character}
+                        >
+                          <strong>{record.character}</strong>
+                          <span className={`mastery-pill ${record.mastery_level}`}>{LEVEL_LABELS[record.mastery_level]}</span>
+                        </CharacterLink>
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty-learning-state"><h3>还没有符合条件的学习记录</h3><p>完成一次正式汉字学习后，会按日期和学习批次出现在这里；仅测评过的字不会混入。</p></div>
+          )}
+          {learningHistory && learningHistory.pages > 1 ? (
+            <nav aria-label="识字记录分页" className="history-pagination">
+              <button disabled={learningHistory.page <= 1} onClick={() => void openRecords(historyPeriod, historySearch, learningHistory.page - 1)} type="button">上一页</button>
+              <span>{learningHistory.page} / {learningHistory.pages}</span>
+              <button disabled={learningHistory.page >= learningHistory.pages} onClick={() => void openRecords(historyPeriod, historySearch, learningHistory.page + 1)} type="button">下一页</button>
+            </nav>
+          ) : null}
+        </section>
       ) : null}
 
       {view === "assessments" ? (

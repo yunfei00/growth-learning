@@ -1,6 +1,7 @@
 """Child-private character learning, assessment, and mastery endpoints."""
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -14,10 +15,12 @@ from app.schemas.learning import (
     AssessmentHistoryEntry,
     AssessmentSessionCreate,
     CharacterAIAssistanceResponse,
+    CharacterLearningHistoryPage,
     CharacterMasteryDetail,
     CharacterMasteryPage,
     CharacterMasteryState,
     CharacterMasterySummary,
+    CharacterNavigationResponse,
     CharacterRecommendation,
     DailyPlanResponse,
     EvidenceSessionResponse,
@@ -36,6 +39,8 @@ from app.services.child_character_learning import (
     create_assessment_session,
     create_learning_session,
     get_character_mastery_detail,
+    get_character_navigation,
+    list_character_learning_history,
     list_character_mastery,
     recommend_characters,
     summarize_character_mastery,
@@ -255,6 +260,81 @@ async def get_character_states(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get(
+    "/{child_id}/character-learning-history",
+    response_model=CharacterLearningHistoryPage,
+)
+async def get_character_learning_history(
+    child_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: DbSession,
+    search: str | None = Query(default=None, max_length=120),
+    learned_from: datetime | None = None,
+    learned_to: datetime | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=50),
+) -> CharacterLearningHistoryPage:
+    await get_authorized_child(session, current_user, child_id)
+    return await list_character_learning_history(
+        session,
+        child_id,
+        search=search,
+        learned_from=learned_from,
+        learned_to=learned_to,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
+    "/{child_id}/characters/{knowledge_point_id}/navigation",
+    response_model=CharacterNavigationResponse,
+)
+async def get_character_sequence_navigation(
+    child_id: uuid.UUID,
+    knowledge_point_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: DbSession,
+    sequence: str = Query(
+        default="system_path",
+        pattern="^(system_path|today|mastery|learning_session|assessment_session|course_activity)$",
+    ),
+    context_id: uuid.UUID | None = None,
+    item_kind: str | None = Query(default=None, pattern="^(new|review)$"),
+    mastery_level: str | None = Query(
+        default=None,
+        pattern="^(unlearned|introduced|recognizing|proficient|stable)$",
+    ),
+    priority: bool | None = None,
+    sort_by: str = Query(default="character", pattern="^(learning_time|recent_review|character)$"),
+    sort_order: str = Query(default="asc", pattern="^(asc|desc)$"),
+) -> CharacterNavigationResponse:
+    await get_authorized_child(session, current_user, child_id)
+    try:
+        result = await get_character_navigation(
+            session,
+            child_id,
+            knowledge_point_id,
+            sequence=sequence,
+            context_id=context_id,
+            item_kind=item_kind,
+            mastery_level=mastery_level,
+            priority=priority,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+        ) from error
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Character is not part of this navigation sequence",
+        )
+    return result
 
 
 @router.get("/{child_id}/characters/{knowledge_point_id}", response_model=CharacterMasteryDetail)
