@@ -224,6 +224,8 @@ async def test_fake_provider_repair_then_success_and_snapshot_immutability(
     assert provider.requests[0].json_response is True
     assert provider.requests[0].max_tokens == 3000
     prompt = provider.requests[0].messages[-1].content
+    assert "每个目标字必须在标题或正文中至少自然出现一次" in prompt
+    assert "repair_instructions" in prompt
     assert child_payload["display_name"] not in prompt
     assert "story-pipeline@example.com" not in prompt
     assert "birth_date" not in prompt

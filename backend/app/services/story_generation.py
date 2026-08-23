@@ -346,6 +346,24 @@ def _prompt(
     repair_reasons: tuple[str, ...] = (),
 ) -> AICompletionRequest:
     profile = PROFILES[difficulty]
+    repair_messages = {
+        "structured_response_invalid": "上次不是有效 JSON；严格按 json_schema 返回一个 JSON 对象。",
+        "content_safety_failed": "上次内容不符合儿童安全要求；只写温暖的日常科学故事。",
+        "story_too_short": (
+            f"上次标题和正文汉字总数太少；至少写 {profile.minimum_occurrences} 个汉字。"
+        ),
+        "story_vocabulary_too_repetitive": "上次用字过于重复；从已学字表中增加不同汉字。",
+        "known_coverage_out_of_range": (
+            "上次已学字占比不合格；标题和正文只能使用已学字、可用字与目标字。"
+        ),
+        "target_coverage_out_of_range": (
+            "上次目标字比例不合格；每个目标字在标题或正文中自然出现一次。"
+        ),
+        "unexpected_coverage_too_high": (
+            "上次出现了未学汉字；标题和正文禁止使用允许字表以外的汉字。"
+        ),
+        "required_target_missing": "上次遗漏目标字；每个目标字都必须在标题或正文中至少出现一次。",
+    }
     contract = {
         "task": "生成家长陪伴模式的简体中文儿童故事，不与孩子开放聊天",
         "age_band": age_band,
@@ -363,13 +381,15 @@ def _prompt(
         "required_target_characters": [item.character for item in targets],
         "completed_science_experience": experience_context,
         "requirements": [
-            "目标字必须在自然完整的情节中出现",
+            "每个目标字必须在标题或正文中至少自然出现一次；只在摘要或问题中出现不算",
+            "标题和正文的每一个汉字只能来自已学字、可用字或目标字列表",
+            f"标题和正文合计至少写 {profile.minimum_occurrences} 个汉字",
             "内容温暖、安全、适合年龄段，禁止成人、暴力、自伤、毒品和赌博内容",
             "避免不在已知字、可用字、目标字集合内的汉字",
             "故事正文至少达到指定汉字长度，语言自然，不能堆砌重复汉字",
             "生成2到3道简单选择题",
         ],
-        "repair_reasons": list(repair_reasons),
+        "repair_instructions": [repair_messages.get(reason, reason) for reason in repair_reasons],
         "json_schema": {
             "title": "string",
             "paragraphs": ["string"],
