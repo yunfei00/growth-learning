@@ -1,6 +1,7 @@
 """Mastery snapshot, target selection, structured generation, and immutable persistence."""
 
 import json
+import logging
 import time
 import uuid
 from dataclasses import dataclass
@@ -42,7 +43,7 @@ from app.services.story_analysis import (
     validate_story_coverage,
 )
 
-PROMPT_VERSION = "story-prompt-v1"
+PROMPT_VERSION = "story-prompt-v1.1"
 CATALOG_LIMITATION = "当前故事约束基于系统 200 字 Starter Catalog，不代表完整儿童基础汉字体系。"
 SAFE_THEMES: dict[str, str] = {
     "animals": "动物",
@@ -72,6 +73,8 @@ UNSAFE_TERMS = {
     "murder",
     "gun",
 }
+
+logger = logging.getLogger(__name__)
 
 
 class StoryGenerationError(RuntimeError):
@@ -371,6 +374,25 @@ def _prompt(
     repair_reasons: tuple[str, ...] = (),
 ) -> AICompletionRequest:
     profile = PROFILES[difficulty]
+    target_characters = [item.character for item in targets]
+    title_body_han_goal = max(profile.minimum_occurrences + 4, len(targets) * 12)
+    target_ratio_goal = (profile.min_target + profile.max_target) / 2
+    target_occurrence_goal = max(
+        len(targets),
+        round(title_body_han_goal * target_ratio_goal),
+    )
+    target_occurrence_goal = min(
+        target_occurrence_goal,
+        int(title_body_han_goal * profile.max_target),
+    )
+    target_base_count, target_remainder = divmod(target_occurrence_goal, len(targets))
+    target_counts = {
+        character: target_base_count + (1 if index < target_remainder else 0)
+        for index, character in enumerate(target_characters)
+    }
+    strong_characters = sorted(known)
+    recognizing_characters = sorted(recognizing)
+    allowed_characters = sorted(known | recognizing | set(target_characters))
     repair_messages = {
         "structured_response_invalid": "上次不是有效 JSON；严格按 json_schema 返回一个 JSON 对象。",
         "content_safety_failed": "上次内容不符合儿童安全要求；只写温暖的日常科学故事。",
@@ -401,18 +423,34 @@ def _prompt(
             "target_allowed_range": [profile.min_target, profile.max_target],
             "unexpected_max": profile.max_unexpected,
         },
-        "strong_known_characters": "".join(sorted(known)),
-        "recognizing_usable_characters": "".join(sorted(recognizing)),
-        "required_target_characters": [item.character for item in targets],
+        # Arrays make each permitted glyph unambiguous to JSON-oriented models;
+        # a concatenated string is too easy to treat as natural-language text.
+        "strong_known_characters": strong_characters,
+        "recognizing_usable_characters": recognizing_characters,
+        "required_target_characters": target_characters,
+        "allowed_title_body_characters": allowed_characters,
+        "title_body_han_plan": {
+            "exact_total_han_characters": title_body_han_goal,
+            "exact_target_occurrences": target_counts,
+            "all_remaining_han_characters_must_come_from": strong_characters,
+            "punctuation_is_not_counted": True,
+        },
         "completed_science_experience": experience_context,
         "requirements": [
-            "每个目标字必须在标题或正文中至少自然出现一次；只在摘要或问题中出现不算",
-            "标题和正文的每一个汉字只能来自已学字、可用字或目标字列表",
-            f"标题和正文合计至少写 {profile.minimum_occurrences} 个汉字",
+            "coverage 字段和 title_body_han_plan 是最高优先级，主题词若不在白名单中就不要使用",
+            f"标题与正文合计必须恰好包含 {title_body_han_goal} 个汉字，标点不计数",
+            (
+                "目标字在标题与正文中的精确次数必须是 "
+                f"{json.dumps(target_counts, ensure_ascii=False)}；只在摘要或问题中出现不算"
+            ),
+            (
+                "标题与正文的每一个汉字必须逐字复制自 allowed_title_body_characters，"
+                "禁止自行补充同义字、连接词或主题词"
+            ),
+            "除目标字外优先只使用 strong_known_characters；可重复使用白名单字组成短句",
             "内容温暖、安全、适合年龄段，禁止成人、暴力、自伤、毒品和赌博内容",
-            "避免不在已知字、可用字、目标字集合内的汉字",
-            "故事正文至少达到指定汉字长度，语言自然，不能堆砌重复汉字",
-            "生成2到3道简单选择题",
+            "摘要、问题和选项不参与覆盖率计算，可以使用正常的简体中文",
+            "生成2到3道简单选择题；先逐字自检标题和正文，再返回 JSON",
         ],
         "repair_instructions": [repair_messages.get(reason, reason) for reason in repair_reasons],
         "json_schema": {
@@ -566,6 +604,19 @@ async def generate_story(
         validation = validate_story_coverage(analysis, payload.difficulty, target_chars)
         if not validation.accepted:
             last_reasons = validation.reasons
+            logger.info(
+                "Story generation attempt rejected by coverage policy",
+                extra={
+                    "generation_run_id": str(run.id),
+                    "attempt": attempt,
+                    "reasons": list(validation.reasons),
+                    "total_han_occurrences": analysis.total_han_occurrences,
+                    "strong_known_coverage": analysis.strong_known_coverage,
+                    "usable_known_coverage": analysis.usable_known_coverage,
+                    "target_coverage": analysis.target_coverage,
+                    "unexpected_coverage": analysis.unexpected_coverage,
+                },
+            )
             continue
 
         if story is None:
@@ -676,6 +727,15 @@ async def generate_story(
         await get_or_create_daily_plan(session, child.id)
         await attach_story_to_today(session, child.id, version.id)
         await session.commit()
+        logger.info(
+            "Story generation succeeded",
+            extra={
+                "generation_run_id": str(run.id),
+                "attempt_count": run.attempt_count,
+                "provider": run.provider,
+                "model": run.model,
+            },
+        )
         return run, version
 
     run.status = StoryGenerationStatus.FAILED
@@ -686,6 +746,14 @@ async def generate_story(
     run.output_tokens = last_response.output_tokens if last_response else None
     run.completed_at = datetime.now(UTC)
     await session.commit()
+    logger.warning(
+        "Story generation exhausted validation retries",
+        extra={
+            "generation_run_id": str(run.id),
+            "attempt_count": run.attempt_count,
+            "reasons": list(last_reasons),
+        },
+    )
     raise StoryGenerationError(
         "生成内容在有限重试后仍未达到识字覆盖和儿童内容要求，请重试或降低难度。",
         category="validation_failed",
