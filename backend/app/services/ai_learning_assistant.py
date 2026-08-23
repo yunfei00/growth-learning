@@ -141,7 +141,10 @@ async def generate_science_parent_tip(
                     AIMessage(role="user", content=json.dumps(contract, ensure_ascii=False)),
                 ],
                 temperature=0.2,
-                max_tokens=500,
+                # Reasoning-capable OpenAI-compatible models can consume part of
+                # this budget before emitting the small JSON payload. Keep enough
+                # headroom so a valid response is not truncated to empty content.
+                max_tokens=1200,
                 json_response=True,
             )
         )

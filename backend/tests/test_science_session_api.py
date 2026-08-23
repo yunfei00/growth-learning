@@ -389,6 +389,7 @@ async def test_completed_experiment_archive_keeps_and_edits_media_without_reopen
     assert ai_tip.status_code == 200, ai_tip.text
     assert "复述" in ai_tip.json()["parent_tip"]
     assert ai_tip.json()["learning_records_modified"] is False
+    assert ai_provider.requests[-1].max_tokens == 1200
     async with session_factory() as session:
         after_records = int(
             await session.scalar(select(func.count()).select_from(LearningRecord)) or 0
