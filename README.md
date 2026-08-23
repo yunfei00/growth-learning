@@ -94,7 +94,7 @@ AI_PROVIDER=openai_compatible
 AI_BASE_URL=https://provider.example/v1
 AI_API_KEY=运行时密钥
 AI_MODEL=provider-model-name
-AI_TIMEOUT_SECONDS=30
+AI_TIMEOUT_SECONDS=60
 AI_STORY_MAX_ATTEMPTS=3
 ```
 

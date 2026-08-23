@@ -12,6 +12,7 @@ from app.integrations.object_storage import (
 def test_settings_normalize_cors_origins() -> None:
     settings = Settings(cors_origins="http://localhost:3000, https://app.example.com ")
 
+    assert settings.ai_timeout_seconds == 60.0
     assert settings.cors_origin_list == [
         "http://localhost:3000",
         "https://app.example.com",

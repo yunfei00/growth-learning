@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     ai_base_url: str = "https://api.openai.com/v1"
     ai_api_key: SecretStr = SecretStr("")
     ai_model: str = ""
-    ai_timeout_seconds: float = 30.0
+    ai_timeout_seconds: float = 60.0
     ai_story_max_attempts: int = 3
 
     @property
