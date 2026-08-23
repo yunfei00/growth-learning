@@ -93,6 +93,10 @@ free practice, and repeat viewing remain auxiliary and never change mastery.
 Sessions and repeated records remain visible as an append-oriented learning timeline. Assessment
 evidence stays in test history.
 
+On a suitably provisioned host, `scripts/server-build-deploy.sh` builds both revision-labelled
+application images locally and then hands the archive to the standard migration/health-gated deploy
+flow. Small hosts can continue using the CI release archive through `server-deploy.sh`.
+
 ## Authorization and privacy
 
 All child projections call the existing household authorization guard. Cross-family users, unrelated

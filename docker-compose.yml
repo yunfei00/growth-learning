@@ -57,6 +57,9 @@ services:
     build:
       context: ./backend
       target: runtime
+      args:
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+        APP_REVISION: ${APP_REVISION:-unknown}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
@@ -113,6 +116,8 @@ services:
       context: ./frontend
       target: runtime
       args:
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+        APP_REVISION: ${APP_REVISION:-unknown}
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-http://localhost:8000}
         NEXT_PUBLIC_APP_BASE_PATH: ${PUBLIC_APP_BASE_PATH:-}
         NODE_OPTIONS: ${FRONTEND_BUILD_NODE_OPTIONS:---max-old-space-size=512}

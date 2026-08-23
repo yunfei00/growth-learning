@@ -3,6 +3,9 @@ FROM python:3.13-slim AS runtime
 ARG APP_VERSION=1.0.0
 ARG APP_REVISION=unknown
 
+LABEL org.opencontainers.image.version=$APP_VERSION \
+      org.opencontainers.image.revision=$APP_REVISION
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \

@@ -29,6 +29,10 @@ COPY . .
 RUN mkdir -p public && nice -n 19 pnpm build
 
 FROM node:24-alpine AS runtime
+ARG APP_VERSION=1.0.0
+ARG APP_REVISION=unknown
+LABEL org.opencontainers.image.version=$APP_VERSION \
+      org.opencontainers.image.revision=$APP_REVISION
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
