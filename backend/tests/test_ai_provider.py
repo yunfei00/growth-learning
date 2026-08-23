@@ -1,5 +1,7 @@
 """Provider-neutral AI adapter tests that never call an external model."""
 
+import json
+
 import httpx
 import pytest
 
@@ -21,6 +23,7 @@ async def test_openai_compatible_provider_normalizes_response() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["authorization"] == "Bearer test-key"
         assert b'"response_format":{"type":"json_object"}' in request.content
+        assert "thinking" not in json.loads(request.content)
         assert request.url.path == "/v1/chat/completions"
         assert request.extensions["timeout"]["read"] == 7.0
         return httpx.Response(
@@ -51,3 +54,33 @@ async def test_openai_compatible_provider_normalizes_response() -> None:
     assert result.model == "provider-model"
     assert result.input_tokens == 4
     assert result.output_tokens == 3
+
+
+@pytest.mark.anyio
+async def test_deepseek_v4_json_requests_disable_default_thinking() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["thinking"] == {"type": "disabled"}
+        return httpx.Response(
+            200,
+            json={
+                "model": "deepseek-v4-flash",
+                "choices": [{"message": {"content": '{"result":"ok"}'}}],
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenAICompatibleProvider(
+            base_url="https://api.deepseek.com",
+            api_key="test-key",
+            model="deepseek-v4-flash",
+            client=client,
+        )
+        result = await provider.complete(
+            AICompletionRequest(
+                messages=[AIMessage(role="user", content="Return JSON")],
+                json_response=True,
+            )
+        )
+
+    assert result.text == '{"result":"ok"}'

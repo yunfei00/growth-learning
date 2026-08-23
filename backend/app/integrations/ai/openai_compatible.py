@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -41,6 +42,13 @@ class OpenAICompatibleProvider:
         }
         if request.json_response:
             payload["response_format"] = {"type": "json_object"}
+            if urlsplit(self._base_url).hostname == "api.deepseek.com" and self._model.startswith(
+                "deepseek-v4"
+            ):
+                # DeepSeek V4 enables thinking by default. For bounded JSON
+                # helpers, non-thinking mode avoids spending the entire output
+                # budget on reasoning while preserving JSON Output support.
+                payload["thinking"] = {"type": "disabled"}
         headers = {"Authorization": f"Bearer {self._api_key}"}
 
         try:
