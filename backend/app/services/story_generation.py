@@ -297,6 +297,31 @@ async def _resolve_targets(
     ]
 
 
+async def _preferred_prompt_characters(
+    session: AsyncSession,
+    characters: set[str],
+    *,
+    limit: int,
+) -> set[str]:
+    """Keep structured story prompts bounded and biased toward common learned characters."""
+    if not characters:
+        return set()
+    rows = list(
+        (
+            await session.scalars(
+                select(ChineseCharacter.character)
+                .where(ChineseCharacter.character.in_(characters))
+                .order_by(
+                    ChineseCharacter.frequency_rank.asc().nulls_last(),
+                    ChineseCharacter.character,
+                )
+                .limit(limit)
+            )
+        ).all()
+    )
+    return set(rows)
+
+
 def _snapshot_payload(
     snapshot: MasterySnapshot, targets: list[SnapshotCharacter]
 ) -> dict[str, object]:
@@ -454,6 +479,8 @@ async def generate_story(
     target_chars = {item.character for item in targets}
     strong = set(snapshot.strong) - target_chars
     recognizing = set(snapshot.recognizing) - target_chars
+    prompt_strong = await _preferred_prompt_characters(session, strong, limit=120)
+    prompt_recognizing = await _preferred_prompt_characters(session, recognizing, limit=40)
 
     if payload.request_key:
         prior = await session.scalar(
@@ -503,8 +530,8 @@ async def generate_story(
                     theme=theme,
                     custom_theme=custom_theme,
                     difficulty=payload.difficulty,
-                    known=strong,
-                    recognizing=recognizing,
+                    known=prompt_strong,
+                    recognizing=prompt_recognizing,
                     targets=targets,
                     experience_context=experience_context,
                     repair_reasons=last_reasons,
