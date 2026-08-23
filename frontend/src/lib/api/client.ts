@@ -1345,7 +1345,7 @@ export function generateExperimentStory(
   return request<StoryGenerationResult>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}/generate-story`, {
     method: "POST",
     body: jsonBody({ difficulty, request_key: createClientKey() }),
-  }, 90_000);
+  }, 120_000);
 }
 
 export function listAdminScienceExperiments(filters: {

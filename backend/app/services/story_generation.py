@@ -395,7 +395,11 @@ def _prompt(
             AIMessage(role="user", content=json.dumps(contract, ensure_ascii=False)),
         ],
         temperature=0.2,
-        max_tokens=1400,
+        # Reasoning-capable OpenAI-compatible models may consume a substantial
+        # part of the completion budget before emitting the structured story.
+        # The story contract itself is also larger than the short explanation
+        # helpers, so keep enough headroom to avoid empty/truncated JSON.
+        max_tokens=3000,
         json_response=True,
     )
 
