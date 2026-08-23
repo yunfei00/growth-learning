@@ -219,7 +219,7 @@ Phase 5 新增表的每条业务外键均显式使用 `ON DELETE RESTRICT`。派
 
 `science_experiments` 保存可搜索、可启用/归档的模板身份；每次内容变化写入新的 `science_experiment_versions.snapshot`，既有实验会话永远引用当时版本。`experiment_materials` 是可复用材料目录，`experiment_material_requirements` 保存必需/可选、数量和替代建议；`family_materials` 是家庭隔离的常备材料清单。
 
-`experiment_sessions` 以孩子和家庭成员为边界，保存 `planned`、`in_progress`、`completed`、`abandoned`、当前步骤和完整模板快照。`experiment_evidence` 只追加预测、观察、孩子总结、提问及孩子原话；`capability_tags` 是非评分行为标签，不能保存数值能力分。原始文本没有更新/删除 API，任何未来 AI 派生内容只能写入独立 derived 字段，不能覆盖原话。
+`experiment_sessions` 以孩子和家庭成员为边界，保存 `planned`、`in_progress`、`completed`、`abandoned`、当前步骤和完整模板快照。`experiment_evidence` 保存预测、观察、孩子总结、提问及孩子原话；`capability_tags` 是非评分行为标签，不能保存数值能力分。Phase 13 允许家庭成员对实验档案中的误记原文做明确修订或补充，并推进会话 `updated_at`；修订不能把 `completed` 改回进行中，也不能改写 `created_at`/`completed_at`。任何 AI 派生内容仍只能作为辅助响应或独立 derived 字段，不能覆盖人工档案或创建测评证据。
 
 `experiment_media_assets` 只保存私有 MinIO 对象元数据。对象键使用 UUID，不包含姓名；读取必须重新通过孩子家庭鉴权，不返回公共 bucket URL。实验完成最多创建一组 `science_experiment_exposure` LearningRecord，不创建 AssessmentItem，也不推断孩子已经认识关联汉字。
 
@@ -264,6 +264,6 @@ session 引用。
 成长树与统一 Today 是查询投影，不新增平行事实表。所有新增外键使用 `ON DELETE RESTRICT`。
 规则、隐私和响应式约定见 [Phase 11 孩子体验](CHILD_EXPERIENCE.md)。
 
-## V1 schema freeze
+## Phase 13 档案与识字内容扩展
 
-Growth Learning `1.0.0` 的唯一 Alembic head 是 `20260820_0011`。Phase 12 没有新增业务表或 destructive migration：LearningRecord、AssessmentItem、ChildKnowledgeState、历史 Story/Science/Growth 快照及原 200 字 UUID 均保持原样。备份恢复使用 PostgreSQL custom dump 与 MinIO 私有对象归档，不以 ORM 重建或覆盖历史证据。
+Phase 13 的 additive migration 为 `20260823_0013`，仅向 `chinese_characters` 添加可空的 `parent_tip`。`simple_meaning`、`common_words`、`example_sentence` 与 `parent_tip` 均由知识库人工维护，并可作为后续 AI 辅助生成的上下文。LearningRecord、AssessmentItem、ChildKnowledgeState、历史 Story/Science/Growth 快照及原有汉字 UUID 保持不变。实验媒体仍由 `experiment_media_assets` 关联私有 MinIO 对象，替换不改变媒体在档案中的稳定 ID。

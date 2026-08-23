@@ -1,15 +1,19 @@
 """Child-private character learning, assessment, and mastery endpoints."""
 
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.api.dependencies import CurrentUser, DbSession
+from app.integrations.ai.base import AIProvider
+from app.integrations.ai.factory import build_ai_provider
 from app.models import ChildKnowledgeState
 from app.schemas.learning import (
     AssessmentBatchSubmit,
     AssessmentHistoryEntry,
     AssessmentSessionCreate,
+    CharacterAIAssistanceResponse,
     CharacterMasteryDetail,
     CharacterMasteryPage,
     CharacterMasteryState,
@@ -25,7 +29,9 @@ from app.schemas.learning import (
     PriorityUpdate,
     ReviewBacklogResponse,
 )
+from app.services.ai_learning_assistant import LearningAssistantError, generate_character_assistance
 from app.services.authorization import get_authorized_child
+from app.services.character_catalog import get_character
 from app.services.child_character_learning import (
     create_assessment_session,
     create_learning_session,
@@ -50,6 +56,13 @@ from app.services.review_planning import (
 )
 
 router = APIRouter(prefix="/children", tags=["character learning"])
+
+
+def get_learning_ai_provider(request: Request) -> AIProvider:
+    return build_ai_provider(request.app.state.settings)
+
+
+LearningAIProvider = Annotated[AIProvider, Depends(get_learning_ai_provider)]
 
 
 @router.get("/{child_id}/learning-settings", response_model=LearningSettingsResponse)
@@ -225,6 +238,8 @@ async def get_character_states(
         pattern="^(unlearned|introduced|recognizing|proficient|stable)$",
     ),
     priority: bool | None = None,
+    sort_by: str = Query(default="character", pattern="^(learning_time|recent_review|character)$"),
+    sort_order: str = Query(default="asc", pattern="^(asc|desc)$"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> CharacterMasteryPage:
@@ -235,6 +250,8 @@ async def get_character_states(
         search=search,
         mastery_level=mastery_level,
         priority=priority,
+        sort_by=sort_by,
+        sort_order=sort_order,
         page=page,
         page_size=page_size,
     )
@@ -252,6 +269,35 @@ async def get_character_state(
     if detail is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
     return detail
+
+
+@router.post(
+    "/{child_id}/characters/{knowledge_point_id}/ai-assistance",
+    response_model=CharacterAIAssistanceResponse,
+)
+async def create_character_ai_assistance(
+    child_id: uuid.UUID,
+    knowledge_point_id: uuid.UUID,
+    request: Request,
+    current_user: CurrentUser,
+    session: DbSession,
+    provider: LearningAIProvider,
+) -> CharacterAIAssistanceResponse:
+    await get_authorized_child(session, current_user, child_id)
+    settings = request.app.state.settings
+    if not (
+        settings.ai_provider != "disabled"
+        and settings.ai_api_key.get_secret_value()
+        and settings.ai_model
+    ):
+        raise HTTPException(status_code=503, detail="AI 服务尚未配置")
+    row = await get_character(session, knowledge_point_id, enabled_only=True)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Character not found")
+    try:
+        return await generate_character_assistance(provider, row[1])
+    except LearningAssistantError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @router.patch(

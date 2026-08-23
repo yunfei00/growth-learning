@@ -31,6 +31,7 @@ export type ChineseCharacter = {
   difficulty_level: number | null;
   simple_meaning: string | null;
   example_sentence: string | null;
+  parent_tip: string | null;
   common_words: string[];
   tags: string[];
   is_enabled: boolean;
@@ -56,6 +57,7 @@ export type CharacterInput = {
   radical?: string | null;
   simple_meaning?: string | null;
   example_sentence?: string | null;
+  parent_tip?: string | null;
   common_words: string[];
   tags: string[];
   is_enabled: boolean;
@@ -123,6 +125,8 @@ export type CharacterMasteryState = {
   pinyin: string;
   common_words: string[];
   simple_meaning: string | null;
+  example_sentence: string | null;
+  parent_tip: string | null;
   mastery_level: MasteryLevel;
   mastery_score: number;
   first_introduced_at: string | null;
@@ -169,6 +173,16 @@ export type TimelineItem = {
 export type CharacterMasteryDetail = {
   state: CharacterMasteryState;
   timeline: TimelineItem[];
+};
+
+export type CharacterAIAssistance = {
+  simple_explanation: string;
+  words: string[];
+  example_sentence: string;
+  parent_tip: string;
+  provider: string;
+  model: string;
+  mastery_directly_modified: false;
 };
 
 export type EvidenceSession = {
@@ -583,6 +597,13 @@ export type ExperimentGrowthCard = {
   capability_tags: string[];
 };
 
+export type ExperimentAIParentTip = {
+  parent_tip: string;
+  provider: string;
+  model: string;
+  learning_records_modified: false;
+};
+
 export type GrowthCategory =
   | "learning"
   | "assessment"
@@ -927,6 +948,8 @@ export function listCharacterMastery(
     search?: string;
     masteryLevel?: MasteryLevel;
     priority?: boolean;
+    sortBy?: "learning_time" | "recent_review" | "character";
+    sortOrder?: "asc" | "desc";
     page?: number;
     pageSize?: number;
   },
@@ -935,6 +958,8 @@ export function listCharacterMastery(
   if (filters.search) query.set("search", filters.search);
   if (filters.masteryLevel) query.set("mastery_level", filters.masteryLevel);
   if (filters.priority !== undefined) query.set("priority", String(filters.priority));
+  if (filters.sortBy) query.set("sort_by", filters.sortBy);
+  if (filters.sortOrder) query.set("sort_order", filters.sortOrder);
   query.set("page", String(filters.page ?? 1));
   query.set("page_size", String(filters.pageSize ?? 20));
   return request<CharacterMasteryPage>(
@@ -948,6 +973,17 @@ export function getCharacterMasteryDetail(
 ): Promise<CharacterMasteryDetail> {
   return request<CharacterMasteryDetail>(
     `/api/v1/children/${childId}/characters/${knowledgePointId}`,
+  );
+}
+
+export function generateCharacterAIAssistance(
+  childId: string,
+  knowledgePointId: string,
+): Promise<CharacterAIAssistance> {
+  return request<CharacterAIAssistance>(
+    `/api/v1/children/${childId}/characters/${knowledgePointId}/ai-assistance`,
+    { method: "POST" },
+    45_000,
   );
 }
 
@@ -1232,6 +1268,18 @@ export function addExperimentEvidence(
   });
 }
 
+export function updateExperimentEvidence(
+  childId: string,
+  sessionId: string,
+  evidenceId: string,
+  payload: { original_text?: string; capability_tags?: string[] },
+): Promise<ExperimentEvidence> {
+  return request<ExperimentEvidence>(
+    `/api/v1/children/${childId}/experiment-sessions/${sessionId}/evidence/${evidenceId}`,
+    { method: "PATCH", body: jsonBody(payload) },
+  );
+}
+
 export function uploadExperimentMedia(childId: string, sessionId: string, file: File): Promise<ExperimentSession> {
   const body = new FormData();
   body.set("file", file);
@@ -1239,6 +1287,32 @@ export function uploadExperimentMedia(childId: string, sessionId: string, file: 
     method: "POST",
     body,
   }, 120_000);
+}
+
+export function replaceExperimentMedia(
+  childId: string,
+  sessionId: string,
+  mediaId: string,
+  file: File,
+): Promise<ExperimentSession> {
+  const body = new FormData();
+  body.set("file", file);
+  return request<ExperimentSession>(
+    `/api/v1/children/${childId}/experiment-sessions/${sessionId}/media/${mediaId}`,
+    { method: "PUT", body },
+    120_000,
+  );
+}
+
+export function deleteExperimentMedia(
+  childId: string,
+  sessionId: string,
+  mediaId: string,
+): Promise<void> {
+  return request<void>(
+    `/api/v1/children/${childId}/experiment-sessions/${sessionId}/media/${mediaId}`,
+    { method: "DELETE" },
+  );
 }
 
 export function completeExperiment(childId: string, sessionId: string, parentNote?: string): Promise<ExperimentSession> {
@@ -1250,6 +1324,17 @@ export function completeExperiment(childId: string, sessionId: string, parentNot
 
 export function getExperimentGrowthCard(childId: string, sessionId: string): Promise<ExperimentGrowthCard> {
   return request<ExperimentGrowthCard>(`/api/v1/children/${childId}/experiment-sessions/${sessionId}/growth-card`);
+}
+
+export function generateExperimentAIParentTip(
+  childId: string,
+  sessionId: string,
+): Promise<ExperimentAIParentTip> {
+  return request<ExperimentAIParentTip>(
+    `/api/v1/children/${childId}/experiment-sessions/${sessionId}/ai-parent-tip`,
+    { method: "POST" },
+    45_000,
+  );
 }
 
 export function generateExperimentStory(

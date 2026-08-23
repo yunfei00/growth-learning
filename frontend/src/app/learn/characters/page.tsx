@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
+import { CharacterLink } from "@/components/character-link";
 import { ChildSwitcher } from "@/components/child-switcher";
 import { ProtectedPage } from "@/components/protected-page";
 import {
@@ -111,6 +112,7 @@ function CharacterLearningContent() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const questionStartedAt = useRef(0);
+  const initialTaskHandled = useRef(false);
   const childId = activeChild?.id ?? "";
 
   const loadCore = useCallback(async () => {
@@ -168,6 +170,7 @@ function CharacterLearningContent() {
   };
 
   const switchChild = (nextChildId: string) => {
+    initialTaskHandled.current = false;
     setActiveChildId(nextChildId);
     setView("today");
     setSummary(null);
@@ -189,7 +192,7 @@ function CharacterLearningContent() {
     try {
       setRecommendations(
         plan.items
-          .filter((item) => item.item_kind === "new" && item.status === "pending")
+          .filter((item) => item.item_kind === "new")
           .map((item) => ({
             id: item.knowledge_point_id,
             character: item.character,
@@ -209,10 +212,22 @@ function CharacterLearningContent() {
   };
 
   const completeLearning = async () => {
-    if (!childId || recommendations.length === 0) return;
+    if (!childId || recommendations.length === 0 || !plan) return;
+    const pendingIds = new Set(
+      plan.items
+        .filter((item) => item.item_kind === "new" && item.status === "pending")
+        .map((item) => item.knowledge_point_id),
+    );
+    const idsToRecord = recommendations
+      .map((item) => item.id)
+      .filter((id) => pendingIds.has(id));
+    if (idsToRecord.length === 0) {
+      setMessage("今日任务已经完成；可以继续查看和练习，不会重复创建学习记录。");
+      return;
+    }
     setIsLoading(true);
     try {
-      await createLearningSession(childId, recommendations.map((item) => item.id));
+      await createLearningSession(childId, idsToRecord);
       setRecommendations([]);
       setMessage("今天的新字已经记入成长档案。");
       await loadCore();
@@ -242,6 +257,23 @@ function CharacterLearningContent() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!plan || initialTaskHandled.current) return;
+    const timer = window.setTimeout(() => {
+      const task = new URLSearchParams(window.location.search).get("task");
+      if (task === "new") {
+        initialTaskHandled.current = true;
+        void startNewLearning();
+      } else if (task === "review") {
+        initialTaskHandled.current = true;
+        void beginPlannedSession("daily_review");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  // The URL task is intentionally handled once after today's persisted plan loads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan]);
 
   const recordPlannedOutcome = async (outcome: AssessmentOutcome) => {
     if (!childId || !session) return;
@@ -412,6 +444,17 @@ function CharacterLearningContent() {
     },
     { correct: 0, hinted_correct: 0, uncertain: 0, incorrect: 0 } as Record<AssessmentOutcome, number>,
   );
+  const pendingNewIds = new Set(
+    plan?.items
+      .filter((item) => item.item_kind === "new" && item.status === "pending")
+      .map((item) => item.knowledge_point_id) ?? [],
+  );
+  const newTaskCompleted = Boolean(
+    plan && plan.recommended_new_count > 0 && plan.new_completed_count >= plan.recommended_new_count,
+  );
+  const reviewTaskCompleted = Boolean(
+    plan && plan.review_count > 0 && plan.review_completed_count >= plan.review_count,
+  );
 
   return (
     <section className="character-learning-page section-shell">
@@ -437,8 +480,8 @@ function CharacterLearningContent() {
           {plan ? (
             <>
               <div className="today-task-grid">
-                <article><span>新字</span><strong>{plan.recommended_new_count}</strong><small>已完成 {plan.new_completed_count}</small><button onClick={() => void startNewLearning()} disabled={plan.recommended_new_count === 0 || plan.new_completed_count >= plan.recommended_new_count} type="button">学习今日新字</button></article>
-                <article><span>复习</span><strong>{plan.review_count}</strong><small>待复习总数 {plan.due_count}</small><button onClick={() => void beginPlannedSession("daily_review")} disabled={plan.review_count === 0} type="button">开始 / 继续复习</button></article>
+                <article className={newTaskCompleted ? "task-completed" : ""}><span>新字</span><strong>{plan.recommended_new_count}</strong><small>{newTaskCompleted ? "已完成 ✓" : `已完成 ${plan.new_completed_count}`}</small><button onClick={() => void startNewLearning()} disabled={plan.recommended_new_count === 0} type="button">{newTaskCompleted ? "再次打开" : "学习今日新字"}</button></article>
+                <article className={reviewTaskCompleted ? "task-completed" : ""}><span>复习</span><strong>{plan.review_count}</strong><small>{reviewTaskCompleted ? "已完成 ✓" : `待复习总数 ${plan.due_count}`}</small><button onClick={() => void beginPlannedSession("daily_review")} disabled={plan.review_count === 0} type="button">{reviewTaskCompleted ? "查看已完成复习" : "开始 / 继续复习"}</button></article>
                 <article><span>阅读</span><strong>1 篇</strong><small>{plan.reading.title ?? (plan.reading.status === "needs_story" ? "需要生成今天的故事" : "故事已准备")}</small><Link className="task-link-button" href={plan.reading.story_version_id ? `/read/${plan.reading.story_version_id}` : "/read"}>{plan.reading.status === "completed" ? "查看已完成故事" : plan.reading.status === "in_progress" ? "继续阅读" : plan.reading.status === "pending" ? "开始阅读" : "生成今天的故事"}</Link></article>
               </div>
               <div className="plan-explanation"><strong>安排说明</strong><p>{plan.recommendation_reason}</p>{plan.due_count > plan.review_count ? <p>剩余项目不会丢失，按当前容量预计约 {plan.estimated_backlog_days} 天逐步完成。</p> : null}</div>
@@ -454,8 +497,8 @@ function CharacterLearningContent() {
       {view === "overview" ? (
         <div className="learning-overview">
           {summary ? <div className="mastery-metric-grid">{([
-            ["未学习", summary.unlearned], ["初识", summary.introduced], ["基本认识", summary.recognizing], ["熟练", summary.proficient], ["稳定掌握", summary.stable],
-          ] as const).map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong><small>字</small></article>)}</div> : <div className="center-state compact"><span className="loading-spinner" /></div>}
+            ["unlearned", "未学习", summary.unlearned], ["introduced", "初识", summary.introduced], ["recognizing", "基本认识", summary.recognizing], ["proficient", "熟练", summary.proficient], ["stable", "稳定掌握", summary.stable],
+          ] as const).map(([levelValue, label, value]) => <Link href={`/learn/characters/status/${levelValue}`} key={levelValue}><span>{label}</span><strong>{value}</strong><small>字 · 点击查看</small></Link>)}</div> : <div className="center-state compact"><span className="loading-spinner" /></div>}
           <div className="literacy-panel">
             <div><p className="eyebrow">透明估算</p><h2>当前字库内估算识字量</h2></div>
             {estimate?.is_sufficient && estimate.estimate != null ? <strong>约 {Math.round(estimate.estimate)} / {estimate.catalog_size}</strong> : <strong>数据不足</strong>}
@@ -467,11 +510,11 @@ function CharacterLearningContent() {
       ) : null}
 
       {view === "new" ? (
-        <section className="learning-workspace"><header><div><p className="eyebrow">今日新字</p><h2>{recommendations.length} 个新字</h2></div><span>由 Daily Plan V1 固定选择</span></header>{isLoading ? <div className="center-state compact"><span className="loading-spinner" /></div> : recommendations.length ? <><div className="new-character-grid">{recommendations.map((item) => <article key={item.id}><strong>{item.character}</strong><p className="character-pinyin">{item.pinyin}</p><p>{item.common_words.join(" · ") || "暂无常用词"}</p><small>{item.simple_meaning || "暂无简释"}</small></article>)}</div><button className="button button-primary workspace-submit" onClick={() => void completeLearning()} disabled={isLoading} type="button">完成今日新字并保存</button></> : <div className="empty-learning-state"><h3>今天不安排新字</h3><p>{plan?.recommendation_reason}</p><button className="button button-secondary" onClick={() => setView("today")} type="button">返回今日任务</button></div>}</section>
+        <section className="learning-workspace"><header><div><p className="eyebrow">今日新字</p><h2>{recommendations.length} 个新字</h2></div><span>{newTaskCompleted ? "已完成 ✓ · 仍可继续打开学习" : "由 Daily Plan V1 固定选择"}</span></header>{isLoading ? <div className="center-state compact"><span className="loading-spinner" /></div> : recommendations.length ? <><div className="new-character-grid">{recommendations.map((item) => <article className={!pendingNewIds.has(item.id) ? "completed" : ""} key={item.id}><CharacterLink className="new-character-link" knowledgePointId={item.id}><strong>{item.character}</strong><p className="character-pinyin">{item.pinyin}</p><p>{item.common_words.join(" · ") || "暂无常用词"}</p><small>{item.simple_meaning || "暂无简释"}</small>{!pendingNewIds.has(item.id) ? <span>已完成 ✓</span> : null}</CharacterLink></article>)}</div>{pendingNewIds.size ? <button className="button button-primary workspace-submit" onClick={() => void completeLearning()} disabled={isLoading} type="button">完成今日新字并保存</button> : <p className="completed-task-note">今日任务已完成。你仍可点击任何汉字再次学习、朗读或练习；系统不会重复计算完成数或创建学习记录。</p>}</> : <div className="empty-learning-state"><h3>今天不安排新字</h3><p>{plan?.recommendation_reason}</p><button className="button button-secondary" onClick={() => setView("today")} type="button">返回今日任务</button></div>}</section>
       ) : null}
 
       {view === "session" && session ? (
-        <section className="learning-workspace assessment-workspace"><header><div><p className="eyebrow">{SOURCE_LABELS[session.source]}</p><h2>{session.status === "completed" ? "完成啦 🎉" : `${session.completed_items + 1} / ${session.total_items}`}</h2></div><span>{session.sampling_method} · {session.sampling_version}</span></header>{session.status === "completed" ? <div className="session-result"><h3>{SOURCE_LABELS[session.source]}完成</h3><div className="result-count-grid">{(Object.keys(OUTCOME_LABELS) as AssessmentOutcome[]).map((outcome) => <article key={outcome}><span>{OUTCOME_LABELS[outcome]}</span><strong>{resultCounts?.[outcome] ?? 0}</strong></article>)}</div><p>没有分数或排名；需要关注的字已经进入后续复习日程。</p><button className="button button-primary" onClick={() => setView("today")} type="button">回到今日任务</button></div> : currentPlannedTarget ? <div className="recognition-card"><strong className="recognition-glyph">{currentPlannedTarget.character}</strong>{answerVisible ? <div className="recognition-answer"><p>{currentPlannedTarget.pinyin}</p><small>看到提示后，请选择“提示后认识”</small></div> : <p className="answer-hidden">拼音和答案默认隐藏</p>}<div className="outcome-grid"><button onClick={() => void recordPlannedOutcome("correct")} disabled={isLoading} type="button">认识</button><button onClick={() => { setAnswerVisible(true); }} className="hint-button" disabled={isLoading} type="button">查看提示</button><button onClick={() => void recordPlannedOutcome("hinted_correct")} disabled={!answerVisible || isLoading} type="button">提示后认识</button><button onClick={() => void recordPlannedOutcome("uncertain")} disabled={isLoading} type="button">不确定</button><button onClick={() => void recordPlannedOutcome("incorrect")} disabled={isLoading} type="button">不认识</button></div></div> : null}</section>
+        <section className="learning-workspace assessment-workspace"><header><div><p className="eyebrow">{SOURCE_LABELS[session.source]}</p><h2>{session.status === "completed" ? "完成啦 🎉" : `${session.completed_items + 1} / ${session.total_items}`}</h2></div><span>{session.sampling_method} · {session.sampling_version}</span></header>{session.status === "completed" ? <div className="session-result"><h3>{SOURCE_LABELS[session.source]}完成</h3><div className="result-count-grid">{(Object.keys(OUTCOME_LABELS) as AssessmentOutcome[]).map((outcome) => <article key={outcome}><span>{OUTCOME_LABELS[outcome]}</span><strong>{resultCounts?.[outcome] ?? 0}</strong></article>)}</div><div className="completed-review-characters">{session.targets.map((target) => <CharacterLink knowledgePointId={target.knowledge_point_id} key={target.knowledge_point_id}><strong>{target.character}</strong><span>{target.pinyin}</span><small>再次查看、朗读或练习</small></CharacterLink>)}</div><p>没有分数或排名；再次打开汉字不会重复提交结果或修改掌握度。</p><button className="button button-primary" onClick={() => setView("today")} type="button">回到今日任务</button></div> : currentPlannedTarget ? <div className="recognition-card"><strong className="recognition-glyph">{currentPlannedTarget.character}</strong>{answerVisible ? <div className="recognition-answer"><p>{currentPlannedTarget.pinyin}</p><small>看到提示后，请选择“提示后认识”</small></div> : <p className="answer-hidden">拼音和答案默认隐藏</p>}<div className="outcome-grid"><button onClick={() => void recordPlannedOutcome("correct")} disabled={isLoading} type="button">认识</button><button onClick={() => { setAnswerVisible(true); }} className="hint-button" disabled={isLoading} type="button">查看提示</button><button onClick={() => void recordPlannedOutcome("hinted_correct")} disabled={!answerVisible || isLoading} type="button">提示后认识</button><button onClick={() => void recordPlannedOutcome("uncertain")} disabled={isLoading} type="button">不确定</button><button onClick={() => void recordPlannedOutcome("incorrect")} disabled={isLoading} type="button">不认识</button></div></div> : null}</section>
       ) : null}
 
       {view === "quick" ? (

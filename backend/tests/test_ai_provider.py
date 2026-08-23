@@ -22,6 +22,7 @@ async def test_openai_compatible_provider_normalizes_response() -> None:
         assert request.headers["authorization"] == "Bearer test-key"
         assert b'"response_format":{"type":"json_object"}' in request.content
         assert request.url.path == "/v1/chat/completions"
+        assert request.extensions["timeout"]["read"] == 7.0
         return httpx.Response(
             200,
             json={
@@ -36,6 +37,7 @@ async def test_openai_compatible_provider_normalizes_response() -> None:
             base_url="https://provider.example/v1",
             api_key="test-key",
             model="configured-model",
+            timeout_seconds=7,
             client=client,
         )
         result = await provider.complete(

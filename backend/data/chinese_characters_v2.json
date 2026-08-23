@@ -223,10 +223,13 @@
       "character": "日",
       "pinyin": "rì",
       "common_words": [
-        "日子",
-        "生日"
+        "日出",
+        "生日",
+        "日光"
       ],
-      "simple_meaning": "太阳，也表示一天。",
+      "simple_meaning": "太阳；一天。",
+      "example_sentence": "太阳出来了。",
+      "parent_tip": "“日”最早的字形像太阳，可以指着太阳让孩子认识这个字。",
       "source_type": "project_starter",
       "source_reference": "chinese_characters_v1"
     },

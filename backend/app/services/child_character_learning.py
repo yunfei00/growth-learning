@@ -48,6 +48,8 @@ def _state_response(
         pinyin=character.pinyin,
         common_words=character.common_words,
         simple_meaning=character.simple_meaning,
+        example_sentence=character.example_sentence,
+        parent_tip=character.parent_tip,
         mastery_level=state.mastery_level if state else MasteryLevel.UNLEARNED,
         mastery_score=state.mastery_score if state else 0,
         first_introduced_at=state.first_introduced_at if state else None,
@@ -160,6 +162,8 @@ async def list_character_mastery(
     search: str | None,
     mastery_level: str | None,
     priority: bool | None,
+    sort_by: str,
+    sort_order: str,
     page: int,
     page_size: int,
 ) -> CharacterMasteryPage:
@@ -190,11 +194,18 @@ async def list_character_mastery(
             )
 
     total = int(await session.scalar(select(func.count()).select_from(query.subquery())) or 0)
+    sort_columns = {
+        "learning_time": ChildKnowledgeState.last_learning_at,
+        "recent_review": ChildKnowledgeState.last_assessed_at,
+        "character": ChineseCharacter.character,
+    }
+    sort_column = sort_columns[sort_by]
+    ordered = sort_column.asc() if sort_order == "asc" else sort_column.desc()
     rows = (
         await session.execute(
             query.order_by(
                 ChildKnowledgeState.is_priority.desc(),
-                ChineseCharacter.created_at,
+                ordered.nulls_last(),
                 ChineseCharacter.character,
             )
             .offset((page - 1) * page_size)

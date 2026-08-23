@@ -84,6 +84,8 @@ class CharacterMasteryState(BaseModel):
     pinyin: str
     common_words: list[str]
     simple_meaning: str | None
+    example_sentence: str | None
+    parent_tip: str | None
     mastery_level: MasteryLevelValue
     mastery_score: float
     first_introduced_at: datetime | None
@@ -142,6 +144,16 @@ class TimelineItem(BaseModel):
 class CharacterMasteryDetail(BaseModel):
     state: CharacterMasteryState
     timeline: list[TimelineItem]
+
+
+class CharacterAIAssistanceResponse(BaseModel):
+    simple_explanation: str
+    words: list[str]
+    example_sentence: str
+    parent_tip: str
+    provider: str
+    model: str
+    mastery_directly_modified: Literal[False] = False
 
 
 class PriorityUpdate(BaseModel):

@@ -583,7 +583,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
                 status=status,
                 count=plan.recommended_new_count,
                 cta_label="继续学习" if status == "in_progress" else "开始学习",
-                href="/learn/characters",
+                href="/learn/characters?task=new",
                 source_type="daily_learning_plan",
                 source_id=plan.id,
             )
@@ -616,7 +616,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
                 status=status,
                 count=review_count,
                 cta_label="继续复习" if status == "in_progress" else "开始复习",
-                href="/learn/characters",
+                href="/learn/characters?task=review",
                 source_type="assessment_session"
                 if in_progress_assessment
                 else "daily_learning_plan",

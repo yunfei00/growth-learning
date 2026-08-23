@@ -17,9 +17,11 @@ from app.models import (
     ScienceExperimentStatus,
 )
 from app.schemas.science import (
+    ExperimentAIParentTipResponse,
     ExperimentCompleteRequest,
     ExperimentEvidenceBatch,
     ExperimentEvidenceResponse,
+    ExperimentEvidenceUpdate,
     ExperimentGrowthCardResponse,
     ExperimentRecommendationResponse,
     ExperimentSessionCreate,
@@ -33,6 +35,10 @@ from app.schemas.science import (
     ScienceExperimentResponse,
 )
 from app.schemas.story import StoryGenerationRequest, StoryGenerationResponse
+from app.services.ai_learning_assistant import (
+    LearningAssistantError,
+    generate_science_parent_tip,
+)
 from app.services.authorization import (
     get_authorized_child,
     require_family_admin,
@@ -45,17 +51,21 @@ from app.services.science_learning import (
     create_or_resume_experiment_session,
     experiment_growth_card,
     experiment_session_response,
+    get_private_experiment_evidence,
     get_private_experiment_session,
     list_experiment_sessions,
     list_family_material_inventory,
     recommend_science_experiments,
+    update_experiment_evidence,
     update_experiment_session,
     update_family_material_inventory,
 )
 from app.services.science_media import (
     ScienceMediaValidationError,
+    delete_experiment_media,
     get_private_media_asset,
     persist_experiment_media,
+    replace_experiment_media,
 )
 from app.services.story_generation import StoryGenerationError, generate_story
 from app.services.story_reading import story_version_response
@@ -275,6 +285,44 @@ async def record_experiment_evidence(
     return [ExperimentEvidenceResponse.model_validate(item) for item in evidence]
 
 
+@router.patch(
+    "/children/{child_id}/experiment-sessions/{experiment_session_id}/evidence/{evidence_id}",
+    response_model=ExperimentEvidenceResponse,
+)
+async def patch_experiment_evidence(
+    child_id: uuid.UUID,
+    experiment_session_id: uuid.UUID,
+    evidence_id: uuid.UUID,
+    payload: ExperimentEvidenceUpdate,
+    session: DbSession,
+    current_user: CurrentUser,
+) -> ExperimentEvidenceResponse:
+    await get_authorized_child(session, current_user, child_id)
+    experiment_session = await get_private_experiment_session(
+        session, child_id, experiment_session_id
+    )
+    if experiment_session is None:
+        raise HTTPException(status_code=404, detail="Experiment session not found")
+    evidence = await get_private_experiment_evidence(
+        session,
+        experiment_session_id=experiment_session_id,
+        evidence_id=evidence_id,
+    )
+    if evidence is None:
+        raise HTTPException(status_code=404, detail="Experiment evidence not found")
+    try:
+        return ExperimentEvidenceResponse.model_validate(
+            await update_experiment_evidence(
+                session,
+                experiment_session=experiment_session,
+                evidence=evidence,
+                payload=payload,
+            )
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @router.post(
     "/children/{child_id}/experiment-sessions/{experiment_session_id}/media",
     response_model=ExperimentSessionResponse,
@@ -295,8 +343,11 @@ async def upload_experiment_media(
     )
     if experiment_session is None:
         raise HTTPException(status_code=404, detail="Experiment session not found")
-    if experiment_session.status != ExperimentSessionStatus.IN_PROGRESS:
-        raise HTTPException(status_code=409, detail="Experiment session is not in progress")
+    if experiment_session.status not in (
+        ExperimentSessionStatus.IN_PROGRESS,
+        ExperimentSessionStatus.COMPLETED,
+    ):
+        raise HTTPException(status_code=409, detail="Experiment session cannot accept media")
     settings = request.app.state.settings
     read_limit = max(
         settings.science_image_max_bytes,
@@ -319,6 +370,103 @@ async def upload_experiment_media(
     except ScienceMediaValidationError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return await experiment_session_response(session, experiment_session)
+
+
+@router.put(
+    "/children/{child_id}/experiment-sessions/{experiment_session_id}/media/{media_id}",
+    response_model=ExperimentSessionResponse,
+)
+async def replace_experiment_media_asset(
+    child_id: uuid.UUID,
+    experiment_session_id: uuid.UUID,
+    media_id: uuid.UUID,
+    request: Request,
+    session: DbSession,
+    current_user: CurrentUser,
+    storage: ScienceStorage,
+    file: ScienceUpload,
+) -> ExperimentSessionResponse:
+    await get_authorized_child(session, current_user, child_id)
+    experiment_session = await get_private_experiment_session(
+        session, child_id, experiment_session_id
+    )
+    if experiment_session is None:
+        raise HTTPException(status_code=404, detail="Experiment session not found")
+    if experiment_session.status not in (
+        ExperimentSessionStatus.IN_PROGRESS,
+        ExperimentSessionStatus.COMPLETED,
+    ):
+        raise HTTPException(status_code=409, detail="Experiment session media is immutable")
+    asset = await get_private_media_asset(
+        session,
+        child_id=child_id,
+        experiment_session_id=experiment_session_id,
+        media_id=media_id,
+    )
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Experiment media not found")
+    settings = request.app.state.settings
+    read_limit = max(
+        settings.science_image_max_bytes,
+        settings.science_video_max_bytes,
+        settings.science_audio_max_bytes,
+    )
+    content = await file.read(read_limit + 1)
+    try:
+        await replace_experiment_media(
+            session,
+            storage,
+            settings=settings,
+            experiment_session=experiment_session,
+            asset=asset,
+            uploader_user_id=current_user.id,
+            filename=file.filename,
+            mime_type=file.content_type,
+            content=content,
+        )
+    except ScienceMediaValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return await experiment_session_response(session, experiment_session)
+
+
+@router.delete(
+    "/children/{child_id}/experiment-sessions/{experiment_session_id}/media/{media_id}",
+    status_code=204,
+)
+async def delete_experiment_media_asset(
+    child_id: uuid.UUID,
+    experiment_session_id: uuid.UUID,
+    media_id: uuid.UUID,
+    session: DbSession,
+    current_user: CurrentUser,
+    storage: ScienceStorage,
+) -> Response:
+    await get_authorized_child(session, current_user, child_id)
+    experiment_session = await get_private_experiment_session(
+        session, child_id, experiment_session_id
+    )
+    if experiment_session is None:
+        raise HTTPException(status_code=404, detail="Experiment session not found")
+    if experiment_session.status not in (
+        ExperimentSessionStatus.IN_PROGRESS,
+        ExperimentSessionStatus.COMPLETED,
+    ):
+        raise HTTPException(status_code=409, detail="Experiment session media is immutable")
+    asset = await get_private_media_asset(
+        session,
+        child_id=child_id,
+        experiment_session_id=experiment_session_id,
+        media_id=media_id,
+    )
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Experiment media not found")
+    await delete_experiment_media(
+        session,
+        storage,
+        experiment_session=experiment_session,
+        asset=asset,
+    )
+    return Response(status_code=204)
 
 
 @router.get(
@@ -401,6 +549,40 @@ async def get_experiment_growth_card(
         return await experiment_growth_card(session, experiment_session)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.post(
+    "/children/{child_id}/experiment-sessions/{experiment_session_id}/ai-parent-tip",
+    response_model=ExperimentAIParentTipResponse,
+)
+async def create_experiment_ai_parent_tip(
+    child_id: uuid.UUID,
+    experiment_session_id: uuid.UUID,
+    request: Request,
+    session: DbSession,
+    current_user: CurrentUser,
+    provider: ScienceAIProvider,
+) -> ExperimentAIParentTipResponse:
+    await get_authorized_child(session, current_user, child_id)
+    settings = request.app.state.settings
+    if not (
+        settings.ai_provider != "disabled"
+        and settings.ai_api_key.get_secret_value()
+        and settings.ai_model
+    ):
+        raise HTTPException(status_code=503, detail="AI 服务尚未配置")
+    experiment_session = await get_private_experiment_session(
+        session, child_id, experiment_session_id
+    )
+    if experiment_session is None:
+        raise HTTPException(status_code=404, detail="Experiment session not found")
+    if experiment_session.status != ExperimentSessionStatus.COMPLETED:
+        raise HTTPException(status_code=409, detail="请先完成实验")
+    response_model = await experiment_session_response(session, experiment_session)
+    try:
+        return await generate_science_parent_tip(provider, experiment_session, response_model)
+    except LearningAssistantError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @router.post(

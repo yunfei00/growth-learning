@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
+import { CharacterLink } from "@/components/character-link";
 import { ProtectedPage } from "@/components/protected-page";
 import {
   ApiClientError,
@@ -88,13 +89,14 @@ function CourseDetailContent() {
                   <p>{activity.instructions}</p>
                   <div className="activity-characters">
                     {activity.points.map((point) => (
-                      <span
+                      <CharacterLink
                         className={point.mastery_level === "stable" ? "stable" : ""}
                         key={point.knowledge_point_id}
-                        title={`${point.pinyin} · ${point.mastery_level}`}
+                        knowledgePointId={point.knowledge_point_id}
                       >
                         {point.character}
-                      </span>
+                        <small>{point.pinyin}</small>
+                      </CharacterLink>
                     ))}
                   </div>
                 </div>

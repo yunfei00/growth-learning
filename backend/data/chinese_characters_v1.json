@@ -21,7 +21,7 @@
     {"character":"足","pinyin":"zú","common_words":["足球","手足"],"simple_meaning":"脚，也表示足够。"},
     {"character":"目","pinyin":"mù","common_words":["目光","目录"],"simple_meaning":"眼睛，也表示条目。"},
     {"character":"耳","pinyin":"ěr","common_words":["耳朵","木耳"],"simple_meaning":"听声音的器官。"},
-    {"character":"日","pinyin":"rì","common_words":["日子","生日"],"simple_meaning":"太阳，也表示一天。"},
+    {"character":"日","pinyin":"rì","common_words":["日出","生日","日光"],"simple_meaning":"太阳；一天。","example_sentence":"太阳出来了。","parent_tip":"“日”最早的字形像太阳，可以指着太阳让孩子认识这个字。"},
     {"character":"月","pinyin":"yuè","common_words":["月亮","月份"],"simple_meaning":"月亮，也表示月份。"},
     {"character":"水","pinyin":"shuǐ","common_words":["水果","开水"],"simple_meaning":"常见的无色液体，是生命所需物质。"},
     {"character":"火","pinyin":"huǒ","common_words":["火车","火苗"],"simple_meaning":"物体燃烧时产生的光和热。"},

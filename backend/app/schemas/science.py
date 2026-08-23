@@ -336,6 +336,31 @@ class ExperimentEvidenceBatch(BaseModel):
     items: list[ExperimentEvidenceInput] = Field(min_length=1, max_length=20)
 
 
+class ExperimentEvidenceUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    original_text: str | None = Field(default=None, min_length=1, max_length=4000)
+    capability_tags: list[CapabilityTagValue] | None = Field(default=None, max_length=6)
+
+    @field_validator("original_text")
+    @classmethod
+    def clean_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+    @field_validator("capability_tags")
+    @classmethod
+    def unique_optional_tags(
+        cls, value: list[CapabilityTagValue] | None
+    ) -> list[CapabilityTagValue] | None:
+        return None if value is None else list(dict.fromkeys(value))
+
+    @model_validator(mode="after")
+    def require_change(self) -> "ExperimentEvidenceUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Provide at least one evidence field")
+        return self
+
+
 class ExperimentEvidenceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -424,3 +449,10 @@ class ExperimentGrowthCardResponse(BaseModel):
     follow_up_questions: list[str]
     related_characters: list[str]
     capability_tags: list[CapabilityTagValue]
+
+
+class ExperimentAIParentTipResponse(BaseModel):
+    parent_tip: str
+    provider: str
+    model: str
+    learning_records_modified: Literal[False] = False

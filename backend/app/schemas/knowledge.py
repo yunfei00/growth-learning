@@ -21,6 +21,7 @@ class CharacterCreate(BaseModel):
     difficulty_level: int | None = Field(default=None, ge=1, le=10)
     simple_meaning: str | None = None
     example_sentence: str | None = None
+    parent_tip: str | None = None
     common_words: list[str] = Field(default_factory=list, max_length=30)
     tags: list[str] = Field(default_factory=list, max_length=30)
     is_enabled: bool = True
@@ -35,7 +36,9 @@ class CharacterCreate(BaseModel):
             raise ValueError("Field cannot be blank")
         return value
 
-    @field_validator("radical", "simple_meaning", "example_sentence", "source_reference")
+    @field_validator(
+        "radical", "simple_meaning", "example_sentence", "parent_tip", "source_reference"
+    )
     @classmethod
     def strip_optional(cls, value: str | None) -> str | None:
         if value is None:
@@ -59,6 +62,7 @@ class CharacterUpdate(BaseModel):
     difficulty_level: int | None = Field(default=None, ge=1, le=10)
     simple_meaning: str | None = None
     example_sentence: str | None = None
+    parent_tip: str | None = None
     common_words: list[str] | None = Field(default=None, max_length=30)
     tags: list[str] | None = Field(default=None, max_length=30)
     is_enabled: bool | None = None
@@ -74,7 +78,7 @@ class CharacterUpdate(BaseModel):
             raise ValueError("Field cannot be blank")
         return value
 
-    @field_validator("radical", "simple_meaning", "example_sentence")
+    @field_validator("radical", "simple_meaning", "example_sentence", "parent_tip")
     @classmethod
     def strip_optional(cls, value: str | None) -> str | None:
         if value is None:
@@ -97,6 +101,7 @@ class CharacterResponse(BaseModel):
     difficulty_level: int | None
     simple_meaning: str | None
     example_sentence: str | None
+    parent_tip: str | None
     common_words: list[str]
     tags: list[str]
     is_enabled: bool

@@ -150,6 +150,11 @@ async def test_learning_and_assessment_create_raw_evidence_and_mastery(
     assert filtered.status_code == 200
     assert filtered.json()["total"] == 1
     assert filtered.json()["items"][0]["character"] == "人"
+    sorted_characters = await client.get(
+        f"/api/v1/children/{child['id']}/characters?sort_by=character&sort_order=desc&page_size=100"
+    )
+    assert sorted_characters.status_code == 200
+    assert {item["character"] for item in sorted_characters.json()["items"]} == {"人", "山"}
 
 
 async def test_mastery_recompute_is_deterministic_and_preserves_all_evidence(

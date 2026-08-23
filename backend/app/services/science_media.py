@@ -1,8 +1,10 @@
 """Validated private media persistence for one authorized experiment session."""
 
+import logging
 import uuid
+from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -20,6 +22,7 @@ ALLOWED_MEDIA: dict[str, tuple[str, str]] = {
     "audio/webm": (ExperimentMediaKind.AUDIO, ".webm"),
     "audio/ogg": (ExperimentMediaKind.AUDIO, ".ogg"),
 }
+logger = logging.getLogger(__name__)
 
 
 class ScienceMediaValidationError(ValueError):
@@ -117,6 +120,7 @@ async def persist_experiment_media(
         uploader_user_id=uploader_user_id,
     )
     session.add(asset)
+    experiment_session.updated_at = datetime.now(UTC)
     try:
         await session.commit()
     except Exception:
@@ -124,6 +128,68 @@ async def persist_experiment_media(
         await storage.remove(object_key)
         raise
     await session.refresh(asset)
+    return asset
+
+
+async def delete_experiment_media(
+    session: AsyncSession,
+    storage: PrivateObjectStorage,
+    *,
+    experiment_session: ExperimentSession,
+    asset: ExperimentMediaAsset,
+) -> None:
+    object_key = asset.object_key
+    await session.execute(delete(ExperimentMediaAsset).where(ExperimentMediaAsset.id == asset.id))
+    experiment_session.updated_at = datetime.now(UTC)
+    await session.commit()
+    try:
+        await storage.remove(object_key)
+    except Exception:
+        logger.exception(
+            "Failed to remove deleted experiment media object", extra={"object_key": object_key}
+        )
+
+
+async def replace_experiment_media(
+    session: AsyncSession,
+    storage: PrivateObjectStorage,
+    *,
+    settings: Settings,
+    experiment_session: ExperimentSession,
+    asset: ExperimentMediaAsset,
+    uploader_user_id: uuid.UUID,
+    filename: str | None,
+    mime_type: str | None,
+    content: bytes,
+) -> ExperimentMediaAsset:
+    kind, extension, original_filename = validate_media(
+        settings=settings, filename=filename, mime_type=mime_type, content=content
+    )
+    old_object_key = asset.object_key
+    new_object_key = f"science/{asset.family_id}/{experiment_session.id}/{uuid.uuid4()}{extension}"
+    await storage.put(new_object_key, content, mime_type or "application/octet-stream")
+    asset.object_key = new_object_key
+    asset.original_filename = original_filename
+    asset.media_kind = kind
+    asset.mime_type = mime_type or "application/octet-stream"
+    asset.size_bytes = len(content)
+    asset.uploader_user_id = uploader_user_id
+    asset.created_at = datetime.now(UTC)
+    experiment_session.updated_at = datetime.now(UTC)
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        await storage.remove(new_object_key)
+        raise
+    await session.refresh(asset)
+    try:
+        await storage.remove(old_object_key)
+    except Exception:
+        logger.exception(
+            "Failed to remove replaced experiment media object",
+            extra={"object_key": old_object_key},
+        )
     return asset
 
 

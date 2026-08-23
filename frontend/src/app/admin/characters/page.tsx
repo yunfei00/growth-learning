@@ -21,6 +21,7 @@ type FormState = {
   commonWords: string;
   simpleMeaning: string;
   exampleSentence: string;
+  parentTip: string;
   radical: string;
   strokeCount: string;
   tags: string;
@@ -33,6 +34,7 @@ const emptyForm: FormState = {
   commonWords: "",
   simpleMeaning: "",
   exampleSentence: "",
+  parentTip: "",
   radical: "",
   strokeCount: "",
   tags: "",
@@ -46,6 +48,7 @@ function toForm(character: ChineseCharacter): FormState {
     commonWords: character.common_words.join("、"),
     simpleMeaning: character.simple_meaning ?? "",
     exampleSentence: character.example_sentence ?? "",
+    parentTip: character.parent_tip ?? "",
     radical: character.radical ?? "",
     strokeCount: character.stroke_count?.toString() ?? "",
     tags: character.tags.join("、"),
@@ -71,6 +74,7 @@ function toPayload(form: FormState): CharacterInput {
     common_words: splitList(form.commonWords),
     simple_meaning: form.simpleMeaning.trim() || null,
     example_sentence: form.exampleSentence.trim() || null,
+    parent_tip: form.parentTip.trim() || null,
     radical: form.radical.trim() || null,
     stroke_count: form.strokeCount ? Number(form.strokeCount) : null,
     tags: splitList(form.tags),
@@ -405,6 +409,10 @@ export default function CharacterCatalogPage() {
               <label>
                 <span>示例句</span>
                 <textarea rows={2} value={form.exampleSentence} onChange={(event) => setForm({ ...form, exampleSentence: event.target.value })} />
+              </label>
+              <label>
+                <span>家长提示</span>
+                <textarea rows={3} value={form.parentTip} onChange={(event) => setForm({ ...form, parentTip: event.target.value })} />
               </label>
               <label>
                 <span>标签（用顿号或逗号分隔）</span>

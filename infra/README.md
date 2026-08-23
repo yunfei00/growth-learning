@@ -24,6 +24,6 @@ PUBLIC_API_BASE_URL=/growth/api
 API_ROOT_PATH=/growth/api
 ```
 
-The Phase 1 backend does not create a bucket at startup because application liveness must not mutate infrastructure. A later media-storage use case should add an idempotent bucket provisioning task with an explicit retention policy.
+The backend keeps experiment and growth media in the private MinIO `MINIO_BUCKET` named volume. The bucket is created idempotently on the first authorized upload, never as a health-check side effect. Object keys contain opaque family/session/asset IDs rather than child names. Browsers read objects only through household-authorized API endpoints; do not add a public Nginx `/media` or `/static` alias. The Nginx API location allows the configured 50 MiB video ceiling and disables request buffering for uploads.
 
 Named volumes preserve local service data across ordinary `docker compose down` calls. Running `docker compose down --volumes` intentionally and irreversibly removes the local PostgreSQL, Redis, and MinIO data.

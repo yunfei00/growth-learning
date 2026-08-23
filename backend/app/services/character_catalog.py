@@ -46,6 +46,7 @@ def to_response(point: KnowledgePoint, character: ChineseCharacter) -> Character
         difficulty_level=character.difficulty_level,
         simple_meaning=character.simple_meaning,
         example_sentence=character.example_sentence,
+        parent_tip=character.parent_tip,
         common_words=character.common_words,
         tags=character.tags,
         is_enabled=character.is_enabled,

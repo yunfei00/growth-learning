@@ -146,6 +146,9 @@ Companion 可陪孩子执行任务，但不能授权、撤销或入班。System 
 | `GET` | `/api/v1/children/{child_id}/assessment-history` | 每日复习、周度和月度测试历史及四类计数 |
 | `GET` | `/api/v1/children/{child_id}/literacy-estimate` | 最新字库范围估算或明确“数据不足” |
 | `GET` | `/api/v1/children/{child_id}/literacy-estimate/history` | 历次字库范围与抽样版本 |
+| `GET` | `/api/v1/children/{child_id}/characters?mastery_level=&sort_by=&sort_order=` | 五类掌握状态的具体汉字列表与基础排序 |
+| `GET` | `/api/v1/children/{child_id}/characters/{point_id}` | 汉字详情、人工学习提示和真实时间线 |
+| `POST` | `/api/v1/children/{child_id}/characters/{point_id}/ai-assistance` | 非权威儿童讲解、组词、例句和家长提示；不写 mastery/evidence |
 
 计划会话提交在一个数据库事务内追加 `AssessmentItem`、重算 `ChildKnowledgeState`、重算 `ChildReviewSchedule` 并更新 `DailyLearningPlan` 进度。若已有题目已经提交，重复请求返回 `409`；会话只有在所有固定目标都有原始证据后才能完成。
 
@@ -167,6 +170,19 @@ Companion 可陪孩子执行任务，但不能授权、撤销或入班。System 
 | `GET` | `/api/v1/children/{child_id}/reading-summary` | 近 7 天真实阅读/陪读/理解题与接触计数 |
 
 Provider 未配置时 context 返回 `provider_configured=false`，生成返回 `503 AI 服务尚未配置`；不会暴露缺失 key、Provider 原始错误或堆栈。故事响应的 coverage 均由应用分析器计算，不采信模型自报值。
+
+### Experiment archive maintenance
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET/PATCH` | `/api/v1/children/{child_id}/experiment-sessions/{session_id}` | 完成后仍可读；仅允许修改家长备注，禁止状态/步骤回退 |
+| `POST` | `.../experiment-sessions/{session_id}/evidence` | 进行中或完成后追加实验现象、回答与原话 |
+| `PATCH` | `.../experiment-sessions/{session_id}/evidence/{evidence_id}` | 修订误记的现象或孩子回答，并更新档案时间 |
+| `POST/PUT/DELETE` | `.../experiment-sessions/{session_id}/media[/media_id]` | 完成后添加、替换或删除私有媒体 |
+| `GET` | `.../experiment-sessions/{session_id}/media/{media_id}/content` | 每次重新验证家庭关系后读取私有对象 |
+| `POST` | `.../experiment-sessions/{session_id}/ai-parent-tip` | 完成后生成辅助家长讲解建议；不写学习记录 |
+
+实验档案维护保留 `created_at` 和 `completed_at`，只推进 `updated_at`；所有写操作都保持 `status=completed`。媒体不通过公共 `/static` 或 `/media` 暴露。
 
 ## 错误约定
 

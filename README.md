@@ -85,9 +85,9 @@ docker compose exec backend python -m app.cli.review --child-id CHILD_UUID
 
 识字学习与复习任务复用 `LearningRecord`，认字检测复用逐项 `AssessmentItem`，阅读任务复用 `ReadingSession`；不存在教师专属掌握度或排行榜。撤销后下一次教师请求立即拒绝，历史 evidence 和老师原文观察仍保留给家庭。完整权限与数据边界见 [家长授权的老师协作](docs/TEACHER_COLLABORATION.md)。
 
-## AI 故事运行时配置
+## AI 学习助手运行时配置
 
-AI 默认禁用。启用时只在服务器 `.env` 配置 OpenAI-compatible Provider，不把 key 写入 Git、CI、前端、数据库或 Issue：
+AI 默认禁用。启用时只在服务器 `.env` 配置 OpenAI-compatible Provider，不把 key 写入 Git、CI、前端、数据库或 Issue。故事生成、汉字儿童讲解和实验家长建议复用同一个 Provider：
 
 ```dotenv
 AI_PROVIDER=openai_compatible
@@ -200,4 +200,4 @@ gl-backup
 
 ## V1 范围与限制
 
-V1 的汉字目录/课程阶段为项目定义；AI 故事需要可选运行时 Provider；没有孩子独立账号、完整数学/英语课程、学校级 LMS、排行榜或开放聊天。Growth Book PDF 使用浏览器打印。详情见 [V1 已知限制](docs/KNOWN_LIMITATIONS.md)。后续工作进入 V2 backlog、普通 bug 或 `1.0.x` 维护版本，不创建 Phase 13。
+V1 的汉字目录/课程阶段为项目定义；AI 辅助内容需要可选运行时 Provider；没有孩子独立账号、完整数学/英语课程、学校级 LMS、排行榜或开放聊天。Growth Book PDF 使用浏览器打印。详情见 [V1 已知限制](docs/KNOWN_LIMITATIONS.md)。AI 不直接修改掌握度、测试成绩或学习证据。

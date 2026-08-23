@@ -166,16 +166,23 @@
   gap: 0.45rem;
 }
 
-.activity-characters span {
+.activity-characters a {
   background: #f5f7f5;
   border-radius: 0.55rem;
-  font-size: 1.25rem;
-  min-width: 2.4rem;
-  padding: 0.35rem;
+  color: var(--ink);
+  display: grid;
+  font-size: clamp(1.65rem, 3vw, 2.15rem);
+  min-width: 3.4rem;
+  padding: 0.45rem;
   text-align: center;
 }
 
-.activity-characters span.stable {
+.activity-characters a small {
+  color: var(--ink-soft);
+  font-size: 0.65rem;
+}
+
+.activity-characters a.stable {
   background: #e8f7ed;
   color: #17633a;
 }
@@ -1637,7 +1644,7 @@ main {
   gap: 12px;
 }
 
-.mastery-metric-grid article {
+.mastery-metric-grid > a {
   min-height: 154px;
   padding: 20px;
   border: 1px solid var(--line);
@@ -1645,7 +1652,11 @@ main {
   display: grid;
   align-content: space-between;
   background: rgba(255, 253, 248, 0.76);
+  color: var(--ink);
+  transition: border-color 150ms ease, transform 150ms ease;
 }
+
+.mastery-metric-grid > a:hover { border-color: var(--forest); transform: translateY(-2px); }
 
 .mastery-metric-grid span,
 .mastery-metric-grid small {
@@ -1733,7 +1744,15 @@ main {
   position: relative;
 }
 
-.new-character-grid article > strong {
+.new-character-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  color: var(--ink);
+}
+
+.new-character-link > strong {
   color: var(--forest-dark);
   font-family: "Noto Serif SC", SimSun, serif;
   font-size: clamp(3.8rem, 7vw, 5.4rem);
@@ -1757,6 +1776,33 @@ main {
   color: var(--ink-soft);
   line-height: 1.5;
 }
+.new-character-grid article.completed { background: #f4f5f1; }
+.new-character-link > span { margin-top: 12px; color: var(--forest); font-size: 0.75rem; font-weight: 800; }
+.completed-task-note { margin: 24px 0 0; padding: 16px; border-radius: 13px; color: var(--ink-soft); background: var(--mint); line-height: 1.65; }
+
+.completed-review-characters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.completed-review-characters a {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--surface);
+}
+
+.completed-review-characters strong { font-size: 2.5rem; }
+
+.completed-review-characters small { color: var(--ink-soft); }
+.today-task-grid article.task-completed { opacity: 0.76; background: #f2f4ef; }
+.today-task-grid article.task-completed button { opacity: 1; background: #527361; }
 
 .priority-badge {
   padding: 4px 8px;
@@ -1967,6 +2013,46 @@ main {
   color: #bed5ca;
 }
 
+/* Phase 13 character overview details and child-scale learning page */
+.character-status-page,
+.character-detail-page { padding-block: 42px 90px; }
+.character-status-page > a { color: var(--forest); font-weight: 800; }
+.character-status-page > header { margin-top: 24px; display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.character-status-page h1 { margin: 4px 0 8px; font-family: "Noto Serif SC", SimSun, serif; font-size: clamp(2.2rem, 6vw, 4rem); }
+.character-status-page header p { color: var(--ink-soft); }
+.character-status-page header label { display: grid; gap: 7px; color: var(--ink-soft); font-size: 0.78rem; font-weight: 750; }
+.character-status-page header select { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.character-status-grid { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 13px; }
+.character-status-card { min-height: 210px; padding: 18px; border: 1px solid var(--line); border-radius: 17px; display: grid; align-content: center; justify-items: center; gap: 9px; color: var(--ink); text-align: center; background: #fff; }
+.character-status-card:hover { border-color: var(--forest); transform: translateY(-2px); }
+.character-status-card > strong { color: var(--forest-dark); font-family: "Noto Serif SC", SimSun, serif; font-size: clamp(4.2rem, 8vw, 6.5rem); line-height: 1; }
+.character-status-card > span { color: var(--forest); font-weight: 750; }
+.character-status-card > small { color: var(--ink-soft); line-height: 1.5; }
+.character-status-card.level-unlearned { background: #f5f3ed; }
+.character-status-card.level-introduced { border-color: #e8d59e; background: #fff9e8; }
+.character-status-card.level-recognizing { border-color: #bdd7c4; background: #f1f8f2; }
+.character-status-card.level-proficient { border-color: #81ad91; background: #e8f4ec; }
+.character-status-card.level-stable { border-color: var(--forest); box-shadow: inset 0 6px var(--forest); }
+
+.character-back { min-height: 44px; padding: 0; border: 0; color: var(--forest); background: transparent; font: inherit; font-weight: 800; cursor: pointer; }
+.character-detail-page > header { margin: 24px 0; padding: clamp(24px, 6vw, 54px); border-radius: 28px; display: flex; align-items: flex-start; justify-content: space-between; color: #fff; background: linear-gradient(145deg, #184437, #2f6f56); }
+.character-detail-page > header > div { display: grid; justify-items: center; }
+.character-detail-page > header h1 { margin: 0; font-family: "Noto Serif SC", SimSun, serif; font-size: clamp(100px, 28vw, 220px); font-weight: 700; line-height: 0.95; }
+.character-detail-page > header > div > span { margin-bottom: 8px; font-size: clamp(1.2rem, 4vw, 1.8rem); letter-spacing: 0.08em; }
+.character-learning-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.character-learning-content article { min-height: 180px; padding: clamp(22px, 4vw, 34px); border: 1px solid var(--line); border-radius: 20px; background: #fff; }
+.character-learning-content h2 { margin: 9px 0 0; font-family: "Noto Serif SC", SimSun, serif; font-size: clamp(1.55rem, 4vw, 2.4rem); line-height: 1.55; }
+.character-word-list { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+.character-word-list strong { padding: 10px 14px; border-radius: 12px; color: var(--forest-dark); background: var(--mint); font-size: clamp(1.25rem, 3vw, 1.8rem); }
+.parent-learning-tip p:last-child { font-size: clamp(1.1rem, 3vw, 1.45rem); line-height: 1.8; }
+.character-detail-actions { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
+.character-practice,
+.ai-boundary-note { margin-top: 18px; padding: 18px 20px; border: 1px solid #e5d39b; border-radius: 15px; background: #fff8df; }
+.character-practice p { font-size: 1.15rem; line-height: 1.7; }
+.character-practice small,
+.ai-boundary-note { color: var(--ink-soft); line-height: 1.6; }
+.ai-boundary-note { border-color: rgba(37, 93, 74, 0.2); background: var(--mint); }
+
 @media (max-width: 920px) {
   .mastery-metric-grid,
   .new-character-grid {
@@ -2000,7 +2086,7 @@ main {
     grid-template-columns: 1fr;
   }
 
-  .mastery-metric-grid article {
+  .mastery-metric-grid > a {
     min-height: 110px;
   }
 
@@ -2019,6 +2105,10 @@ main {
   .mastery-detail li {
     grid-template-columns: 62px 1fr;
   }
+
+  .character-status-page > header { align-items: stretch; flex-direction: column; }
+  .character-learning-content { grid-template-columns: 1fr; }
+  .character-detail-page > header { align-items: center; flex-direction: column; }
 }
 
 /* Phase 9: deliberately limited teacher collaboration */
@@ -2749,11 +2839,30 @@ main {
 .evidence-list span,
 .evidence-list small { color: var(--ink-soft); font-size: 0.7rem; }
 .evidence-list p { margin: 7px 0; }
+.evidence-edit-row { margin: 10px 0; display: grid; grid-template-columns: 1fr auto auto; gap: 8px; }
+.evidence-edit-row textarea { min-height: 84px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; resize: vertical; }
+.evidence-edit-row button,
+.experiment-media-item button,
+.experiment-media-item label { min-height: 38px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--forest-dark); background: #fff; cursor: pointer; font: inherit; font-size: 0.75rem; font-weight: 750; }
 
 .experiment-media-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .experiment-media-grid img,
 .experiment-media-grid video { width: 100%; min-height: 170px; border-radius: 12px; object-fit: cover; background: #111; }
 .experiment-media-grid audio { width: 100%; }
+.experiment-media-item { padding: 10px; border: 1px solid var(--line); border-radius: 14px; display: grid; gap: 8px; background: #fff; }
+.experiment-media-item > small { overflow: hidden; color: var(--ink-soft); text-overflow: ellipsis; white-space: nowrap; }
+.experiment-media-item > div { display: flex; gap: 8px; }
+.experiment-media-item > div button { color: #8b3e36; }
+.experiment-archive-meta { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.experiment-archive-meta > div { padding: 16px; border: 1px solid var(--line); border-radius: 13px; display: grid; gap: 6px; background: #fff; }
+.experiment-archive-meta span { color: var(--ink-soft); font-size: 0.72rem; }
+.experiment-archive-meta strong { font-size: 0.86rem; }
+.archive-parent-note { max-width: 760px; margin-top: 24px; display: grid; gap: 10px; }
+.archive-parent-note .parent-note { display: grid; gap: 7px; }
+.archive-parent-note .button { justify-self: start; }
+.ai-assistance { margin: 20px 0; padding: 18px; border: 1px solid rgba(37, 93, 74, 0.2); border-radius: 14px; background: #fff; }
+.ai-assistance p { margin: 8px 0; line-height: 1.7; }
+.ai-assistance small { color: var(--ink-soft); }
 .science-session > .parent-note { max-width: 760px; margin-top: 24px; }
 .growth-card { background: rgba(220, 234, 223, 0.48); }
 .growth-evidence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2788,9 +2897,11 @@ main {
   .experiment-guidance,
   .growth-evidence-grid,
   .experiment-media-grid,
+  .experiment-archive-meta,
   .admin-science-filters { grid-template-columns: 1fr; }
   .experiment-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .evidence-form { grid-template-columns: 1fr; }
+  .evidence-edit-row { grid-template-columns: 1fr; }
   .experiment-history > a { align-items: flex-start; flex-direction: column; }
 }
 

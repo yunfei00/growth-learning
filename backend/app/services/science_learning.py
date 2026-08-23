@@ -35,6 +35,7 @@ from app.schemas.science import (
     ExperimentCompleteRequest,
     ExperimentEvidenceBatch,
     ExperimentEvidenceResponse,
+    ExperimentEvidenceUpdate,
     ExperimentGrowthCardResponse,
     ExperimentMediaResponse,
     ExperimentRecommendationResponse,
@@ -399,12 +400,13 @@ async def update_experiment_session(
     now: datetime | None = None,
 ) -> ExperimentSession:
     now = now or datetime.now(UTC)
-    if experiment_session.status in (
-        ExperimentSessionStatus.COMPLETED,
-        ExperimentSessionStatus.ABANDONED,
+    if experiment_session.status == ExperimentSessionStatus.ABANDONED:
+        raise ValueError("Abandoned experiment sessions are immutable")
+    if experiment_session.status == ExperimentSessionStatus.COMPLETED and (
+        payload.action is not None or payload.current_step is not None
     ):
-        raise ValueError("Completed or abandoned experiment sessions are immutable")
-    if payload.parent_note is not None:
+        raise ValueError("A completed experiment must remain completed")
+    if "parent_note" in payload.model_fields_set:
         if not can_manage_parent_note:
             raise PermissionError("Family administrator permission required for parent note")
         experiment_session.parent_note = payload.parent_note
@@ -430,8 +432,11 @@ async def append_experiment_evidence(
     actor_user_id: uuid.UUID,
     payload: ExperimentEvidenceBatch,
 ) -> list[ExperimentEvidence]:
-    if experiment_session.status != ExperimentSessionStatus.IN_PROGRESS:
-        raise ValueError("Experiment session is not in progress")
+    if experiment_session.status not in (
+        ExperimentSessionStatus.IN_PROGRESS,
+        ExperimentSessionStatus.COMPLETED,
+    ):
+        raise ValueError("Experiment session cannot accept evidence")
     added: list[ExperimentEvidence] = []
     for item in payload.items:
         if item.client_key:
@@ -455,10 +460,48 @@ async def append_experiment_evidence(
         )
         session.add(evidence)
         added.append(evidence)
+    experiment_session.updated_at = datetime.now(UTC)
     await session.commit()
     for item in added:
         await session.refresh(item)
     return added
+
+
+async def get_private_experiment_evidence(
+    session: AsyncSession,
+    *,
+    experiment_session_id: uuid.UUID,
+    evidence_id: uuid.UUID,
+) -> ExperimentEvidence | None:
+    return await session.scalar(
+        select(ExperimentEvidence).where(
+            ExperimentEvidence.id == evidence_id,
+            ExperimentEvidence.experiment_session_id == experiment_session_id,
+        )
+    )
+
+
+async def update_experiment_evidence(
+    session: AsyncSession,
+    *,
+    experiment_session: ExperimentSession,
+    evidence: ExperimentEvidence,
+    payload: ExperimentEvidenceUpdate,
+    now: datetime | None = None,
+) -> ExperimentEvidence:
+    if experiment_session.status not in (
+        ExperimentSessionStatus.IN_PROGRESS,
+        ExperimentSessionStatus.COMPLETED,
+    ):
+        raise ValueError("Experiment session evidence is immutable")
+    if payload.original_text is not None:
+        evidence.original_text = payload.original_text
+    if payload.capability_tags is not None:
+        evidence.capability_tags = list(payload.capability_tags)
+    experiment_session.updated_at = now or datetime.now(UTC)
+    await session.commit()
+    await session.refresh(evidence)
+    return evidence
 
 
 async def get_private_experiment_session(

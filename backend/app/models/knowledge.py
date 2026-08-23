@@ -71,6 +71,7 @@ class ChineseCharacter(TimestampMixin, Base):
     difficulty_level: Mapped[int | None] = mapped_column(Integer)
     simple_meaning: Mapped[str | None] = mapped_column(Text)
     example_sentence: Mapped[str | None] = mapped_column(Text)
+    parent_tip: Mapped[str | None] = mapped_column(Text)
     common_words: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     is_enabled: Mapped[bool] = mapped_column(default=True, server_default="true", nullable=False)

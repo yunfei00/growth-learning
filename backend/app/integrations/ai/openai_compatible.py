@@ -1,5 +1,6 @@
 """Generic adapter for OpenAI-compatible chat completion APIs."""
 
+import logging
 from typing import Any
 
 import httpx
@@ -45,7 +46,10 @@ class OpenAICompatibleProvider:
         try:
             if self._client is not None:
                 response = await self._client.post(
-                    f"{self._base_url}/chat/completions", headers=headers, json=payload
+                    f"{self._base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=self._timeout_seconds,
                 )
             else:
                 async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
@@ -56,7 +60,7 @@ class OpenAICompatibleProvider:
             data: dict[str, Any] = response.json()
             choice = data["choices"][0]
             usage = data.get("usage", {})
-            return AICompletionResponse(
+            result = AICompletionResponse(
                 text=choice["message"]["content"],
                 provider="openai_compatible",
                 model=data.get("model", self._model),
@@ -64,5 +68,19 @@ class OpenAICompatibleProvider:
                 input_tokens=usage.get("prompt_tokens"),
                 output_tokens=usage.get("completion_tokens"),
             )
+            logging.getLogger(__name__).info(
+                "AI completion succeeded",
+                extra={
+                    "provider": result.provider,
+                    "model": result.model,
+                    "finish_reason": result.finish_reason,
+                },
+            )
+            return result
         except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
+            logging.getLogger(__name__).warning(
+                "AI completion failed",
+                extra={"provider": "openai_compatible", "model": self._model},
+                exc_info=True,
+            )
             raise AIProviderError("The AI provider returned an invalid response") from exc
