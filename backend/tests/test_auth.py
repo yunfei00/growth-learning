@@ -71,6 +71,7 @@ async def test_login_me_logout_browser_session(client: httpx.AsyncClient) -> Non
     )
     assert login.status_code == 200
     assert login.json()["id"] == user["id"]
+    assert login.json()["last_login_at"] is not None
     cookie = login.headers["set-cookie"]
     assert "HttpOnly" in cookie
     assert "SameSite=lax" in cookie

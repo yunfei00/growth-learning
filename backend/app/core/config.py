@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
     auth_token_ttl_seconds: int = 60 * 60 * 24 * 7
     auth_token_issuer: str = "growth-learning"
+    registration_mode: Literal["closed", "invite_only", "approval", "open"] = "invite_only"
+    invitation_code_secret: SecretStr = SecretStr("")
+    auth_rate_limit_window_seconds: int = 15 * 60
+    auth_login_rate_limit: int = 10
+    auth_registration_rate_limit: int = 5
 
     database_url: str = "postgresql+asyncpg://localhost/growth_learning"
     redis_url: str = "redis://localhost:6379/0"
@@ -76,7 +81,26 @@ class Settings(BaseSettings):
             raise ValueError("SameSite=None requires a Secure authentication cookie")
         if "*" in self.cors_origin_list:
             raise ValueError("Wildcard CORS is not allowed with credentialed browser sessions")
+        invitation_secret = self.invitation_code_secret.get_secret_value()
+        if invitation_secret and len(invitation_secret) < 32:
+            raise ValueError("INVITATION_CODE_SECRET must contain at least 32 characters")
+        if self.auth_rate_limit_window_seconds < 1:
+            raise ValueError("AUTH_RATE_LIMIT_WINDOW_SECONDS must be positive")
+        if self.auth_login_rate_limit < 1 or self.auth_registration_rate_limit < 1:
+            raise ValueError("Authentication rate limits must be positive")
+        if self.app_environment == "production" and self.registration_mode not in {
+            "closed",
+            "invite_only",
+        }:
+            raise ValueError(
+                "Production REGISTRATION_MODE currently supports only closed or invite_only"
+            )
         return self
+
+    @property
+    def effective_invitation_code_secret(self) -> str:
+        """Use a dedicated invitation HMAC key when supplied, otherwise the auth secret."""
+        return self.invitation_code_secret.get_secret_value() or self.auth_secret.get_secret_value()
 
 
 @lru_cache

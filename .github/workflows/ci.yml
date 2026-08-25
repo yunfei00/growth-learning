@@ -112,6 +112,14 @@ jobs:
                       text("SELECT system_role FROM users WHERE email = :email"),
                       {"email": "migration-fixture@example.com"},
                   )
+                  legacy_status = await connection.execute(
+                      text(
+                          "SELECT account_status, registration_source, is_active, session_version "
+                          "FROM users WHERE email = :email"
+                      ),
+                      {"email": "migration-fixture@example.com"},
+                  )
+                  legacy_status = legacy_status.one()
               await engine.dispose()
               required = {
                   "users", "families", "family_members", "children", "alembic_version",
@@ -144,12 +152,15 @@ jobs:
                   "course_activity_progress",
                   "achievement_definitions", "child_achievements", "star_ledger",
                   "family_reward_settings", "family_reward_goals",
+                  "platform_invitations", "platform_audit_logs",
               }
               missing = required - tables
               if missing:
                   raise SystemExit(f"Missing migrated tables: {sorted(missing)}")
               if legacy_role != "user":
                   raise SystemExit(f"Existing user received unsafe role: {legacy_role!r}")
+              if tuple(legacy_status) != ("active", "legacy", True, 0):
+                  raise SystemExit(f"Existing user received unsafe account state: {legacy_status!r}")
               print(f"Verified tables: {sorted(required)}")
 
           asyncio.run(main())

@@ -13,6 +13,7 @@ def test_settings_normalize_cors_origins() -> None:
     settings = Settings(cors_origins="http://localhost:3000, https://app.example.com ")
 
     assert settings.ai_timeout_seconds == 60.0
+    assert settings.registration_mode == "invite_only"
     assert settings.cors_origin_list == [
         "http://localhost:3000",
         "https://app.example.com",
@@ -49,3 +50,11 @@ def test_cookie_and_cors_security_combinations_are_validated() -> None:
         Settings(app_environment="test", auth_cookie_samesite="none", auth_cookie_secure=False)
     with pytest.raises(ValueError, match="Wildcard CORS"):
         Settings(app_environment="test", cors_origins="*")
+    with pytest.raises(ValueError, match="INVITATION_CODE_SECRET"):
+        Settings(app_environment="test", invitation_code_secret="too-short")
+    with pytest.raises(ValueError, match="REGISTRATION_MODE"):
+        Settings(
+            app_environment="production",
+            auth_secret="a-production-auth-secret-with-more-than-32-characters",
+            registration_mode="open",
+        )

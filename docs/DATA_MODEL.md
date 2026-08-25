@@ -23,13 +23,24 @@
 | `email` | 规范化为小写；唯一约束和唯一索引 |
 | `display_name` | 用户显示名称 |
 | `password_hash` | Argon2 密码哈希；禁止 API 返回 |
-| `is_active` | 账户是否可登录 |
+| `is_active` | 兼容字段；数据库约束要求与 `account_status=active` 完全一致 |
+| `account_status` | 权威状态：`active`、`suspended`、`disabled` |
 | `system_role` | 平台角色：`user` 或 `admin`；注册默认 `user` |
+| `registration_source` | `legacy`、`platform_invitation` 或 `admin_created` |
+| `registered_via_invitation_id` | 可空平台邀请码关联；已有账号保持空值 |
+| `last_login_at` | 最近一次成功登录时间 |
+| `session_version` | JWT 会话撤销版本 |
 | `created_at` / `updated_at` | 审计时间戳 |
 
 密码、会话 token、密码哈希不得写入应用日志。数据库不保存明文密码。
 
 `system_role=admin` 是平台管理权限，与 `family_members.role=admin` 完全独立。系统管理员不因平台角色自动获得任何家庭或孩子的访问权。
+
+### `platform_invitations` / `platform_audit_logs`
+
+`platform_invitations` 保存 HMAC-SHA256 `code_hash`、不可逆提示、用途、创建人、过期时间、最大/已用次数、可选邮箱约束、撤销与最后使用时间；不保存完整邀请码。注册事务用行锁原子消费。
+
+`platform_audit_logs` 是追加式平台安全审计，保存 actor、可选 target、事件类型、时间和无 secret metadata。密码、邀请码明文、JWT 和基础设施 secret 禁止写入。
 
 ### `families`
 

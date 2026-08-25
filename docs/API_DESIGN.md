@@ -17,10 +17,13 @@
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| `POST` | `/api/v1/auth/register` | 注册账户 |
+| `POST` | `/api/v1/auth/register` | 按 `REGISTRATION_MODE` 校验并原子消费平台邀请码后注册 |
 | `POST` | `/api/v1/auth/login` | 登录并设置 HttpOnly Cookie |
 | `POST` | `/api/v1/auth/logout` | 清除同路径 Cookie |
 | `GET` | `/api/v1/auth/me` | 获取当前用户 |
+| `GET` | `/api/v1/auth/account` | 当前账号元数据 |
+| `POST` | `/api/v1/auth/change-password` | 校验当前密码、修改密码并撤销其他旧会话 |
+| `POST` | `/api/v1/auth/logout-all` | 增加 session version 并清除当前 Cookie |
 
 ### Families
 
@@ -74,6 +77,10 @@ Companion 可陪孩子执行任务，但不能授权、撤销或入班。System 
 | Method | Path | 说明 |
 | --- | --- | --- |
 | `GET` | `/api/v1/admin/overview` | 用户、家庭、孩子、汉字的真实 COUNT |
+| `GET` | `/api/v1/admin/users` | 搜索、状态筛选和分页账号元数据；只返回家庭数量 |
+| `PATCH` | `/api/v1/admin/users/{id}/status` | 暂停、恢复或长期禁用账号；旧 session 立即失效 |
+| `POST/GET` | `/api/v1/admin/invitations` | 创建一次显示明文的邀请码；分页列表只返回提示 |
+| `POST` | `/api/v1/admin/invitations/{id}/revoke` | 原子撤销未失效的邀请码 |
 | `GET` | `/api/v1/admin/characters` | 搜索、启用状态过滤、分页 |
 | `POST` | `/api/v1/admin/characters` | 新增规范汉字 |
 | `GET` | `/api/v1/admin/characters/{id}` | 管理员读取单字 |

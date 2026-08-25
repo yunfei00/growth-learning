@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-26 — Phase 14 platform access
+
+- Production registration is invite-only with hashed, expiring, revocable, usage-bounded and optional email-constrained platform invitations.
+- Added authoritative account lifecycle states, session-version revocation, last-login tracking, account password controls and logout-all-devices.
+- Added paginated system-admin user/invitation management, privacy-safe audit logs, Redis authentication rate limits and recovery CLI commands.
+- Existing users migrate additively to active legacy accounts without changing families, children or learning evidence.
+
 ## Unreleased - Phase 13
 
 - 统一全部汉字入口为同一单字学习页：明确来源返回、确定性上一个/下一个、语音控件，以及桌面首屏左右布局；系统路径按 current catalog 的全局顺序跨组连续导航 1200 字。

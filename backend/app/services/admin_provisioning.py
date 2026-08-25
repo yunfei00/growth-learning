@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
-from app.models import SystemRole, User
+from app.models import AccountStatus, RegistrationSource, SystemRole, User
+from app.services.platform_access import add_platform_audit
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,9 @@ async def create_admin(
         display_name=normalized_name,
         password_hash=hash_password(password),
         system_role=SystemRole.ADMIN,
+        account_status=AccountStatus.ACTIVE,
+        is_active=True,
+        registration_source=RegistrationSource.ADMIN_CREATED,
     )
     session.add(user)
     await session.commit()
@@ -68,6 +72,35 @@ async def set_admin_password(
     if user is None or user.system_role != SystemRole.ADMIN:
         raise LookupError("System administrator not found")
     user.password_hash = hash_password(password)
+    user.session_version += 1
+    add_platform_audit(
+        session,
+        event_type="admin_reset_password",
+        actor_user_id=None,
+        target_user_id=user.id,
+        metadata={"source": "server_cli"},
+    )
     await session.commit()
     await session.refresh(user)
     return ProvisionResult(user, "password_updated")
+
+
+async def reset_user_password(
+    session: AsyncSession, *, email: str, password: str
+) -> ProvisionResult:
+    """Server recovery path for any account; the password is read outside argv."""
+    user = await session.scalar(select(User).where(User.email == normalize_email(email)))
+    if user is None:
+        raise LookupError("User not found")
+    user.password_hash = hash_password(password)
+    user.session_version += 1
+    add_platform_audit(
+        session,
+        event_type="admin_reset_password",
+        actor_user_id=None,
+        target_user_id=user.id,
+        metadata={"source": "server_cli"},
+    )
+    await session.commit()
+    await session.refresh(user)
+    return ProvisionResult(user, "password_reset")

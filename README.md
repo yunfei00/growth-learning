@@ -5,7 +5,7 @@ Growth Learning `1.0.0` 是一个面向儿童长期学习与成长记录的家�
 ## 当前用户流程
 
 ```text
-注册 → 登录 → 创建家庭 → 添加孩子 → 今日识字/复习 → 适读故事 → 周末科学实验 → 长期成长证据
+平台邀请码 → 注册 → 登录 → 创建家庭 → 添加孩子 → 今日识字/复习 → 适读故事 → 周末科学实验 → 长期成长证据
                                                     ↘ 家长授权老师 → 老师任务/观察
 ```
 
@@ -69,6 +69,9 @@ docker compose exec backend python -m app.cli.admin promote-admin \
   --email existing@example.com
 docker compose exec backend python -m app.cli.admin set-password \
   --email admin@example.com
+docker compose exec backend gl-admin list-users
+docker compose exec backend gl-admin create-invitation \
+  --created-by-email admin@example.com --expires-days 7 --max-uses 1
 docker compose exec backend python -m app.cli.characters import-starter
 docker compose exec backend python -m app.cli.science import-starter
 docker compose exec backend python -m app.cli.mastery
@@ -77,7 +80,7 @@ docker compose exec backend python -m app.cli.review
 docker compose exec backend python -m app.cli.review --child-id CHILD_UUID
 ```
 
-`create-admin` 可重复执行且不会重复创建账户；已有普通账户必须显式执行 `promote-admin`。项目自有 Starter 数据位于 `backend/data/chinese_characters_v1.json` 和 `backend/data/science_experiments_v1.json`；科学数据是项目自编的家庭实验起始集，不复制商业课程，也不宣称官方标准。
+`create-admin` 可重复执行且不会重复创建账户；已有普通账户必须显式执行 `promote-admin`。生产注册默认 `REGISTRATION_MODE=invite_only`；邀请码、账号状态、会话撤销、审计和恢复 CLI 详见 [平台账号准入与安全](docs/PLATFORM_ACCESS.md)。项目自有 Starter 数据位于 `backend/data/chinese_characters_v1.json` 和 `backend/data/science_experiments_v1.json`；科学数据是项目自编的家庭实验起始集，不复制商业课程，也不宣称官方标准。
 
 ## 老师协作
 
@@ -103,6 +106,8 @@ CI 始终使用确定性 Fake Provider，不调用真实外部 AI。未配置时
 ## 服务器部署
 
 完整环境固定部署到 `/opt/apps/growth-learning`，由 Docker Compose 运行 PostgreSQL、Redis、MinIO、FastAPI 和 Next.js。数据库、Redis、MinIO 不映射公网端口，Web/API 仅绑定宿主机回环地址并由 Nginx 代理。
+
+生产 `.env` 必须保持 `REGISTRATION_MODE=invite_only`，并建议设置独立、至少 32 字符的 `INVITATION_CODE_SECRET`。登录/注册默认由 Redis 执行 15 分钟固定窗口限流。升级只影响新账号创建，已有账号迁移为 `active + legacy` 后继续登录。
 
 首次配置：
 
@@ -174,6 +179,7 @@ gl-backup
 - [家庭导出格式 V1](docs/EXPORT_FORMAT.md)
 - [生产备份与恢复演练](docs/BACKUP_RESTORE.md)
 - [V1 角色与隐私矩阵](docs/ROLE_PRIVACY_MATRIX.md)
+- [Phase 14 平台账号准入与安全](docs/PLATFORM_ACCESS.md)
 - [V1 发布清单](docs/RELEASE_CHECKLIST.md)
 - [V1 已知限制](docs/KNOWN_LIMITATIONS.md)
 - [1.0.0 变更日志](CHANGELOG.md)

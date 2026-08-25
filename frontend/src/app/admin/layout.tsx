@@ -14,6 +14,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </div>
           <nav aria-label="管理后台导航">
             <Link href="/admin">概览</Link>
+            <p>平台账号</p>
+            <Link href="/admin/users">用户</Link>
+            <Link href="/admin/invitations">邀请码</Link>
             <p>知识库</p>
             <Link href="/admin/characters">汉字</Link>
             <Link href="/admin/science">科学实验</Link>

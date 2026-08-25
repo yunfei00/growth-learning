@@ -56,6 +56,7 @@ async def test_app(
         app_environment="test",
         auth_secret="test-auth-secret-that-is-long-enough-for-hs256",
         auth_cookie_path="/",
+        registration_mode="open",
     )
     application = create_app(settings)
     application.dependency_overrides[get_db_session] = override_db_session

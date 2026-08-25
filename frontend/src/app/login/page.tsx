@@ -96,7 +96,7 @@ function LoginForm() {
         </form>
 
         <p className="auth-alternate">
-          还没有账号？<Link href="/register">创建账号</Link>
+          收到平台邀请码？<Link href="/register">使用邀请码注册</Link>
         </p>
       </div>
     </section>

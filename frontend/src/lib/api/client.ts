@@ -6,9 +6,72 @@ export type User = {
   email: string;
   display_name: string;
   is_active: boolean;
+  account_status: "active" | "suspended" | "disabled";
   system_role: "user" | "admin";
+  registration_source: "legacy" | "platform_invitation" | "admin_created";
+  last_login_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AccountMetadata = {
+  id: string;
+  email: string;
+  display_name: string;
+  account_status: "active" | "suspended" | "disabled";
+  created_at: string;
+  last_login_at: string | null;
+};
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  display_name: string;
+  account_status: "active" | "suspended" | "disabled";
+  system_role: "user" | "admin";
+  registration_source: "legacy" | "platform_invitation" | "admin_created";
+  registered_via_invitation_id: string | null;
+  created_at: string;
+  updated_at: string;
+  last_login_at: string | null;
+  family_count: number;
+};
+
+export type AdminUserPage = {
+  items: AdminUser[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type PlatformInvitation = {
+  id: string;
+  purpose: "create_account";
+  status: "active" | "used" | "expired" | "revoked" | "exhausted";
+  code_hint: string;
+  created_by_user_id: string;
+  created_by_display_name: string;
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+  max_uses: number;
+  used_count: number;
+  email_constraint: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+};
+
+export type CreatedPlatformInvitation = PlatformInvitation & {
+  invitation_code: string;
+};
+
+export type PlatformInvitationPage = {
+  items: PlatformInvitation[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
 };
 
 export type AdminOverview = {
@@ -902,6 +965,7 @@ export function getHealth(): Promise<HealthResponse> {
 }
 
 export function registerAccount(payload: {
+  invitation_code: string;
   display_name: string;
   email: string;
   password: string;
@@ -925,6 +989,25 @@ export function logoutAccount(): Promise<void> {
 
 export function getCurrentUser(): Promise<User> {
   return request<User>("/api/v1/auth/me");
+}
+
+export function getAccountMetadata(): Promise<AccountMetadata> {
+  return request<AccountMetadata>("/api/v1/auth/account");
+}
+
+export function changeAccountPassword(payload: {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}): Promise<User> {
+  return request<User>("/api/v1/auth/change-password", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function logoutAllDevices(): Promise<void> {
+  return request<void>("/api/v1/auth/logout-all", { method: "POST" });
 }
 
 export function listFamilies(): Promise<Family[]> {
@@ -959,6 +1042,56 @@ export function createChild(
 
 export function getAdminOverview(): Promise<AdminOverview> {
   return request<AdminOverview>("/api/v1/admin/overview");
+}
+
+export function listAdminUsers(filters: {
+  search?: string;
+  accountStatus?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<AdminUserPage> {
+  const query = new URLSearchParams();
+  if (filters.search) query.set("search", filters.search);
+  if (filters.accountStatus) query.set("account_status", filters.accountStatus);
+  query.set("page", String(filters.page ?? 1));
+  query.set("page_size", String(filters.pageSize ?? 20));
+  return request<AdminUserPage>(`/api/v1/admin/users?${query.toString()}`);
+}
+
+export function updateAdminUserStatus(
+  userId: string,
+  accountStatus: AdminUser["account_status"],
+): Promise<AdminUser> {
+  return request<AdminUser>(`/api/v1/admin/users/${userId}/status`, {
+    method: "PATCH",
+    body: jsonBody({ account_status: accountStatus }),
+  });
+}
+
+export function createPlatformInvitation(payload: {
+  expires_at: string;
+  max_uses: number;
+  email_constraint: string | null;
+}): Promise<CreatedPlatformInvitation> {
+  return request<CreatedPlatformInvitation>("/api/v1/admin/invitations", {
+    method: "POST",
+    body: jsonBody({ purpose: "create_account", ...payload }),
+  });
+}
+
+export function listPlatformInvitations(
+  page = 1,
+  pageSize = 20,
+): Promise<PlatformInvitationPage> {
+  return request<PlatformInvitationPage>(
+    `/api/v1/admin/invitations?page=${page}&page_size=${pageSize}`,
+  );
+}
+
+export function revokePlatformInvitation(id: string): Promise<PlatformInvitation> {
+  return request<PlatformInvitation>(`/api/v1/admin/invitations/${id}/revoke`, {
+    method: "POST",
+  });
 }
 
 export function listAdminCharacters(filters: {

@@ -24,6 +24,9 @@ dependencies = [
   "uvicorn[standard]==0.52.1",
 ]
 
+[project.scripts]
+gl-admin = "app.cli.admin:main"
+
 [project.optional-dependencies]
 dev = [
   "aiosqlite==0.22.1",

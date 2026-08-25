@@ -12,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.cli.admin import read_password
 from app.core.security import verify_password
 from app.models import KnowledgeRelation, SystemRole, User
-from app.services.admin_provisioning import create_admin, promote_admin, set_admin_password
+from app.services.admin_provisioning import (
+    create_admin,
+    promote_admin,
+    reset_user_password,
+    set_admin_password,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -103,6 +108,23 @@ async def test_existing_user_requires_explicit_promotion(
         promoted = await promote_admin(session, email="member@example.com")
         assert promoted.action == "promoted"
         assert promoted.user.id == uuid.UUID(user["id"])
+
+
+async def test_server_recovery_can_reset_normal_user_password(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user = await register_and_login(client, "recovery-member@example.com")
+    async with session_factory() as session:
+        result = await reset_user_password(
+            session,
+            email="recovery-member@example.com",
+            password="recovered-test-password",
+        )
+        assert result.action == "password_reset"
+        assert result.user.id == uuid.UUID(user["id"])
+        assert verify_password("recovered-test-password", result.user.password_hash)
+        assert result.user.session_version == 1
 
 
 async def test_admin_guard_denies_unauthenticated_normal_and_family_admin(

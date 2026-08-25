@@ -38,6 +38,7 @@ app/core          配置、日志、安全等横切能力
 
 - `identity`：用户身份与会话
 - `administration`：独立系统管理员 Guard、CLI 和真实系统计数
+- `platform access`：邀请制准入、账号生命周期、session version、认证限流与安全审计；不进入家庭私有域
 - `families`：家庭、成员、儿童档案、授权
 - `knowledge`：通用知识点、汉字目录和知识关系
 - `curriculum`：未来的学科、能力、课程和活动

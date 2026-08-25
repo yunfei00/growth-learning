@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 import { useActiveChild } from "@/components/active-child-provider";
 import { ProtectedPage } from "@/components/protected-page";
@@ -70,7 +71,7 @@ function FamilySettingsContent() {
 
   return (
     <section className="settings-page section-shell">
-      <header><p className="eyebrow">Family settings</p><h1>家庭设置</h1><p className="role-note">成长鼓励由家庭选择；它不改变学习证据或知识掌握状态。</p></header>
+      <header><p className="eyebrow">Family settings</p><h1>家庭设置</h1><p className="role-note">成长鼓励由家庭选择；它不改变学习证据或知识掌握状态。</p><Link className="button button-secondary" href="/settings/account">账号与安全</Link></header>
       {error ? <p className="form-message form-error" role="alert">{error}</p> : null}
       {message ? <p className="form-message form-success" role="status">{message}</p> : null}
       {!settings ? <div className="center-state compact"><span className="loading-spinner" /><p>正在读取设置…</p></div> : (

@@ -10,6 +10,7 @@ import { ApiClientError, registerAccount } from "@/lib/api/client";
 export default function RegisterPage() {
   const router = useRouter();
   const { status } = useAuth();
+  const [invitationCode, setInvitationCode] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,7 +35,12 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      await registerAccount({ display_name: displayName, email, password });
+      await registerAccount({
+        invitation_code: invitationCode,
+        display_name: displayName,
+        email,
+        password,
+      });
       router.push(`/login?registered=1&email=${encodeURIComponent(email)}`);
     } catch (requestError) {
       setError(
@@ -51,10 +57,24 @@ export default function RegisterPage() {
     <section className="auth-page section-shell">
       <div className="auth-card">
         <p className="eyebrow">成长学习</p>
-        <h1>创建账号</h1>
-        <p className="auth-intro">为家庭建立安全、独立的成长空间。</p>
+        <h1>创建 Growth Learning 账号</h1>
+        <p className="auth-intro">
+          Growth Learning 当前采用邀请制，请使用平台管理员提供的邀请码。
+        </p>
 
         <form className="form-stack" onSubmit={(event) => void handleSubmit(event)}>
+          <label>
+            <span>邀请码</span>
+            <input
+              autoCapitalize="characters"
+              autoComplete="one-time-code"
+              maxLength={128}
+              onChange={(event) => setInvitationCode(event.target.value)}
+              placeholder="GL-XXXXXXXXXXXX"
+              required
+              value={invitationCode}
+            />
+          </label>
           <label>
             <span>姓名</span>
             <input
@@ -110,7 +130,7 @@ export default function RegisterPage() {
           ) : null}
 
           <button className="button button-primary form-submit" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "正在创建…" : "注册"}
+            {isSubmitting ? "正在创建…" : "创建账号"}
           </button>
         </form>
 

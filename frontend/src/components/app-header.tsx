@@ -145,7 +145,7 @@ export function AppHeader() {
           ) : status === "unauthenticated" ? (
             <>
               <Link href="/login">登录</Link>
-              <Link className="nav-register" href="/register">创建账号</Link>
+              <Link className="nav-register" href="/register">使用邀请码注册</Link>
             </>
           ) : (
             <span className="header-user">正在加载…</span>

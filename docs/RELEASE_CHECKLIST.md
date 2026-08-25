@@ -15,6 +15,9 @@
 - 服务器 checkout、前后端 image revision、健康响应 revision 均等于 `RELEASE_SHA`。
 - `alembic current == alembic heads`，PostgreSQL、Redis、MinIO、backend、frontend healthy。
 - `/growth`、`/growth/status`、`/growth/api/health`、`/growth/api/docs` 正常。
+- `REGISTRATION_MODE=invite_only`；无/假/过期/撤销邀请码注册失败，有效邀请码只消费一次。
+- 已有用户和管理员登录成功；暂停账号的新登录和旧 Cookie 均拒绝，恢复后可重新登录。
+- `/admin/users` 与 `/admin/invitations` 可用，但 System Admin 读取家庭/孩子私有端点仍返回 `404`。
 - 家庭、识字/复习/周月测、课程、阅读、科学、老师、成长档案、Child Mode 和成就执行 scoped E2E。
 - Role/Privacy Matrix、cross-family IDOR、兄弟隔离、Teacher revocation、System Admin household privacy 通过。
 - V1 export 的 manifest、JSON/CSV/media、checksums/counts 与 secret exclusion 通过。

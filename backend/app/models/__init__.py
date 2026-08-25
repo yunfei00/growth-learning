@@ -41,7 +41,7 @@ from app.models.growth import (
     GrowthReportVersion,
     GrowthSourceType,
 )
-from app.models.identity import SystemRole, User
+from app.models.identity import AccountStatus, RegistrationSource, SystemRole, User
 from app.models.knowledge import (
     ChineseCharacter,
     KnowledgePoint,
@@ -60,6 +60,12 @@ from app.models.learning import (
     LearningSession,
     MasteryLevel,
     SessionStatus,
+)
+from app.models.platform import (
+    InvitationPurpose,
+    InvitationStoredStatus,
+    PlatformAuditLog,
+    PlatformInvitation,
 )
 from app.models.review import (
     AssessmentSessionPlan,
@@ -157,7 +163,13 @@ __all__ = [
     "FamilyRewardSettings",
     "StarLedger",
     "SystemRole",
+    "AccountStatus",
+    "RegistrationSource",
     "User",
+    "InvitationPurpose",
+    "InvitationStoredStatus",
+    "PlatformInvitation",
+    "PlatformAuditLog",
     "GrowthEvent",
     "GrowthEventCategory",
     "GrowthEventType",

@@ -11,6 +11,7 @@ from app.api.v1.experience import router as experience_router
 from app.api.v1.families import router as families_router
 from app.api.v1.growth import router as growth_router
 from app.api.v1.learning import router as learning_router
+from app.api.v1.platform_admin import router as platform_admin_router
 from app.api.v1.science import router as science_router
 from app.api.v1.science_admin import router as science_admin_router
 from app.api.v1.stories import router as stories_router
@@ -19,6 +20,7 @@ from app.schemas.system import ApiInfoResponse
 
 router = APIRouter(tags=["api"])
 router.include_router(auth_router)
+router.include_router(platform_admin_router)
 router.include_router(admin_router)
 router.include_router(characters_router)
 router.include_router(courses_router)
