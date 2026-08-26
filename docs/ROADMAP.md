@@ -175,6 +175,21 @@ Growth Learning V1 的 Phase 1–12 已收敛到 `1.0.0`。每阶段都以迁移
 
 退出条件：邀请制注册、已有账号兼容、账号暂停/恢复、会话失效、账号安全、管理员 UI/CLI、迁移、权限测试与生产烟测全部通过。
 
+## Phase 15：家庭、多孩子与父母协作
+
+- 使用安全内部 CLI 精确清理一户已确认测试家庭，保留成人账号；完整 FK 扫描、dry-run、备份引用、事务和保守 MinIO 清理
+- FamilyInvitation 与 PlatformInvitation 分离，支持已有账号接受邮箱绑定、可过期、可撤销、单次家庭邀请
+- FamilyMember 权限和 AdultChildRelation 家庭身份分离；保护最后一个 admin，移除成员不改写历史 actor
+- 一个家庭支持多个成人与多个 Child；孩子资料可编辑、归档和恢复，不提供正式物理删除
+- active family 显式持久化，每个家庭分别记住 active child；切换后重新加载，后端继续强制跨家庭边界
+- 今日任务、识字、阅读、科学和成长证据由成人共享，家庭动态直接投影 canonical evidence
+
+退出条件：迁移、角色/跨家庭/邀请/共享 evidence 测试和前端 lint/build/CI 全绿；生产备份后精确清理并完成两个已有账号加入同一 Family/Child 的安全验收。
+
+### Phase 15.1：可选家长模式 PIN
+
+家庭级 4～6 位数字 PIN 用于防止孩子误从 Child Mode 返回 Parent Mode；只保存哈希，可关闭，且必须明确它不等同于账号密码。本项独立 Issue 跟踪，不阻塞 Phase 15 家庭协作数据边界。
+
 ## V2 Backlog
 
 - 更完整的可访问性、性能预算、外部安全评估与可观测性

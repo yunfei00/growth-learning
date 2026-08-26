@@ -4,10 +4,13 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 FamilyRoleValue = Literal["admin", "companion"]
 GenderValue = Literal["male", "female", "other"]
+AdultChildRelationValue = Literal[
+    "father", "mother", "grandfather", "grandmother", "guardian", "other"
+]
 
 
 def _strip_required_name(value: str) -> str:
@@ -45,12 +48,89 @@ class MemberUserResponse(BaseModel):
     display_name: str
 
 
+class AdultChildRelationResponse(BaseModel):
+    id: uuid.UUID
+    child_id: uuid.UUID
+    relation: AdultChildRelationValue
+    created_at: datetime
+    updated_at: datetime
+
+
 class FamilyMemberResponse(BaseModel):
     id: uuid.UUID
     role: FamilyRoleValue
     user: MemberUserResponse
+    relations: list[AdultChildRelationResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+
+
+class FamilyMemberRoleUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: FamilyRoleValue
+
+
+class AdultChildRelationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    relation: AdultChildRelationValue
+
+
+class FamilyInvitationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email_constraint: EmailStr | None = None
+    role_to_grant: FamilyRoleValue = "companion"
+    expires_at: datetime
+
+
+class FamilyInvitationResponse(BaseModel):
+    id: uuid.UUID
+    family_id: uuid.UUID
+    family_name: str
+    code_hint: str
+    status: Literal["active", "expired", "revoked", "used"]
+    role_to_grant: FamilyRoleValue
+    email_constraint: str | None
+    created_by_user_id: uuid.UUID
+    created_by_display_name: str
+    expires_at: datetime
+    used_count: int
+    revoked_at: datetime | None
+    accepted_by_user_id: uuid.UUID | None
+    accepted_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class FamilyInvitationCreatedResponse(FamilyInvitationResponse):
+    invitation_code: str
+
+
+class FamilyInvitationAcceptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    invitation_code: str = Field(min_length=8, max_length=80)
+
+
+class FamilyInvitationAcceptResponse(BaseModel):
+    family_id: uuid.UUID
+    family_name: str
+    membership_id: uuid.UUID
+    role: FamilyRoleValue
+    already_member: bool
+
+
+class FamilyActivityResponse(BaseModel):
+    id: uuid.UUID
+    kind: Literal["learning", "reading", "science", "growth"]
+    child_id: uuid.UUID
+    child_name: str
+    actor_user_id: uuid.UUID | None
+    actor_display_name: str | None
+    title: str
+    occurred_at: datetime
 
 
 class ChildCreate(BaseModel):
@@ -127,5 +207,7 @@ class ChildResponse(BaseModel):
     birth_date: date
     gender: GenderValue | None
     avatar_key: str | None
+    is_archived: bool
+    archived_at: datetime | None
     created_at: datetime
     updated_at: datetime

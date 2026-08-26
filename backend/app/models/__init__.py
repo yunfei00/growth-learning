@@ -25,7 +25,15 @@ from app.models.experience import (
     FamilyRewardSettings,
     StarLedger,
 )
-from app.models.family import Child, Family, FamilyMember, FamilyRole
+from app.models.family import (
+    AdultChildRelation,
+    AdultChildRelationType,
+    Child,
+    Family,
+    FamilyInvitation,
+    FamilyMember,
+    FamilyRole,
+)
 from app.models.growth import (
     ExportJob,
     ExportJobStatus,
@@ -155,8 +163,11 @@ __all__ = [
     "LearningActivity",
     "Child",
     "Family",
+    "FamilyInvitation",
     "FamilyMember",
     "FamilyRole",
+    "AdultChildRelation",
+    "AdultChildRelationType",
     "AchievementDefinition",
     "ChildAchievement",
     "FamilyRewardGoal",

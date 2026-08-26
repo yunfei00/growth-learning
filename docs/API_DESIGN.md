@@ -34,17 +34,27 @@
 | `GET` | `/api/v1/families/{family_id}` | 家庭成员 |
 | `PATCH` | `/api/v1/families/{family_id}` | `admin` |
 | `GET` | `/api/v1/families/{family_id}/members` | 家庭成员 |
+| `PATCH/DELETE` | `/api/v1/families/{family_id}/members/{member_id}` | `admin`；修改权限或移除，保护最后一个 admin |
+| `PUT` | `/api/v1/families/{family_id}/members/{member_id}/relations/{child_id}` | `admin`；设置逐孩子家庭关系 |
+| `POST/GET` | `/api/v1/families/{family_id}/invitations` | `admin`；创建/列出单次家庭邀请 |
+| `POST` | `/api/v1/families/{family_id}/invitations/{invitation_id}/revoke` | `admin` |
+| `GET` | `/api/v1/family-invitations/pending` | 当前用户邮箱绑定且仍有效的邀请 |
+| `POST` | `/api/v1/family-invitations/accept` | 已登录用户用家庭邀请码加入 |
+| `POST` | `/api/v1/family-invitations/{invitation_id}/accept` | 已登录用户接受绑定自己邮箱的邀请 |
+| `GET` | `/api/v1/families/{family_id}/activity` | 家庭成员；从正式 evidence 实时投影最近动态 |
 
 ### Children
 
 | Method | Path | 权限 |
 | --- | --- | --- |
 | `POST` | `/api/v1/families/{family_id}/children` | `admin` |
-| `GET` | `/api/v1/families/{family_id}/children` | 家庭成员 |
+| `GET` | `/api/v1/families/{family_id}/children` | 家庭成员；默认排除归档，可用 `include_archived=true` |
 | `GET` | `/api/v1/children/{child_id}` | 所属家庭成员 |
 | `PATCH` | `/api/v1/children/{child_id}` | 所属家庭 `admin` |
+| `POST` | `/api/v1/children/{child_id}/archive` | 所属家庭 `admin`；保留全部历史 |
+| `POST` | `/api/v1/children/{child_id}/restore` | 所属家庭 `admin` |
 
-当前不提供家庭成员邮件邀请或孩子删除。
+Family Invitation 与 Platform Invitation 是两个安全边界，不能互换。当前不提供家庭或孩子的公开物理删除 API。
 
 ### Parent-authorized teacher collaboration
 

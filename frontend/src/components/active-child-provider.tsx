@@ -18,17 +18,26 @@ import {
   listChildren,
   listFamilies,
 } from "@/lib/api/client";
+import {
+  ACTIVE_FAMILY_KEY,
+  activeChildKey,
+  loadFamilyChildren,
+  selectRemembered,
+} from "@/lib/household-selection";
 
-const ACTIVE_CHILD_KEY = "growth-learning:active-child-id";
+const LEGACY_ACTIVE_CHILD_KEY = "growth-learning:active-child-id";
 
 type HouseholdStatus = "idle" | "loading" | "ready" | "error";
 
 type ActiveChildContextValue = {
   status: HouseholdStatus;
+  families: Family[];
+  activeFamily: Family | null;
   family: Family | null;
   children: Child[];
   activeChild: Child | null;
   error: string;
+  setActiveFamilyId: (familyId: string) => void;
   setActiveChildId: (childId: string) => void;
   refresh: () => Promise<void>;
 };
@@ -38,6 +47,7 @@ const ActiveChildContext = createContext<ActiveChildContextValue | null>(null);
 export function ActiveChildProvider({ children: content }: { children: ReactNode }) {
   const { status: authStatus } = useAuth();
   const [status, setStatus] = useState<HouseholdStatus>("idle");
+  const [families, setFamilies] = useState<Family[]>([]);
   const [family, setFamily] = useState<Family | null>(null);
   const [children, setChildren] = useState<Child[]>([]);
   const [activeChildId, setActiveChildIdState] = useState("");
@@ -49,6 +59,7 @@ export function ActiveChildProvider({ children: content }: { children: ReactNode
     setError("");
     try {
       const families = await listFamilies();
+      setFamilies(families);
       if (families.length === 0) {
         setFamily(null);
         setChildren([]);
@@ -56,13 +67,20 @@ export function ActiveChildProvider({ children: content }: { children: ReactNode
         setStatus("ready");
         return;
       }
-      const currentFamily = families[0];
-      const householdChildren = await listChildren(currentFamily.id);
-      const saved = window.localStorage.getItem(ACTIVE_CHILD_KEY);
-      const selected = householdChildren.some((child) => child.id === saved)
-        ? saved!
-        : (householdChildren[0]?.id ?? "");
-      if (selected) window.localStorage.setItem(ACTIVE_CHILD_KEY, selected);
+      const currentFamily = selectRemembered(
+        families,
+        window.localStorage.getItem(ACTIVE_FAMILY_KEY),
+      );
+      if (!currentFamily) throw new Error("No selectable family");
+      window.localStorage.setItem(ACTIVE_FAMILY_KEY, currentFamily.id);
+      const familyChildKey = activeChildKey(currentFamily.id);
+      const saved =
+        window.localStorage.getItem(familyChildKey) ??
+        window.localStorage.getItem(LEGACY_ACTIVE_CHILD_KEY);
+      const loaded = await loadFamilyChildren(currentFamily.id, saved, listChildren);
+      const householdChildren = loaded.children;
+      const selected = loaded.activeChild?.id ?? "";
+      if (selected) window.localStorage.setItem(familyChildKey, selected);
       setFamily(currentFamily);
       setChildren(householdChildren);
       setActiveChildIdState(selected);
@@ -83,6 +101,7 @@ export function ActiveChildProvider({ children: content }: { children: ReactNode
         void refresh();
       } else if (authStatus === "unauthenticated") {
         setStatus("idle");
+        setFamilies([]);
         setFamily(null);
         setChildren([]);
         setActiveChildIdState("");
@@ -98,21 +117,76 @@ export function ActiveChildProvider({ children: content }: { children: ReactNode
       window.removeEventListener("growth-learning:household-changed", handleHouseholdChanged);
   }, [refresh]);
 
+  const setActiveFamilyId = useCallback(
+    (familyId: string) => {
+      const selectedFamily = families.find((item) => item.id === familyId);
+      if (!selectedFamily || selectedFamily.id === family?.id) return;
+      window.localStorage.setItem(ACTIVE_FAMILY_KEY, selectedFamily.id);
+      setStatus("loading");
+      setError("");
+      void loadFamilyChildren(
+        selectedFamily.id,
+        window.localStorage.getItem(activeChildKey(selectedFamily.id)),
+        listChildren,
+      )
+        .then(({ children: householdChildren, activeChild: selected }) => {
+          if (selected) {
+            window.localStorage.setItem(activeChildKey(selectedFamily.id), selected.id);
+          }
+          setFamily(selectedFamily);
+          setChildren(householdChildren);
+          setActiveChildIdState(selected?.id ?? "");
+          setStatus("ready");
+        })
+        .catch((requestError: unknown) => {
+          setError(
+            requestError instanceof ApiClientError
+              ? requestError.message
+              : "暂时无法切换家庭",
+          );
+          setStatus("error");
+        });
+    },
+    [families, family?.id],
+  );
+
   const setActiveChildId = useCallback(
     (childId: string) => {
       if (!children.some((child) => child.id === childId)) return;
-      window.localStorage.setItem(ACTIVE_CHILD_KEY, childId);
+      if (!family) return;
+      window.localStorage.setItem(activeChildKey(family.id), childId);
       setActiveChildIdState(childId);
     },
-    [children],
+    [children, family],
   );
   const activeChild = useMemo(
     () => children.find((child) => child.id === activeChildId) ?? null,
     [activeChildId, children],
   );
   const value = useMemo(
-    () => ({ status, family, children, activeChild, error, setActiveChildId, refresh }),
-    [status, family, children, activeChild, error, setActiveChildId, refresh],
+    () => ({
+      status,
+      families,
+      activeFamily: family,
+      family,
+      children,
+      activeChild,
+      error,
+      setActiveFamilyId,
+      setActiveChildId,
+      refresh,
+    }),
+    [
+      status,
+      families,
+      family,
+      children,
+      activeChild,
+      error,
+      setActiveFamilyId,
+      setActiveChildId,
+      refresh,
+    ],
   );
 
   return <ActiveChildContext.Provider value={value}>{content}</ActiveChildContext.Provider>;

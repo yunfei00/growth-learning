@@ -19,7 +19,10 @@
 - System Admin 只管理系统内容，不获得家庭、孩子、故事、实验、成长档案或导出读取权；若该账号同时是家庭成员，家庭权限仅来自对应 membership。
 - System Admin 可知道某用户属于几个家庭，但用户管理 DTO 不返回家庭名称、孩子、学习、故事、媒体或成长内容。
 - Companion 可以陪伴产生原始学习、阅读和科学证据，但不能修改家庭关键设置、授权老师、管理家庭课程路径或导出全家数据。
+- Family Admin 可以邀请/移除成人、修改 `admin/companion` 权限、维护逐孩子关系及新增/编辑/归档孩子；系统拒绝移除或降级最后一个 admin。
+- 成人的爸爸/妈妈/监护人关系只用于家庭展示，绝不推导权限。两个家长可以同时是 admin；同一成人对兄弟姐妹可以有不同关系。
+- 被移除的成人下一次家庭/孩子请求立即失效；其已有 User 与历史 evidence actor 原样保留。
 - 课程完成、故事阅读和科学 exposure 都不能直接写“认识/正确”；`ChildKnowledgeState` 只由统一 evidence 算法推导。
 - 跨家庭/跨孩子/跨老师对象使用后端归属查询拒绝，通常以 `404` 隐藏资源存在性。
 
-这些边界由 `test_families.py`、`test_character_learning.py`、`test_story_generation_and_reading.py`、`test_science_lab.py`、`test_growth_archive.py`、`test_teacher_collaboration.py`、`test_courses_and_catalog.py` 与 `test_child_experience.py` 共同覆盖。
+这些边界由 `test_families.py`、`test_family_collaboration.py`、`test_household_cleanup.py`、`test_character_learning.py`、`test_story_generation_and_reading.py`、`test_science_lab.py`、`test_growth_archive.py`、`test_teacher_collaboration.py`、`test_courses_and_catalog.py` 与 `test_child_experience.py` 共同覆盖。

@@ -64,7 +64,7 @@ export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { status, user, logout } = useAuth();
-  const { activeChild } = useActiveChild();
+  const { activeChild, families, family, setActiveFamilyId } = useActiveChild();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [childMode, setChildMode] = useState(false);
 
@@ -158,6 +158,20 @@ export function AppHeader() {
         <nav aria-label="账户和扩展导航" className="parent-account-nav">
           {status === "authenticated" ? (
             <>
+              {families.length > 1 ? (
+                <label className="header-family-switcher">
+                  <span>当前家庭</span>
+                  <select
+                    aria-label="切换当前家庭"
+                    onChange={(event) => setActiveFamilyId(event.target.value)}
+                    value={family?.id ?? ""}
+                  >
+                    {families.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <Link href="/courses">课程</Link>
               <Link href="/teacher-collaboration">老师</Link>
               <Link href="/settings">设置</Link>

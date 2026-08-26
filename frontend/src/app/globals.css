@@ -1578,6 +1578,217 @@ main {
   }
 }
 
+/* Phase 15: family collaboration keeps permissions, relations and evidence legible. */
+.header-family-switcher {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.header-family-switcher span {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
+.header-family-switcher select,
+.family-page-switcher select {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+}
+
+.settings-header-actions,
+.family-management-header,
+.family-page-switcher,
+.inline-family-form,
+.family-child-list article > div:last-child {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.onboarding-invitations,
+.one-time-invitation {
+  background: #f2faf5;
+  border: 1px solid #b9ddc5;
+  border-radius: 16px;
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 1rem;
+  padding: 1rem;
+}
+
+.onboarding-invitations article,
+.invitation-list article,
+.family-child-list article {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.onboarding-invitations article div,
+.invitation-list article div,
+.family-child-list article > div:first-child,
+.member-identity {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.onboarding-invitations small,
+.invitation-list small,
+.family-child-list small,
+.family-activity-list small,
+.member-identity small {
+  color: var(--ink-soft);
+}
+
+.onboarding-divider {
+  border-top: 1px solid var(--line);
+  margin: 1.4rem 0 1rem;
+  text-align: center;
+}
+
+.onboarding-divider span {
+  background: var(--surface);
+  color: var(--ink-soft);
+  padding: 0 0.75rem;
+  position: relative;
+  top: -0.75rem;
+}
+
+.family-management-page {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.family-management-header {
+  justify-content: space-between;
+}
+
+.family-page-switcher {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.8rem 1rem;
+  width: fit-content;
+}
+
+.family-management-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: 0 12px 30px rgb(61 78 65 / 6%);
+  display: grid;
+  gap: 1.1rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.family-management-card h2,
+.family-management-card h3,
+.onboarding-invitations h2 {
+  margin: 0;
+}
+
+.family-management-card p {
+  margin-bottom: 0;
+}
+
+.inline-family-form label,
+.family-invite-form label,
+.family-child-form label,
+.family-member-list label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.family-invite-form,
+.family-child-form {
+  align-items: end;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.family-child-form h3 {
+  grid-column: 1 / -1;
+}
+
+.family-member-list,
+.family-child-list,
+.invitation-list,
+.family-activity-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.family-member-list > article {
+  align-items: end;
+  background: #f8faf8;
+  border-radius: 16px;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(160px, 1.5fr) repeat(3, minmax(130px, 1fr)) auto;
+  padding: 1rem;
+}
+
+.family-child-list article,
+.invitation-list article {
+  border-bottom: 1px solid var(--line);
+  padding: 0.75rem 0;
+}
+
+.family-child-list article.archived {
+  opacity: 0.65;
+}
+
+.one-time-invitation code {
+  font-size: clamp(1rem, 3vw, 1.35rem);
+  overflow-wrap: anywhere;
+}
+
+.family-activity-list article {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.family-activity-list article > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.button-danger {
+  color: #a11b1b;
+}
+
+@media (max-width: 900px) {
+  .family-invite-form,
+  .family-child-form,
+  .family-member-list > article {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .header-family-switcher span { display: none; }
+  .header-family-switcher select { max-width: 105px; }
+  .family-management-header { align-items: flex-start; }
+  .family-invite-form,
+  .family-child-form,
+  .family-member-list > article {
+    grid-template-columns: 1fr;
+  }
+  .onboarding-invitations article,
+  .invitation-list article,
+  .family-child-list article {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .card-link {
   display: inline-block;
   margin-top: 13px;

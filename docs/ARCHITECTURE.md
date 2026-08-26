@@ -40,6 +40,7 @@ app/core          配置、日志、安全等横切能力
 - `administration`：独立系统管理员 Guard、CLI 和真实系统计数
 - `platform access`：邀请制准入、账号生命周期、session version、认证限流与安全审计；不进入家庭私有域
 - `families`：家庭、成员、儿童档案、授权
+- `family collaboration`：已有账号家庭邀请、成员权限、逐孩子关系、多家庭/多孩子选择和真实 evidence 动态投影
 - `knowledge`：通用知识点、汉字目录和知识关系
 - `curriculum`：未来的学科、能力、课程和活动
 - `learning`：学习/复习/测评原始事件与掌握状态计算
@@ -74,6 +75,8 @@ LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
 
 - 每个请求先确认当前用户，再以 `family_id` 建立租户边界。
 - FamilyMember 表达用户在家庭中的角色；Child 是受保护的档案实体。
+- FamilyInvitation 是加入指定家庭的单次能力，与 PlatformInvitation 的平台注册准入严格分离。
+- AdultChildRelation 只表达成人与单个孩子的称谓，不参与授权；同一家庭可以有多个 admin。
 - TeacherChildRelation 是显式授权，不从“老师角色”推导对所有孩子的访问权。
 - 授权校验同时考虑角色、资源归属、scope、action、生效/过期时间和撤销状态。
 - 服务层是强制授权边界；前端隐藏按钮只改善体验，不构成安全控制。
@@ -83,11 +86,24 @@ LearningRecord / AssessmentItem / ReviewRecord (append-only evidence)
 - 教师任务复用 `LearningRecord`、`AssessmentItem` 与 `ReadingSession`，不建立第二套学习事实；教师观察单向投影到家长时间线。
 - 教师端响应使用专用最小 DTO，排除家庭成员、兄弟姐妹、私人媒体、完整时间线、故事书、报告、成长册和导出。
 
-## 5.1 系统知识与孩子状态分离
+### 5.1 Family Collaboration V1
+
+```text
+existing User --accept hashed FamilyInvitation--> FamilyMember(role)
+                                                       │
+                                                       ├── Family A / Child A1, A2
+                                                       └── AdultChildRelation per Child
+```
+
+后端授权仍以实时 membership 与资源所属 Family 为准，不信任前端 active family。前端持久化 `active-family-id`，并使用 `active-child:<family-id>` 分别记住每个家庭的当前孩子；切换家庭必定重新加载其孩子。今日任务、学习、阅读、科学和成长继续引用同一个 canonical Child，因此不同成人看到同一状态，同时每条 evidence 保留实际 `actor_user_id`。
+
+家庭最近动态不建第二套事实表，而是从已完成的 `LearningSession`、`ReadingSession`、`ExperimentSession` 和非系统 `GrowthEvent` 投影。
+
+## 5.2 系统知识与孩子状态分离
 
 `KnowledgePoint` 是跨学科规范主表，`ChineseCharacter` 是一对一的汉字属性，`KnowledgeRelation` 表达知识间关系。它们属于系统目录，不引用 Child。孩子掌握情况由 `LearningRecord`、`AssessmentItem` 和 `ChildKnowledgeState` 通过 `child_id + knowledge_point_id` 建立上下文，不污染共享知识。
 
-## 5.2 Mastery V1 计算边界
+## 5.3 Mastery V1 计算边界
 
 Mastery V1 是纯确定性服务，不调用 LLM。API 写入一批学习或测评证据后，只重算受影响的知识点；运维 CLI 可从全部历史重建所有投影。`ChildKnowledgeState` 不是事实来源，即使投影损坏或算法升级，原始记录仍可恢复它。稳定掌握要求多次独立正确且跨越足够时间，规则详见 [Mastery V1](MASTERY_ALGORITHM.md)。
 

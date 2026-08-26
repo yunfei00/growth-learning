@@ -1,6 +1,7 @@
 """Authorized child profile endpoints."""
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
@@ -32,4 +33,32 @@ async def update_child(
         setattr(child, field, value)
     await session.commit()
     await session.refresh(child)
+    return child
+
+
+@router.post("/{child_id}/archive", response_model=ChildResponse)
+async def archive_child(
+    child_id: uuid.UUID, current_user: CurrentUser, session: DbSession
+) -> Child:
+    """Archive a child profile without deleting any historical evidence."""
+    child, _ = await get_authorized_child(session, current_user, child_id, admin_required=True)
+    if not child.is_archived:
+        child.is_archived = True
+        child.archived_at = datetime.now(UTC)
+        await session.commit()
+        await session.refresh(child)
+    return child
+
+
+@router.post("/{child_id}/restore", response_model=ChildResponse)
+async def restore_child(
+    child_id: uuid.UUID, current_user: CurrentUser, session: DbSession
+) -> Child:
+    """Restore a previously archived child profile."""
+    child, _ = await get_authorized_child(session, current_user, child_id, admin_required=True)
+    if child.is_archived:
+        child.is_archived = False
+        child.archived_at = None
+        await session.commit()
+        await session.refresh(child)
     return child

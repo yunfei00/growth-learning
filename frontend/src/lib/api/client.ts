@@ -153,8 +153,75 @@ export type Child = {
   birth_date: string;
   gender: ChildGender | null;
   avatar_key: string | null;
+  is_archived: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AdultChildRelation =
+  | "father"
+  | "mother"
+  | "grandfather"
+  | "grandmother"
+  | "guardian"
+  | "other";
+
+export type FamilyMember = {
+  id: string;
+  role: FamilyRole;
+  user: { id: string; email: string; display_name: string };
+  relations: Array<{
+    id: string;
+    child_id: string;
+    relation: AdultChildRelation;
+    created_at: string;
+    updated_at: string;
+  }>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FamilyInvitationStatus = "active" | "expired" | "revoked" | "used";
+
+export type FamilyInvitation = {
+  id: string;
+  family_id: string;
+  family_name: string;
+  code_hint: string;
+  status: FamilyInvitationStatus;
+  role_to_grant: FamilyRole;
+  email_constraint: string | null;
+  created_by_user_id: string;
+  created_by_display_name: string;
+  expires_at: string;
+  used_count: number;
+  revoked_at: string | null;
+  accepted_by_user_id: string | null;
+  accepted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FamilyInvitationCreated = FamilyInvitation & { invitation_code: string };
+
+export type FamilyInvitationAcceptance = {
+  family_id: string;
+  family_name: string;
+  membership_id: string;
+  role: FamilyRole;
+  already_member: boolean;
+};
+
+export type FamilyActivity = {
+  id: string;
+  kind: "learning" | "reading" | "science" | "growth";
+  child_id: string;
+  child_name: string;
+  actor_user_id: string | null;
+  actor_display_name: string | null;
+  title: string;
+  occurred_at: string;
 };
 
 export type HealthResponse = {
@@ -1021,8 +1088,17 @@ export function createFamily(name: string): Promise<Family> {
   });
 }
 
-export function listChildren(familyId: string): Promise<Child[]> {
-  return request<Child[]>(`/api/v1/families/${familyId}/children`);
+export function updateFamily(familyId: string, name: string): Promise<Family> {
+  return request<Family>(`/api/v1/families/${familyId}`, {
+    method: "PATCH",
+    body: jsonBody({ name }),
+  });
+}
+
+export function listChildren(familyId: string, includeArchived = false): Promise<Child[]> {
+  return request<Child[]>(
+    `/api/v1/families/${familyId}/children${includeArchived ? "?include_archived=true" : ""}`,
+  );
 }
 
 export function createChild(
@@ -1038,6 +1114,109 @@ export function createChild(
     method: "POST",
     body: jsonBody(payload),
   });
+}
+
+export function updateChild(
+  childId: string,
+  payload: Partial<{
+    display_name: string;
+    nickname: string | null;
+    birth_date: string;
+    gender: ChildGender | null;
+  }>,
+): Promise<Child> {
+  return request<Child>(`/api/v1/children/${childId}`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function archiveChild(childId: string): Promise<Child> {
+  return request<Child>(`/api/v1/children/${childId}/archive`, { method: "POST" });
+}
+
+export function restoreChild(childId: string): Promise<Child> {
+  return request<Child>(`/api/v1/children/${childId}/restore`, { method: "POST" });
+}
+
+export function listFamilyMembers(familyId: string): Promise<FamilyMember[]> {
+  return request<FamilyMember[]>(`/api/v1/families/${familyId}/members`);
+}
+
+export function updateFamilyMemberRole(
+  familyId: string,
+  memberId: string,
+  role: FamilyRole,
+): Promise<FamilyMember> {
+  return request<FamilyMember>(`/api/v1/families/${familyId}/members/${memberId}`, {
+    method: "PATCH",
+    body: jsonBody({ role }),
+  });
+}
+
+export function removeFamilyMember(familyId: string, memberId: string): Promise<void> {
+  return request<void>(`/api/v1/families/${familyId}/members/${memberId}`, {
+    method: "DELETE",
+  });
+}
+
+export function setAdultChildRelation(
+  familyId: string,
+  memberId: string,
+  childId: string,
+  relation: AdultChildRelation,
+): Promise<FamilyMember["relations"][number]> {
+  return request(`/api/v1/families/${familyId}/members/${memberId}/relations/${childId}`, {
+    method: "PUT",
+    body: jsonBody({ relation }),
+  });
+}
+
+export function createFamilyInvitation(
+  familyId: string,
+  payload: { email_constraint?: string | null; role_to_grant: FamilyRole; expires_at: string },
+): Promise<FamilyInvitationCreated> {
+  return request<FamilyInvitationCreated>(`/api/v1/families/${familyId}/invitations`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function listFamilyInvitations(familyId: string): Promise<FamilyInvitation[]> {
+  return request<FamilyInvitation[]>(`/api/v1/families/${familyId}/invitations`);
+}
+
+export function revokeFamilyInvitation(
+  familyId: string,
+  invitationId: string,
+): Promise<FamilyInvitation> {
+  return request<FamilyInvitation>(
+    `/api/v1/families/${familyId}/invitations/${invitationId}/revoke`,
+    { method: "POST" },
+  );
+}
+
+export function listPendingFamilyInvitations(): Promise<FamilyInvitation[]> {
+  return request<FamilyInvitation[]>("/api/v1/family-invitations/pending");
+}
+
+export function acceptFamilyInvitation(code: string): Promise<FamilyInvitationAcceptance> {
+  return request<FamilyInvitationAcceptance>("/api/v1/family-invitations/accept", {
+    method: "POST",
+    body: jsonBody({ invitation_code: code }),
+  });
+}
+
+export function acceptPendingFamilyInvitation(
+  invitationId: string,
+): Promise<FamilyInvitationAcceptance> {
+  return request<FamilyInvitationAcceptance>(`/api/v1/family-invitations/${invitationId}/accept`, {
+    method: "POST",
+  });
+}
+
+export function listFamilyActivity(familyId: string): Promise<FamilyActivity[]> {
+  return request<FamilyActivity[]>(`/api/v1/families/${familyId}/activity`);
 }
 
 export function getAdminOverview(): Promise<AdminOverview> {

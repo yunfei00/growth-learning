@@ -69,7 +69,15 @@
 - `admin`：查看家庭/成员/孩子；修改家庭；创建和修改孩子。
 - `companion`：查看家庭/成员/孩子；不能修改家庭核心配置或孩子资料。
 
-Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/拒绝、邮箱验证、撤销和审计，不使用“输入邮箱即加入”的临时实现。
+`role` 只表达权限，不表达爸爸、妈妈等家庭身份。Phase 15 的关系由逐孩子的 `adult_child_relations` 单独表达。
+
+### Family Collaboration Model V1
+
+`family_invitations` 与平台注册用的 `platform_invitations` 完全分离。家庭邀请只允许已有登录用户加入一个指定家庭：邀请码仅保存带独立 domain prefix 的 HMAC-SHA256 哈希，默认且强制单次使用，可绑定规范化邮箱、过期和撤销。接受邀请在行锁与数据库事务中创建唯一 `(family_id, user_id)` membership；重复接受同一邀请对同一用户幂等。
+
+`adult_child_relations` 使用 `(user_id, child_id)` 唯一约束，分别保存 `father`、`mother`、`grandfather`、`grandmother`、`guardian` 或 `other`。它不授予权限；权限永远来自对应家庭的 `FamilyMember.role`。因此同一成人可以对不同孩子保留不同关系，两个家长也都可以是 `admin`。
+
+Family Member 移除只删除 membership 与关系标签，不删除 `User`，也不改写过去 evidence 的 `actor_user_id`。降权或移除最后一个家庭管理员会被事务性拒绝。
 
 ### 教师协作（Phase 9）
 
@@ -103,7 +111,15 @@ Phase 2 不实现邀请成员。正式邀请需要 token 生命周期、接受/�
 | `birth_date` | 出生日期，用于动态计算年龄 |
 | `gender` | 可选：`male`、`female`、`other` |
 | `avatar_key` | 可选的私有对象存储键 |
+| `is_archived` | 是否从正常孩子选择器中隐藏 |
+| `archived_at` | 可空归档时间；恢复后清空 |
 | `created_at` / `updated_at` | 审计时间戳 |
+
+一个家庭可以有多个孩子。孩子的学习、今日任务、阅读、科学与成长证据始终按 `child_id` 共享给当前家庭成员并彼此隔离。正式 API 只支持归档/恢复，不提供物理删除。
+
+### 内部家庭清理例外
+
+经人工确认的测试家庭只能通过服务器内部 `python -m app.cli.household_cleanup` 处理。CLI 从 ORM 完整 FK 图递归发现后代，dry-run 不修改数据，执行要求精确重复 Family UUID 和备份引用；数据库删除在单一事务中完成。对象存储只在事务提交后删除已无任何数据库引用的 key，无法确认或删除失败时保留对象。此维护能力不暴露 Family/Child DELETE API。
 
 ## 外键删除策略
 

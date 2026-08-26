@@ -2,12 +2,13 @@
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from app.api.dependencies import CurrentUser, DbSession
-from app.models import Child, Family, FamilyMember, FamilyRole, User
+from app.models import AdultChildRelation, Child, Family, FamilyMember, FamilyRole, User
 from app.schemas.family import (
+    AdultChildRelationResponse,
     ChildCreate,
     ChildResponse,
     FamilyCreate,
@@ -109,11 +110,27 @@ async def list_family_members(
             .order_by(FamilyMember.created_at)
         )
     ).all()
+    relations = list(
+        (
+            await session.scalars(
+                select(AdultChildRelation)
+                .where(AdultChildRelation.family_id == family_id)
+                .order_by(AdultChildRelation.created_at, AdultChildRelation.id)
+            )
+        ).all()
+    )
+    relations_by_user: dict[uuid.UUID, list[AdultChildRelation]] = {}
+    for relation in relations:
+        relations_by_user.setdefault(relation.user_id, []).append(relation)
     return [
         FamilyMemberResponse(
             id=membership.id,
             role=membership.role,
             user=MemberUserResponse.model_validate(user),
+            relations=[
+                AdultChildRelationResponse.model_validate(item, from_attributes=True)
+                for item in relations_by_user.get(user.id, [])
+            ],
             created_at=membership.created_at,
             updated_at=membership.updated_at,
         )
@@ -143,12 +160,18 @@ async def create_child(
 
 @router.get("/{family_id}/children", response_model=list[ChildResponse])
 async def list_children(
-    family_id: uuid.UUID, current_user: CurrentUser, session: DbSession
+    family_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: DbSession,
+    include_archived: bool = Query(default=False),
 ) -> list[Child]:
     """List the real child profiles visible inside a family boundary."""
     await require_family_membership(session, current_user, family_id)
+    conditions = [Child.family_id == family_id]
+    if not include_archived:
+        conditions.append(Child.is_archived.is_(False))
     return list(
         await session.scalars(
-            select(Child).where(Child.family_id == family_id).order_by(Child.created_at)
+            select(Child).where(*conditions).order_by(Child.created_at)
         )
     )
