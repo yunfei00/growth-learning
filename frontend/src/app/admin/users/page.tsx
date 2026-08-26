@@ -23,8 +23,43 @@ const SOURCE_LABELS = {
   admin_created: "管理员创建",
 } as const;
 
-function formatDate(value: string | null): string {
-  return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "从未登录";
+function formatDate(value: string | null, fallback = "—"): string {
+  return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : fallback;
+}
+
+function UserActionSelect({
+  item,
+  currentUserId,
+  working,
+  onChange,
+}: {
+  item: AdminUser;
+  currentUserId?: string;
+  working: boolean;
+  onChange: (target: AdminUser, nextStatus: AdminUser["account_status"]) => void;
+}) {
+  if (item.id === currentUserId) {
+    return <span className="admin-current-account">当前账号</span>;
+  }
+
+  return (
+    <select
+      aria-label={`管理 ${item.display_name} 的账号状态`}
+      className="admin-action-select"
+      disabled={working}
+      onChange={(event) => {
+        if (event.target.value) {
+          onChange(item, event.target.value as AdminUser["account_status"]);
+        }
+      }}
+      value=""
+    >
+      <option disabled value="">{working ? "处理中…" : "操作…"}</option>
+      {item.account_status !== "active" ? <option value="active">恢复</option> : null}
+      {item.account_status === "active" ? <option value="suspended">暂停</option> : null}
+      {item.account_status !== "disabled" ? <option value="disabled">禁用</option> : null}
+    </select>
+  );
 }
 
 export default function AdminUsersPage() {
@@ -124,55 +159,66 @@ export default function AdminUsersPage() {
 
       {error ? <p className="form-message form-error" role="alert">{error}</p> : null}
 
-      <div className="admin-table-wrap" aria-busy={!result}>
-        <table className="admin-data-table">
+      <div className="admin-table-wrap admin-users-list" aria-busy={!result}>
+        <table className="admin-data-table admin-users-table">
           <thead>
             <tr>
-              <th>用户</th><th>状态</th><th>角色</th><th>注册来源</th>
-              <th>注册时间</th><th>最后登录</th><th>家庭</th><th>操作</th>
+              <th>用户</th><th>状态</th><th>角色 / 来源</th>
+              <th>最近登录</th><th>家庭</th><th>操作</th>
             </tr>
           </thead>
           <tbody>
             {result?.items.map((item) => (
               <tr key={item.id}>
-                <td><strong>{item.display_name}</strong><small>{item.email}</small></td>
+                <td className="admin-primary-cell">
+                  <strong>{item.display_name}</strong>
+                  <small>{item.email}</small>
+                  <small>注册于 {formatDate(item.created_at)}</small>
+                </td>
                 <td><span className={`status-pill ${item.account_status}`}>{STATUS_LABELS[item.account_status]}</span></td>
-                <td>{item.system_role === "admin" ? "系统管理员" : "用户"}</td>
-                <td>{SOURCE_LABELS[item.registration_source]}</td>
-                <td>{formatDate(item.created_at)}</td>
-                <td>{formatDate(item.last_login_at)}</td>
+                <td>
+                  <strong>{item.system_role === "admin" ? "系统管理员" : "用户"}</strong>
+                  <small>{SOURCE_LABELS[item.registration_source]}</small>
+                </td>
+                <td>{formatDate(item.last_login_at, "从未登录")}</td>
                 <td>{item.family_count}</td>
                 <td>
-                  <div className="admin-row-actions">
-                    {item.account_status === "active" ? (
-                      <button
-                        className="button button-quiet"
-                        disabled={workingId === item.id || item.id === currentUser?.id}
-                        onClick={() => void updateStatus(item, "suspended")}
-                        type="button"
-                      >暂停</button>
-                    ) : (
-                      <button
-                        className="button button-secondary"
-                        disabled={workingId === item.id}
-                        onClick={() => void updateStatus(item, "active")}
-                        type="button"
-                      >恢复</button>
-                    )}
-                    {item.account_status !== "disabled" && item.id !== currentUser?.id ? (
-                      <button
-                        className="button button-quiet danger"
-                        disabled={workingId === item.id}
-                        onClick={() => void updateStatus(item, "disabled")}
-                        type="button"
-                      >禁用</button>
-                    ) : null}
-                  </div>
+                  <UserActionSelect
+                    currentUserId={currentUser?.id}
+                    item={item}
+                    onChange={(target, nextStatus) => void updateStatus(target, nextStatus)}
+                    working={workingId === item.id}
+                  />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        <div className="admin-mobile-card-list">
+          {result?.items.map((item) => (
+            <article className="admin-mobile-card" key={item.id}>
+              <header>
+                <div><strong>{item.display_name}</strong><small>{item.email}</small></div>
+                <span className={`status-pill ${item.account_status}`}>{STATUS_LABELS[item.account_status]}</span>
+              </header>
+              <dl>
+                <div><dt>角色</dt><dd>{item.system_role === "admin" ? "系统管理员" : "用户"}</dd></div>
+                <div><dt>来源</dt><dd>{SOURCE_LABELS[item.registration_source]}</dd></div>
+                <div><dt>注册</dt><dd>{formatDate(item.created_at)}</dd></div>
+                <div><dt>最近登录</dt><dd>{formatDate(item.last_login_at, "从未登录")}</dd></div>
+                <div><dt>家庭</dt><dd>{item.family_count}</dd></div>
+              </dl>
+              <footer>
+                <UserActionSelect
+                  currentUserId={currentUser?.id}
+                  item={item}
+                  onChange={(target, nextStatus) => void updateStatus(target, nextStatus)}
+                  working={workingId === item.id}
+                />
+              </footer>
+            </article>
+          ))}
+        </div>
         {result && result.items.length === 0 ? <p className="empty-note">没有符合条件的用户。</p> : null}
       </div>
 

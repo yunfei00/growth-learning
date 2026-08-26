@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
 import { useAuth } from "@/components/auth-provider";
+import { resolveAppHeaderMode } from "@/lib/header-mode";
 
 const PARENT_PRIMARY = [
   ["/home", "首页", "⌂"],
@@ -98,7 +99,37 @@ export function AppHeader() {
     router.push("/home");
   };
 
-  if (status === "authenticated" && childMode) {
+  const headerMode = resolveAppHeaderMode({
+    pathname,
+    authenticated: status === "authenticated",
+    systemAdmin: user?.system_role === "admin",
+    childMode,
+  });
+
+  if (headerMode === "admin") {
+    return (
+      <header className="site-header admin-mode-header">
+        <Link className="brand admin-mode-brand" href="/admin" aria-label="成长学习管理后台概览">
+          <span className="brand-mark" aria-hidden="true">长</span>
+          <span>成长学习 <small>· 管理后台</small></span>
+        </Link>
+        <nav aria-label="管理员账户导航" className="admin-account-nav">
+          <Link href="/home">返回家长端</Link>
+          <span className="admin-header-user">{user?.display_name}</span>
+          <button
+            className="nav-button"
+            disabled={isLoggingOut}
+            onClick={() => void handleLogout()}
+            type="button"
+          >
+            {isLoggingOut ? "退出中…" : "退出"}
+          </button>
+        </nav>
+      </header>
+    );
+  }
+
+  if (headerMode === "child") {
     return (
       <header className="site-header child-mode-header">
         <Link className="child-mode-brand" href="/kids" aria-label="孩子模式今天">

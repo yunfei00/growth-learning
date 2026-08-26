@@ -86,10 +86,16 @@ export default function AdminInvitationsPage() {
       <header className="admin-page-header"><div><p className="eyebrow">Platform invitations</p><h2>邀请码管理</h2><p>完整邀请码只在创建响应中出现一次，数据库和列表均不保存明文。</p></div></header>
 
       <form className="invitation-create-panel" onSubmit={(event) => void submit(event)}>
+        <header>
+          <div>
+            <h3>创建平台邀请码</h3>
+            <p>设置有效范围后生成；完整邀请码需要立即安全保存。</p>
+          </div>
+        </header>
         <label><span>用途</span><input disabled value="创建平台账号" /></label>
-        <label><span>过期时间</span><input min={new Date().toISOString().slice(0, 16)} onChange={(event) => setExpiresAt(event.target.value)} required type="datetime-local" value={expiresAt} /></label>
+        <label><span>有效期</span><input min={new Date().toISOString().slice(0, 16)} onChange={(event) => setExpiresAt(event.target.value)} required type="datetime-local" value={expiresAt} /></label>
         <label><span>最大使用次数</span><input max="100" min="1" onChange={(event) => setMaxUses(event.target.value)} required type="number" value={maxUses} /></label>
-        <label><span>绑定邮箱（可选）</span><input onChange={(event) => setEmail(event.target.value)} placeholder="mom@example.com" type="email" value={email} /></label>
+        <label><span>限定邮箱（可选）</span><input onChange={(event) => setEmail(event.target.value)} placeholder="mom@example.com" type="email" value={email} /></label>
         <button className="button button-primary" disabled={working} type="submit">{working ? "生成中…" : "生成邀请码"}</button>
       </form>
 
@@ -97,26 +103,56 @@ export default function AdminInvitationsPage() {
       {message ? <p className="form-message form-success" role="status">{message}</p> : null}
       {created ? (
         <section className="one-time-secret" aria-label="一次性显示的邀请码">
-          <div><small>仅本次显示</small><strong>{created.invitation_code}</strong></div>
-          <button className="button button-secondary" onClick={() => void copyCode()} type="button">复制邀请码</button>
-          <button className="button button-quiet" onClick={() => setCreated(null)} type="button">我已保存，关闭</button>
+          <div className="one-time-secret-content">
+            <span className="one-time-secret-warning">⚠ 完整邀请码只显示这一次</span>
+            <strong>{created.invitation_code}</strong>
+            <small>关闭后无法再次查看完整内容。</small>
+          </div>
+          <div className="one-time-secret-actions">
+            <button className="button button-secondary" onClick={() => void copyCode()} type="button">复制邀请码</button>
+            <button className="button button-quiet" onClick={() => setCreated(null)} type="button">我已保存</button>
+          </div>
         </section>
       ) : null}
 
-      <div className="admin-table-wrap" aria-busy={!result}>
-        <table className="admin-data-table">
-          <thead><tr><th>邀请码</th><th>状态</th><th>创建时间</th><th>过期时间</th><th>使用次数</th><th>邮箱限制</th><th>创建人</th><th>最后使用</th><th>操作</th></tr></thead>
+      <div className="admin-table-wrap admin-invitations-list" aria-busy={!result}>
+        <table className="admin-data-table admin-invitations-table">
+          <thead><tr><th>邀请码</th><th>状态</th><th>使用情况</th><th>限制 / 有效期</th><th>操作</th></tr></thead>
           <tbody>{result?.items.map((item) => (
             <tr key={item.id}>
-              <td><strong>{item.code_hint}</strong></td>
+              <td className="admin-primary-cell">
+                <strong>{item.code_hint}</strong>
+                <small>创建于 {formatDate(item.created_at)}</small>
+                <small>创建人：{item.created_by_display_name}</small>
+              </td>
               <td><span className={`status-pill ${item.status}`}>{STATUS_LABELS[item.status]}</span></td>
-              <td>{formatDate(item.created_at)}</td><td>{formatDate(item.expires_at)}</td>
-              <td>{item.used_count} / {item.max_uses}</td><td>{item.email_constraint || "不限邮箱"}</td>
-              <td>{item.created_by_display_name}</td><td>{formatDate(item.last_used_at)}</td>
+              <td><strong>{item.used_count} / {item.max_uses}</strong><small>最后使用：{formatDate(item.last_used_at)}</small></td>
+              <td className="admin-limit-cell"><strong>{item.email_constraint || "不限邮箱"}</strong><small>到期：{formatDate(item.expires_at)}</small></td>
               <td>{item.status === "active" ? <button className="button button-quiet danger" disabled={working} onClick={() => void revoke(item.id)} type="button">撤销</button> : "—"}</td>
             </tr>
           ))}</tbody>
         </table>
+        <div className="admin-mobile-card-list">
+          {result?.items.map((item) => (
+            <article className="admin-mobile-card" key={item.id}>
+              <header>
+                <strong>{item.code_hint}</strong>
+                <span className={`status-pill ${item.status}`}>{STATUS_LABELS[item.status]}</span>
+              </header>
+              <dl>
+                <div><dt>使用</dt><dd>{item.used_count} / {item.max_uses}</dd></div>
+                <div><dt>邮箱</dt><dd>{item.email_constraint || "不限邮箱"}</dd></div>
+                <div><dt>创建</dt><dd>{formatDate(item.created_at)}</dd></div>
+                <div><dt>到期</dt><dd>{formatDate(item.expires_at)}</dd></div>
+                <div><dt>创建人</dt><dd>{item.created_by_display_name}</dd></div>
+                <div><dt>最后使用</dt><dd>{formatDate(item.last_used_at)}</dd></div>
+              </dl>
+              {item.status === "active" ? (
+                <footer><button className="button button-quiet danger" disabled={working} onClick={() => void revoke(item.id)} type="button">撤销</button></footer>
+              ) : null}
+            </article>
+          ))}
+        </div>
         {result && result.items.length === 0 ? <p className="empty-note">还没有平台邀请码。</p> : null}
       </div>
       {result && result.pages > 1 ? <nav aria-label="邀请码分页" className="pagination-bar"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)} type="button">上一页</button><span>第 {page} / {result.pages} 页</span><button disabled={page >= result.pages} onClick={() => setPage((value) => value + 1)} type="button">下一页</button></nav> : null}
