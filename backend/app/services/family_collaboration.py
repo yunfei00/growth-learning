@@ -247,10 +247,7 @@ async def accept_family_invitation_code(
 ) -> FamilyInvitationAcceptanceResult:
     invitation = await session.scalar(
         select(FamilyInvitation)
-        .where(
-            FamilyInvitation.code_hash
-            == hash_family_invitation_code(invitation_code, settings)
-        )
+        .where(FamilyInvitation.code_hash == hash_family_invitation_code(invitation_code, settings))
         .with_for_update()
     )
     return await _accept_locked_invitation(
@@ -288,9 +285,7 @@ async def update_family_member_role(
     members = list(
         (
             await session.scalars(
-                select(FamilyMember)
-                .where(FamilyMember.family_id == family_id)
-                .with_for_update()
+                select(FamilyMember).where(FamilyMember.family_id == family_id).with_for_update()
             )
         ).all()
     )
@@ -326,9 +321,7 @@ async def remove_family_member(
     members = list(
         (
             await session.scalars(
-                select(FamilyMember)
-                .where(FamilyMember.family_id == family_id)
-                .with_for_update()
+                select(FamilyMember).where(FamilyMember.family_id == family_id).with_for_update()
             )
         ).all()
     )

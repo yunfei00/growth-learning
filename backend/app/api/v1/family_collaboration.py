@@ -188,9 +188,7 @@ async def list_invitations(
             .order_by(FamilyInvitation.created_at.desc(), FamilyInvitation.id)
         )
     ).all()
-    return [
-        _invitation_response(row[0], family_name=row[1], creator_name=row[2]) for row in rows
-    ]
+    return [_invitation_response(row[0], family_name=row[1], creator_name=row[2]) for row in rows]
 
 
 @router.post(
@@ -242,9 +240,7 @@ async def pending_invitations(
             .order_by(FamilyInvitation.created_at.desc())
         )
     ).all()
-    return [
-        _invitation_response(row[0], family_name=row[1], creator_name=row[2]) for row in rows
-    ]
+    return [_invitation_response(row[0], family_name=row[1], creator_name=row[2]) for row in rows]
 
 
 @router.post(

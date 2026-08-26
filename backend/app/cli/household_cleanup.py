@@ -130,9 +130,7 @@ async def _assert_ownership_boundary(
         ]
         if not owner_columns:
             continue
-        rows = (
-            await session.execute(select(*owner_columns).where(primary_key.in_(ids)))
-        ).all()
+        rows = (await session.execute(select(*owner_columns).where(primary_key.in_(ids)))).all()
         for row in rows:
             values = dict(zip((column.name for column in owner_columns), row, strict=True))
             row_family_id = values.get("family_id")
@@ -162,9 +160,7 @@ async def _collect_object_keys(
                 value
                 for value in (
                     await session.scalars(
-                        select(object_key).where(
-                            primary_key.in_(ids), object_key.is_not(None)
-                        )
+                        select(object_key).where(primary_key.in_(ids), object_key.is_not(None))
                     )
                 ).all()
                 if value

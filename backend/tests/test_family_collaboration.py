@@ -21,9 +21,7 @@ async def register_and_login(
         json={"email": email, "display_name": display_name, "password": password},
     )
     assert registered.status_code == 201
-    logged_in = await client.post(
-        "/api/v1/auth/login", json={"email": email, "password": password}
-    )
+    logged_in = await client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert logged_in.status_code == 200
     return registered.json()
 
@@ -194,9 +192,7 @@ async def test_expired_revoked_and_companion_invitation_attempts_are_denied(
 
         active = await create_invitation(admin, family["id"], email="companion@example.com")
         assert (
-            await member.post(
-                f"/api/v1/family-invitations/{active['id']}/accept"
-            )
+            await member.post(f"/api/v1/family-invitations/{active['id']}/accept")
         ).status_code == 200
         denied = await member.post(
             f"/api/v1/families/{family['id']}/invitations",
@@ -244,8 +240,7 @@ async def test_member_removal_preserves_actor_and_revokes_next_request(
         assert last_admin.status_code == 409
 
         relation = await admin.put(
-            f"/api/v1/families/{family['id']}/members/{owner_member['id']}"
-            f"/relations/{child['id']}",
+            f"/api/v1/families/{family['id']}/members/{owner_member['id']}/relations/{child['id']}",
             json={"relation": "father"},
         )
         assert relation.status_code == 200
@@ -271,9 +266,7 @@ async def test_member_removal_preserves_actor_and_revokes_next_request(
         )
         assert learned.status_code == 201
 
-        history = await admin.get(
-            f"/api/v1/children/{child['id']}/character-learning-history"
-        )
+        history = await admin.get(f"/api/v1/children/{child['id']}/character-learning-history")
         assert history.status_code == 200
         assert history.json()["total_records"] == 1
         learned_by_admin = await admin.post(
@@ -372,9 +365,7 @@ async def test_multiple_children_edit_archive_and_restore(
         f"/api/v1/children/{first['id']}/learning-sessions",
         json={
             "source": "parent_assisted",
-            "items": [
-                {"knowledge_point_id": str(point_id), "activity_type": "introduced"}
-            ],
+            "items": [{"knowledge_point_id": str(point_id), "activity_type": "introduced"}],
         },
     )
     assert learned.status_code == 201

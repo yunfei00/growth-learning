@@ -170,8 +170,4 @@ async def list_children(
     conditions = [Child.family_id == family_id]
     if not include_archived:
         conditions.append(Child.is_archived.is_(False))
-    return list(
-        await session.scalars(
-            select(Child).where(*conditions).order_by(Child.created_at)
-        )
-    )
+    return list(await session.scalars(select(Child).where(*conditions).order_by(Child.created_at)))
