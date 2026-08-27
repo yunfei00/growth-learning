@@ -134,6 +134,7 @@ async def create_character(
     session: AsyncSession, payload: CharacterCreate
 ) -> tuple[KnowledgePoint, ChineseCharacter]:
     point = KnowledgePoint(
+        subject=CourseSubject.CHINESE,
         type=KnowledgeType.CHINESE_CHARACTER,
         status=KnowledgeStatus.ACTIVE,
         title=payload.character,
@@ -185,6 +186,7 @@ async def import_characters(session: AsyncSession, items: list[CharacterCreate])
             ).one_or_none()
             if row is None:
                 point = KnowledgePoint(
+                    subject=CourseSubject.CHINESE,
                     type=KnowledgeType.CHINESE_CHARACTER,
                     status=KnowledgeStatus.ACTIVE,
                     title=payload.character,

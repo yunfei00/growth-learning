@@ -22,6 +22,9 @@ from app.models.identity import TimestampMixin
 
 class CourseSubject(StrEnum):
     CHINESE = "chinese"
+    MATH = "math"
+    ENGLISH = "english"
+    SCIENCE = "science"
 
 
 class CourseSourceType(StrEnum):
@@ -38,6 +41,13 @@ class CourseStatus(StrEnum):
 
 
 class ActivityType(StrEnum):
+    KNOWLEDGE_LEARNING = "knowledge_learning"
+    GUIDED_PRACTICE = "guided_practice"
+    INDEPENDENT_PRACTICE = "independent_practice"
+    KNOWLEDGE_REVIEW = "knowledge_review"
+    KNOWLEDGE_CHECK = "knowledge_check"
+    LISTENING = "listening"
+    SPEAKING = "speaking"
     CHARACTER_LEARNING = "character_learning"
     CHARACTER_REVIEW = "character_review"
     RECOGNITION_CHECK = "recognition_check"
@@ -108,7 +118,10 @@ class CharacterCatalogEntry(TimestampMixin, Base):
 class Course(TimestampMixin, Base):
     __tablename__ = "courses"
     __table_args__ = (
-        CheckConstraint("subject IN ('chinese')", name="ck_courses_subject"),
+        CheckConstraint(
+            "subject IN ('chinese', 'math', 'english', 'science')",
+            name="ck_courses_subject",
+        ),
         CheckConstraint(
             "source_type IN ('system', 'family', 'teacher', 'textbook_reference')",
             name="ck_courses_source",
@@ -172,7 +185,9 @@ class LearningActivity(TimestampMixin, Base):
         UniqueConstraint("course_unit_id", "order_index", name="uq_learning_activity_order"),
         CheckConstraint("order_index >= 0", name="ck_learning_activities_order"),
         CheckConstraint(
-            "activity_type IN ('character_learning', 'character_review', 'recognition_check', "
+            "activity_type IN ('knowledge_learning', 'guided_practice', "
+            "'independent_practice', 'knowledge_review', 'knowledge_check', 'listening', "
+            "'speaking', 'character_learning', 'character_review', 'recognition_check', "
             "'reading', 'science_reference', 'offline_instruction')",
             name="ck_learning_activities_type",
         ),

@@ -18,6 +18,7 @@ const NAV_GROUPS = [
   {
     label: "内容管理",
     items: [
+      ["/admin/knowledge", "知识点"],
       ["/admin/characters", "汉字"],
       ["/admin/science", "科学实验"],
       ["/admin/courses", "课程与 Catalog"],

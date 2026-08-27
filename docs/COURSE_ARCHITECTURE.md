@@ -1,5 +1,10 @@
 # Reusable Course Architecture and Chinese Catalog
 
+Phase 16 extends `Course.subject` to Chinese, math, English, and science. An activity can only map
+active knowledge points whose subject exactly matches its course. Subject-filtered empty lists are
+valid production states; no demo curriculum is auto-seeded. Generic evidence-producing activities
+are resolved by an explicit executor registry. See [multi-subject foundation](MULTISUBJECT_FOUNDATION.md).
+
 ## Canonical knowledge boundary
 
 `KnowledgePoint` remains the only system knowledge identity. A course never creates a

@@ -190,6 +190,17 @@ Growth Learning V1 的 Phase 1–12 已收敛到 `1.0.0`。每阶段都以迁移
 
 家庭级 4～6 位数字 PIN 用于防止孩子误从 Child Mode 返回 Parent Mode；只保存哈希，可关闭，且必须明确它不等同于账号密码。本项独立 Issue 跟踪，不阻塞 Phase 15 家庭协作数据边界。
 
+## Phase 16：多学科基础架构
+
+- `KnowledgePoint.subject` 与受数据库约束的语文/数学/英语/科学类型矩阵
+- 现有汉字原位回填并保持 UUID、Catalog、Course、Story、Science 和 evidence 引用
+- 通用 Learning/Assessment evidence 与课程活动执行器注册表
+- Mastery Policy 注册表；仅汉字启用现有 V1，未支持学科明确返回 unavailable
+- 识字分母、复习、成就、故事已知字与成长树的汉字边界审计
+- `/admin/knowledge` 与按学科筛选/创建的系统课程；生产不填充假课程
+
+退出条件：迁移、数据保护、类型约束、课程隔离、evidence、mastery boundary、前后端和生产烟测全部通过。完整设计见 [Phase 16 多学科基础](MULTISUBJECT_FOUNDATION.md)。
+
 ## V2 Backlog
 
 - 更完整的可访问性、性能预算、外部安全评估与可观测性

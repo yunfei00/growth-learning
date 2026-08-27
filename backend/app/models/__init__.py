@@ -57,9 +57,11 @@ from app.models.knowledge import (
     KnowledgeStatus,
     KnowledgeType,
     RelationType,
+    Subject,
 )
 from app.models.learning import (
     AssessmentItem,
+    AssessmentKind,
     AssessmentOutcome,
     AssessmentSession,
     ChildKnowledgeState,
@@ -200,6 +202,8 @@ __all__ = [
     "KnowledgeStatus",
     "KnowledgeType",
     "RelationType",
+    "Subject",
+    "AssessmentKind",
     "AssessmentItem",
     "AssessmentOutcome",
     "AssessmentSession",

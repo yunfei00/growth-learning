@@ -166,7 +166,7 @@ Family Member 移除只删除 membership 与关系标签，不删除 `User`，�
 
 ### `knowledge_points`
 
-所有学科共用的规范知识主表。字段包含 UUID、`type`、`status`、标题、唯一 `canonical_key`、来源类型/引用和审计时间。当前 `type` 仅启用 `chinese_character`，结构可扩展 `chinese_word`、`math_concept`、`english_word`、`science_concept`。
+所有学科共用的规范知识主表。字段包含 UUID、`subject`、`type`、`status`、标题、唯一 `canonical_key`、来源类型/引用和审计时间。当前支持语文（汉字与拼音）、数学能力点、英文字母/单词/自然拼读和科学概念；数据库约束强制 type 与 subject 匹配。完整矩阵见 [Phase 16 多学科基础](MULTISUBJECT_FOUNDATION.md)。
 
 ### `chinese_characters`
 
@@ -182,15 +182,15 @@ Family Member 移除只删除 membership 与关系标签，不删除 `User`，�
 
 ### `learning_sessions` / `learning_records`
 
-`learning_sessions` 保存一次有边界的学习活动，包含孩子、执行成年人、来源、开始/结束时间以及 `in_progress`、`completed`、`abandoned` 状态。`learning_records` 以 `(session_id, knowledge_point_id)` 唯一，保存 `introduced`、`relearned`、`parent_marked_seen` 或 `story_exposure` 原始事实。`story_exposure` 只表示在故事中接触，不能等价为认识。记录只追加，不提供更新或删除 API。
+`learning_sessions` 保存一次有边界的学习活动，包含孩子、执行成年人、来源、开始/结束时间以及 `in_progress`、`completed`、`abandoned` 状态。`learning_records` 以 `(session_id, knowledge_point_id)` 唯一，保存接触、再学、引导练习、独立练习、复习、应用、故事或科学实验接触等原始事实。`story_exposure` 只表示在故事中接触，不能等价为认识。记录只追加，不提供更新或删除 API。
 
 ### `assessment_sessions` / `assessment_items`
 
-测评会话同样保存状态与执行人。每个 `assessment_item` 记录一个汉字的 `correct`、`hinted_correct`、`uncertain` 或 `incorrect`，以及可选反应时间和是否使用提示。四种结果不能合并，后续算法可以从完整事实重新解释。
+测评会话同样保存状态、执行人和 `assessment_kind`。每个 `assessment_item` 记录知识点的 `correct`、`hinted_correct`、`uncertain` 或 `incorrect`，以及可选反应时间、提示、`skill_dimension` 和结构化证据元数据。四种结果不能合并，后续算法可以从完整事实重新解释。
 
 ### `child_knowledge_states`
 
-以 `(child_id, knowledge_point_id)` 唯一的派生投影，包含五级掌握度、0–1 分数、首次/最近学习与测评时间、四类结果计数、连续正确/错误、平均反应时间、家庭管理员设置的 `is_priority` 以及 `algorithm_version`。
+以 `(child_id, knowledge_point_id)` 唯一的派生投影，增加 `policy_key`、`state_code` 与 `dimensions_json`。当前只有 `chinese_character` 注册 `chinese-character-v1`；其他学科保存证据但不创建假掌握度或复习日程。
 
 五级为：`unlearned(0)`、`introduced(1)`、`recognizing(2)`、`proficient(3)`、`stable(4)`。状态可通过 `python -m app.cli.mastery` 从原始证据完整重算；重算保留 `is_priority`，不修改或删除任何原始记录。具体规则见 [Mastery V1](MASTERY_ALGORITHM.md)。
 

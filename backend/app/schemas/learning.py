@@ -10,8 +10,23 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.schemas.story import DailyReadingTaskResponse
 
 SessionStatusValue = Literal["in_progress", "completed", "abandoned"]
-ActivityTypeValue = Literal["introduced", "relearned", "parent_marked_seen"]
+ActivityTypeValue = Literal[
+    "introduced",
+    "relearned",
+    "parent_marked_seen",
+    "guided_practice",
+    "independent_practice",
+    "reviewed",
+    "applied",
+]
 AssessmentOutcomeValue = Literal["correct", "hinted_correct", "uncertain", "incorrect"]
+AssessmentKindValue = Literal[
+    "recognition",
+    "practice_check",
+    "listening_check",
+    "oral_check",
+    "math_check",
+]
 MasteryLevelValue = Literal["unlearned", "introduced", "recognizing", "proficient", "stable"]
 
 
@@ -44,6 +59,8 @@ class AssessmentItemInput(BaseModel):
     outcome: AssessmentOutcomeValue
     response_time_ms: int | None = Field(default=None, ge=0, le=3_600_000)
     hint_used: bool = False
+    skill_dimension: str | None = Field(default=None, min_length=1, max_length=60)
+    evidence_metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def align_hint_outcome(self) -> "AssessmentItemInput":
@@ -57,6 +74,7 @@ class AssessmentSessionCreate(BaseModel):
 
     status: SessionStatusValue = "completed"
     source: str = Field(default="quick_recognition", min_length=1, max_length=40)
+    assessment_kind: AssessmentKindValue = "recognition"
     items: list[AssessmentItemInput] = Field(min_length=1, max_length=50)
 
     @model_validator(mode="after")
@@ -76,6 +94,8 @@ class EvidenceSessionResponse(BaseModel):
     started_at: datetime
     completed_at: datetime | None
     created_at: datetime
+    mastery_projection: Literal["configured", "partially_unavailable", "unavailable"]
+    projection_unavailable_knowledge_point_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
 class CharacterMasteryState(BaseModel):
@@ -264,6 +284,7 @@ class ReviewBacklogResponse(BaseModel):
 
 
 class DailyPlanItemResponse(BaseModel):
+    subject: Literal["chinese"] = "chinese"
     knowledge_point_id: uuid.UUID
     character: str
     pinyin: str

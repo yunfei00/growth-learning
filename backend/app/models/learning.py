@@ -5,6 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -33,6 +34,18 @@ class LearningActivityType(StrEnum):
     PARENT_MARKED_SEEN = "parent_marked_seen"
     STORY_EXPOSURE = "story_exposure"
     SCIENCE_EXPERIMENT_EXPOSURE = "science_experiment_exposure"
+    GUIDED_PRACTICE = "guided_practice"
+    INDEPENDENT_PRACTICE = "independent_practice"
+    REVIEWED = "reviewed"
+    APPLIED = "applied"
+
+
+class AssessmentKind(StrEnum):
+    RECOGNITION = "recognition"
+    PRACTICE_CHECK = "practice_check"
+    LISTENING_CHECK = "listening_check"
+    ORAL_CHECK = "oral_check"
+    MATH_CHECK = "math_check"
 
 
 class AssessmentOutcome(StrEnum):
@@ -88,7 +101,8 @@ class LearningRecord(TimestampMixin, Base):
         ),
         CheckConstraint(
             "activity_type IN ('introduced', 'relearned', 'parent_marked_seen', "
-            "'story_exposure', 'science_experiment_exposure')",
+            "'story_exposure', 'science_experiment_exposure', 'guided_practice', "
+            "'independent_practice', 'reviewed', 'applied')",
             name="ck_learning_records_activity_type",
         ),
     )
@@ -122,6 +136,11 @@ class AssessmentSession(TimestampMixin, Base):
             "status IN ('in_progress', 'completed', 'abandoned')",
             name="ck_assessment_sessions_status",
         ),
+        CheckConstraint(
+            "assessment_kind IN ('recognition', 'practice_check', 'listening_check', "
+            "'oral_check', 'math_check')",
+            name="ck_assessment_sessions_kind",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -135,6 +154,12 @@ class AssessmentSession(TimestampMixin, Base):
         String(20), default=SessionStatus.IN_PROGRESS, server_default=SessionStatus.IN_PROGRESS
     )
     source: Mapped[str] = mapped_column(String(40), default="quick_recognition", nullable=False)
+    assessment_kind: Mapped[str] = mapped_column(
+        String(30),
+        default=AssessmentKind.RECOGNITION,
+        server_default=AssessmentKind.RECOGNITION,
+        nullable=False,
+    )
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -175,6 +200,10 @@ class AssessmentItem(TimestampMixin, Base):
     outcome: Mapped[str] = mapped_column(String(24), nullable=False)
     response_time_ms: Mapped[int | None] = mapped_column(Integer)
     hint_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    skill_dimension: Mapped[str | None] = mapped_column(String(60))
+    evidence_metadata: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default="{}", nullable=False
+    )
     assessed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -221,3 +250,12 @@ class ChildKnowledgeState(TimestampMixin, Base):
     average_response_time_ms: Mapped[float | None] = mapped_column(Float)
     is_priority: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     algorithm_version: Mapped[str] = mapped_column(String(20), default="v1", server_default="v1")
+    policy_key: Mapped[str] = mapped_column(
+        String(80), default="chinese-character-v1", server_default="chinese-character-v1"
+    )
+    state_code: Mapped[str] = mapped_column(
+        String(40), default=MasteryLevel.UNLEARNED, server_default=MasteryLevel.UNLEARNED
+    )
+    dimensions_json: Mapped[dict[str, object]] = mapped_column(
+        JSON, default=dict, server_default="{}", nullable=False
+    )

@@ -12,6 +12,22 @@ from app.models.identity import TimestampMixin
 
 class KnowledgeType(StrEnum):
     CHINESE_CHARACTER = "chinese_character"
+    PINYIN_INITIAL = "pinyin_initial"
+    PINYIN_FINAL = "pinyin_final"
+    PINYIN_TONE = "pinyin_tone"
+    PINYIN_SYLLABLE = "pinyin_syllable"
+    MATH_SKILL = "math_skill"
+    ENGLISH_LETTER = "english_letter"
+    ENGLISH_WORD = "english_word"
+    ENGLISH_PHONICS = "english_phonics"
+    SCIENCE_CONCEPT = "science_concept"
+
+
+class Subject(StrEnum):
+    CHINESE = "chinese"
+    MATH = "math"
+    ENGLISH = "english"
+    SCIENCE = "science"
 
 
 class KnowledgeStatus(StrEnum):
@@ -31,11 +47,36 @@ class KnowledgePoint(TimestampMixin, Base):
 
     __tablename__ = "knowledge_points"
     __table_args__ = (
-        CheckConstraint("type IN ('chinese_character')", name="ck_knowledge_points_type"),
+        CheckConstraint(
+            "type IN ('chinese_character', 'pinyin_initial', 'pinyin_final', "
+            "'pinyin_tone', 'pinyin_syllable', 'math_skill', 'english_letter', "
+            "'english_word', 'english_phonics', 'science_concept')",
+            name="ck_knowledge_points_type",
+        ),
+        CheckConstraint(
+            "subject IN ('chinese', 'math', 'english', 'science')",
+            name="ck_knowledge_points_subject",
+        ),
+        CheckConstraint(
+            "(type IN ('chinese_character', 'pinyin_initial', 'pinyin_final', "
+            "'pinyin_tone', 'pinyin_syllable') AND subject = 'chinese') OR "
+            "(type = 'math_skill' AND subject = 'math') OR "
+            "(type IN ('english_letter', 'english_word', 'english_phonics') "
+            "AND subject = 'english') OR "
+            "(type = 'science_concept' AND subject = 'science')",
+            name="ck_knowledge_points_type_subject",
+        ),
         CheckConstraint("status IN ('active', 'archived')", name="ck_knowledge_points_status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    subject: Mapped[str] = mapped_column(
+        String(30),
+        default=Subject.CHINESE,
+        server_default=Subject.CHINESE,
+        index=True,
+        nullable=False,
+    )
     type: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
     status: Mapped[str] = mapped_column(
         String(20), default=KnowledgeStatus.ACTIVE, server_default=KnowledgeStatus.ACTIVE

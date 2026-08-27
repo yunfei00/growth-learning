@@ -3,7 +3,20 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+KNOWLEDGE_TYPE_SUBJECTS = {
+    "chinese_character": "chinese",
+    "pinyin_initial": "chinese",
+    "pinyin_final": "chinese",
+    "pinyin_tone": "chinese",
+    "pinyin_syllable": "chinese",
+    "math_skill": "math",
+    "english_letter": "english",
+    "english_word": "english",
+    "english_phonics": "english",
+    "science_concept": "science",
+}
 
 
 def normalize_list(values: list[str]) -> list[str]:
@@ -140,6 +153,68 @@ class AdminOverviewResponse(BaseModel):
     children: int
     characters: int
     science_experiments: int = 0
+
+
+class KnowledgePointCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str = Field(pattern="^(chinese|math|english|science)$")
+    type: str = Field(
+        pattern=(
+            "^(chinese_character|pinyin_initial|pinyin_final|pinyin_tone|"
+            "pinyin_syllable|math_skill|english_letter|english_word|"
+            "english_phonics|science_concept)$"
+        )
+    )
+    title: str = Field(min_length=1, max_length=120)
+    canonical_key: str = Field(min_length=3, max_length=160, pattern=r"^[a-z0-9-]+:\S+$")
+    source_type: str = Field(default="manual", min_length=1, max_length=40)
+    source_reference: str | None = Field(default=None, max_length=255)
+
+    @field_validator("title", "canonical_key", "source_type")
+    @classmethod
+    def strip_required_knowledge(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Field cannot be blank")
+        return value
+
+    @field_validator("source_reference")
+    @classmethod
+    def strip_optional_knowledge(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
+    @model_validator(mode="after")
+    def type_matches_subject(self) -> "KnowledgePointCreate":
+        if KNOWLEDGE_TYPE_SUBJECTS[self.type] != self.subject:
+            raise ValueError("Knowledge type does not belong to the selected subject")
+        return self
+
+
+class KnowledgePointResponse(BaseModel):
+    id: uuid.UUID
+    subject: str
+    type: str
+    status: str
+    title: str
+    canonical_key: str
+    source_type: str
+    source_reference: str | None
+    mastery_policy_key: str | None
+    mastery_projection_status: str
+    learning_evidence_count: int = 0
+    assessment_evidence_count: int = 0
+    child_state_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class KnowledgePointPage(BaseModel):
+    items: list[KnowledgePointResponse]
+    page: int
+    page_size: int
+    total: int
+    pages: int
 
 
 class KnowledgeRelationCreate(BaseModel):

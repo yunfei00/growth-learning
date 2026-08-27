@@ -133,6 +133,46 @@ export type ImportReport = {
   errors: string[];
 };
 
+export type Subject = "chinese" | "math" | "english" | "science";
+
+export type KnowledgeType =
+  | "chinese_character"
+  | "pinyin_initial"
+  | "pinyin_final"
+  | "pinyin_tone"
+  | "pinyin_syllable"
+  | "math_skill"
+  | "english_letter"
+  | "english_word"
+  | "english_phonics"
+  | "science_concept";
+
+export type AdminKnowledgePoint = {
+  id: string;
+  subject: Subject;
+  type: KnowledgeType;
+  status: "active" | "archived";
+  title: string;
+  canonical_key: string;
+  source_type: string;
+  source_reference: string | null;
+  mastery_policy_key: string | null;
+  mastery_projection_status: "configured" | "unavailable";
+  learning_evidence_count: number;
+  assessment_evidence_count: number;
+  child_state_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminKnowledgePage = {
+  items: AdminKnowledgePoint[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
 export type FamilyRole = "admin" | "companion";
 
 export type Family = {
@@ -1310,6 +1350,42 @@ export function importStarterCharacters(): Promise<ImportReport> {
   });
 }
 
+export function listAdminKnowledge(filters: {
+  subject?: Subject | "";
+  type?: KnowledgeType | "";
+  status?: "active" | "archived" | "";
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<AdminKnowledgePage> {
+  const query = new URLSearchParams();
+  if (filters.subject) query.set("subject", filters.subject);
+  if (filters.type) query.set("type", filters.type);
+  if (filters.status) query.set("status", filters.status);
+  if (filters.search) query.set("search", filters.search);
+  query.set("page", String(filters.page ?? 1));
+  query.set("page_size", String(filters.pageSize ?? 20));
+  return request<AdminKnowledgePage>(`/api/v1/admin/knowledge?${query.toString()}`);
+}
+
+export function getAdminKnowledge(id: string): Promise<AdminKnowledgePoint> {
+  return request<AdminKnowledgePoint>(`/api/v1/admin/knowledge/${id}`);
+}
+
+export function createAdminKnowledge(payload: {
+  subject: Subject;
+  type: KnowledgeType;
+  title: string;
+  canonical_key: string;
+  source_type?: string;
+  source_reference?: string | null;
+}): Promise<AdminKnowledgePoint> {
+  return request<AdminKnowledgePoint>("/api/v1/admin/knowledge", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
 export function getCharacterMasterySummary(childId: string): Promise<CharacterMasterySummary> {
   return request<CharacterMasterySummary>(`/api/v1/children/${childId}/characters/summary`);
 }
@@ -2224,17 +2300,29 @@ export function listEnabledCharacters(search = ""): Promise<CharacterPage> {
 
 export type CoursePoint = {
   knowledge_point_id: string;
-  character: string;
-  pinyin: string;
+  title: string;
+  subject: Subject;
+  knowledge_type: KnowledgeType;
+  character: string | null;
+  pinyin: string | null;
   role: "primary" | "review" | "optional" | "prerequisite";
   order_index: number;
-  mastery_level: MasteryLevel;
+  mastery_level: MasteryLevel | null;
+  mastery_policy_key: string | null;
+  projection_status: "configured" | "unavailable";
 };
 
 export type CourseActivity = {
   id: string;
   title: string;
   activity_type:
+    | "knowledge_learning"
+    | "guided_practice"
+    | "independent_practice"
+    | "knowledge_review"
+    | "knowledge_check"
+    | "listening"
+    | "speaking"
     | "character_learning"
     | "character_review"
     | "recognition_check"
@@ -2259,12 +2347,13 @@ export type CourseUnit = {
   introduced_count: number;
   stable_count: number;
   unlearned_count: number;
+  projection_unavailable_count: number;
   activities: CourseActivity[];
 };
 
 export type Course = {
   id: string;
-  subject: "chinese";
+  subject: Subject;
   title: string;
   description: string | null;
   source_type: "system" | "family" | "teacher" | "textbook_reference";
@@ -2282,15 +2371,17 @@ export type Course = {
   introduced_count: number;
   stable_count: number;
   unlearned_count: number;
+  projection_unavailable_count: number;
   units: CourseUnit[];
   created_at: string;
   updated_at: string;
 };
 
 export type CourseInput = {
+  subject?: Subject;
   title: string;
   description?: string | null;
-  source_type: "family" | "teacher" | "textbook_reference";
+  source_type: "system" | "family" | "teacher" | "textbook_reference";
   reference_metadata?: Record<string, string>;
   units: Array<{
     title: string;
@@ -2333,6 +2424,7 @@ export type CatalogRelease = {
 };
 
 export type ChildTodayTask = {
+  subject: Subject;
   kind: "new" | "review" | "reading" | "science" | "teacher";
   title: string;
   description: string;
@@ -2433,8 +2525,10 @@ export type RewardSettings = {
   goals: RewardGoal[];
 };
 
-export function listCourses(childId: string): Promise<Course[]> {
-  return request<Course[]>(`/api/v1/courses?child_id=${encodeURIComponent(childId)}`);
+export function listCourses(childId: string, subject?: Subject): Promise<Course[]> {
+  const query = new URLSearchParams({ child_id: childId });
+  if (subject) query.set("subject", subject);
+  return request<Course[]>(`/api/v1/courses?${query.toString()}`);
 }
 
 export function getCourse(courseId: string, childId: string): Promise<Course> {
@@ -2457,8 +2551,8 @@ export function createTeacherCourse(payload: CourseInput): Promise<Course> {
   });
 }
 
-export function listTeacherCourses(): Promise<Course[]> {
-  return request<Course[]>("/api/v1/teacher/courses");
+export function listTeacherCourses(subject?: Subject): Promise<Course[]> {
+  return request<Course[]>(`/api/v1/teacher/courses${subject ? `?subject=${subject}` : ""}`);
 }
 
 export function enrollCourse(
@@ -2526,8 +2620,15 @@ export function importChineseCatalog(): Promise<{
   return request("/api/v1/admin/catalog/import", { method: "POST" });
 }
 
-export function listAdminCourses(): Promise<Course[]> {
-  return request<Course[]>("/api/v1/admin/courses");
+export function listAdminCourses(subject?: Subject): Promise<Course[]> {
+  return request<Course[]>(`/api/v1/admin/courses${subject ? `?subject=${subject}` : ""}`);
+}
+
+export function createAdminCourse(payload: CourseInput): Promise<Course> {
+  return request<Course>("/api/v1/admin/courses", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
 }
 
 export function getChildToday(childId: string): Promise<ChildToday> {

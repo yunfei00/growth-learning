@@ -9,6 +9,7 @@ import {
   ApiClientError,
   type ChildToday,
   getChildToday,
+  type Subject,
 } from "@/lib/api/client";
 
 const TASK_ICONS: Record<string, string> = {
@@ -17,6 +18,13 @@ const TASK_ICONS: Record<string, string> = {
   reading: "📖",
   science: "🔬",
   teacher: "🧑‍🏫",
+};
+
+const SUBJECT_LABELS: Record<Subject, string> = {
+  chinese: "语文",
+  math: "数学",
+  english: "英语",
+  science: "科学",
 };
 
 function ChildHomeContent() {
@@ -113,7 +121,7 @@ function ChildHomeContent() {
                 </span>
                 <span className="child-task-copy">
                   <strong>{task.title}</strong>
-                  <small>{task.description}</small>
+                  <small>{SUBJECT_LABELS[task.subject]} · {task.description}</small>
                 </span>
                 <span className="child-task-cta">
                   {task.status === "completed" ? "完成啦 ✓" : task.cta_label}

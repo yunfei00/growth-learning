@@ -10,6 +10,7 @@ import {
   ApiClientError,
   type ChineseCharacter,
   type Course,
+  type Subject,
   copyCoursePath,
   createFamilyCourse,
   enrollCourse,
@@ -25,9 +26,17 @@ const sourceLabels: Record<Course["source_type"], string> = {
   textbook_reference: "教材参考",
 };
 
+const subjectLabels: Record<Subject, string> = {
+  chinese: "语文",
+  math: "数学",
+  english: "英语",
+  science: "科学",
+};
+
 function CoursesContent() {
   const { status, family, children, activeChild, setActiveChildId } = useActiveChild();
   const [courses, setCourses] = useState<Course[]>([]);
+  const [subject, setSubject] = useState<Subject | "">("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
@@ -44,12 +53,12 @@ function CoursesContent() {
   const load = useCallback(async () => {
     if (!activeChild) return;
     try {
-      setCourses(await listCourses(activeChild.id));
+      setCourses(await listCourses(activeChild.id, subject || undefined));
       setError("");
     } catch (requestError) {
       setError(requestError instanceof ApiClientError ? requestError.message : "课程加载失败");
     }
-  }, [activeChild]);
+  }, [activeChild, subject]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -172,6 +181,13 @@ function CoursesContent() {
       {message ? <p className="form-message form-success">{message}</p> : null}
 
       <section className="course-actions">
+        <label>
+          学科
+          <select value={subject} onChange={(event) => setSubject(event.target.value as Subject | "")}>
+            <option value="">全部学科</option>
+            {(Object.keys(subjectLabels) as Subject[]).map((item) => <option key={item} value={item}>{subjectLabels[item]}</option>)}
+          </select>
+        </label>
         {family.current_role === "admin" ? (
           <button className="button button-primary" onClick={() => setShowCreate(!showCreate)}>
             {showCreate ? "收起" : "创建家庭课程"}
@@ -269,16 +285,18 @@ function CoursesContent() {
         {courses.map((course) => (
           <article className="course-card" key={course.id}>
             <div className="course-card-topline">
-              <span>{sourceLabels[course.source_type]}</span>
+              <span>{subjectLabels[course.subject]} · {sourceLabels[course.source_type]}</span>
               <span>{course.enrollment_status ? `路径：${course.enrollment_status}` : "未选择"}</span>
             </div>
             <h2>{course.title}</h2>
             <p>{course.description}</p>
             <div className="course-stat-row">
               <span>课程完成 {course.completed_activities}/{course.activity_count}</span>
-              <span>已学习 {course.introduced_count}</span>
-              <span>稳定掌握 {course.stable_count}</span>
-              <span>待学习 {course.unlearned_count}</span>
+              {course.projection_unavailable_count ? (
+                <span>{course.projection_unavailable_count} 项掌握度策略未配置</span>
+              ) : (
+                <><span>已学习 {course.introduced_count}</span><span>稳定掌握 {course.stable_count}</span><span>待学习 {course.unlearned_count}</span></>
+              )}
             </div>
             <div className="course-card-actions">
               <Link href={`/courses/${course.id}`}>查看详情</Link>
@@ -295,6 +313,7 @@ function CoursesContent() {
           </article>
         ))}
       </section>
+      {courses.length === 0 ? <p className="empty-note">当前学科暂无可用课程。</p> : null}
     </main>
   );
 }

@@ -101,7 +101,7 @@ existing User --accept hashed FamilyInvitation--> FamilyMember(role)
 
 ## 5.2 系统知识与孩子状态分离
 
-`KnowledgePoint` 是跨学科规范主表，`ChineseCharacter` 是一对一的汉字属性，`KnowledgeRelation` 表达知识间关系。它们属于系统目录，不引用 Child。孩子掌握情况由 `LearningRecord`、`AssessmentItem` 和 `ChildKnowledgeState` 通过 `child_id + knowledge_point_id` 建立上下文，不污染共享知识。
+`KnowledgePoint` 是跨学科规范主表，使用受约束的 `subject + type` 区分语文、数学、英语与科学；`ChineseCharacter` 是一对一的汉字属性，`KnowledgeRelation` 表达知识间关系。它们属于系统目录，不引用 Child。孩子学习事实由 `LearningRecord`、`AssessmentItem` 通过 `child_id + knowledge_point_id` 建立上下文，不污染共享知识。`ChildKnowledgeState` 由显式 Mastery Policy 派生；当前只有汉字策略，未支持学科不会伪造状态。详见 [Phase 16 多学科基础](MULTISUBJECT_FOUNDATION.md)。
 
 ## 5.3 Mastery V1 计算边界
 

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
 import { ProtectedPage } from "@/components/protected-page";
-import { ApiClientError, type ChildToday, getChildToday } from "@/lib/api/client";
+import { ApiClientError, type ChildToday, getChildToday, type Subject } from "@/lib/api/client";
 
 const ICONS: Record<string, string> = {
   new: "🌱",
@@ -13,6 +13,13 @@ const ICONS: Record<string, string> = {
   reading: "📖",
   science: "🔬",
   teacher: "🧑‍🏫",
+};
+
+const SUBJECT_LABELS: Record<Subject, string> = {
+  chinese: "语文",
+  math: "数学",
+  english: "英语",
+  science: "科学",
 };
 
 function ChildTodayContent() {
@@ -63,7 +70,7 @@ function ChildTodayContent() {
             <article className={`child-today-task status-${task.status}`} key={`${task.kind}-${task.source_id ?? index}`}>
               <div className="child-task-number" aria-hidden="true">{task.status === "completed" ? "✓" : index + 1}</div>
               <span className="child-today-icon" aria-hidden="true">{ICONS[task.kind]}</span>
-              <div><h2>{task.title}</h2><p>{task.description}</p></div>
+              <div><small>{SUBJECT_LABELS[task.subject]}</small><h2>{task.title}</h2><p>{task.description}</p></div>
               <Link href={task.href}>{task.status === "completed" ? "再看看" : task.cta_label}</Link>
             </article>
           ))}

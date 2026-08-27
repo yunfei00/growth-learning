@@ -8,11 +8,14 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies import DbSession, require_system_admin
 from app.models import (
+    AssessmentItem,
     Child,
+    ChildKnowledgeState,
     ChineseCharacter,
     Family,
     KnowledgePoint,
     KnowledgeRelation,
+    LearningRecord,
     ScienceExperiment,
     User,
 )
@@ -24,6 +27,9 @@ from app.schemas.knowledge import (
     CharacterResponse,
     CharacterUpdate,
     ImportReport,
+    KnowledgePointCreate,
+    KnowledgePointPage,
+    KnowledgePointResponse,
     KnowledgeRelationCreate,
     KnowledgeRelationResponse,
 )
@@ -36,12 +42,49 @@ from app.services.character_catalog import (
     load_starter_dataset,
     to_response,
 )
+from app.services.mastery import mastery_policy_for_type
 
 router = APIRouter(
     prefix="/admin",
     tags=["system administration"],
     dependencies=[Depends(require_system_admin)],
 )
+
+
+async def _knowledge_response(session: DbSession, point: KnowledgePoint) -> KnowledgePointResponse:
+    policy = mastery_policy_for_type(point.type)
+    evidence_counts = (
+        await session.execute(
+            select(
+                select(func.count(LearningRecord.id))
+                .where(LearningRecord.knowledge_point_id == point.id)
+                .scalar_subquery(),
+                select(func.count(AssessmentItem.id))
+                .where(AssessmentItem.knowledge_point_id == point.id)
+                .scalar_subquery(),
+                select(func.count(ChildKnowledgeState.id))
+                .where(ChildKnowledgeState.knowledge_point_id == point.id)
+                .scalar_subquery(),
+            )
+        )
+    ).one()
+    return KnowledgePointResponse(
+        id=point.id,
+        subject=point.subject,
+        type=point.type,
+        status=point.status,
+        title=point.title,
+        canonical_key=point.canonical_key,
+        source_type=point.source_type,
+        source_reference=point.source_reference,
+        mastery_policy_key=policy.key if policy else None,
+        mastery_projection_status="configured" if policy else "unavailable",
+        learning_evidence_count=int(evidence_counts[0] or 0),
+        assessment_evidence_count=int(evidence_counts[1] or 0),
+        child_state_count=int(evidence_counts[2] or 0),
+        created_at=point.created_at,
+        updated_at=point.updated_at,
+    )
 
 
 @router.get("/overview", response_model=AdminOverviewResponse)
@@ -58,6 +101,93 @@ async def get_overview(session: DbSession) -> AdminOverviewResponse:
             await session.scalar(select(func.count()).select_from(ScienceExperiment)) or 0
         ),
     )
+
+
+@router.get("/knowledge", response_model=KnowledgePointPage)
+async def admin_list_knowledge(
+    session: DbSession,
+    subject: str | None = Query(default=None, pattern="^(chinese|math|english|science)$"),
+    knowledge_type: str | None = Query(default=None, alias="type", max_length=40),
+    knowledge_status: str | None = Query(
+        default=None, alias="status", pattern="^(active|archived)$"
+    ),
+    search: str | None = Query(default=None, max_length=120),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> KnowledgePointPage:
+    filters = []
+    if subject is not None:
+        filters.append(KnowledgePoint.subject == subject)
+    if knowledge_type is not None:
+        filters.append(KnowledgePoint.type == knowledge_type)
+    if knowledge_status is not None:
+        filters.append(KnowledgePoint.status == knowledge_status)
+    if search:
+        term = f"%{search.strip()}%"
+        filters.append(KnowledgePoint.title.ilike(term) | KnowledgePoint.canonical_key.ilike(term))
+    total = int(
+        await session.scalar(select(func.count()).select_from(KnowledgePoint).where(*filters)) or 0
+    )
+    points = list(
+        (
+            await session.scalars(
+                select(KnowledgePoint)
+                .where(*filters)
+                .order_by(
+                    KnowledgePoint.subject,
+                    KnowledgePoint.type,
+                    KnowledgePoint.title,
+                    KnowledgePoint.id,
+                )
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+        ).all()
+    )
+    return KnowledgePointPage(
+        items=[await _knowledge_response(session, point) for point in points],
+        page=page,
+        page_size=page_size,
+        total=total,
+        pages=(total + page_size - 1) // page_size,
+    )
+
+
+@router.post(
+    "/knowledge", response_model=KnowledgePointResponse, status_code=status.HTTP_201_CREATED
+)
+async def admin_create_knowledge(
+    payload: KnowledgePointCreate, session: DbSession
+) -> KnowledgePointResponse:
+    if payload.type == "chinese_character":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Use the character catalog endpoint for Chinese characters",
+        )
+    point = KnowledgePoint(status="active", **payload.model_dump())
+    session.add(point)
+    try:
+        await session.commit()
+    except IntegrityError as error:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Knowledge point canonical key already exists",
+        ) from error
+    await session.refresh(point)
+    return await _knowledge_response(session, point)
+
+
+@router.get("/knowledge/{knowledge_point_id}", response_model=KnowledgePointResponse)
+async def admin_get_knowledge(
+    knowledge_point_id: uuid.UUID, session: DbSession
+) -> KnowledgePointResponse:
+    point = await session.get(KnowledgePoint, knowledge_point_id)
+    if point is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge point not found"
+        )
+    return await _knowledge_response(session, point)
 
 
 @router.get("/characters", response_model=CharacterPage)

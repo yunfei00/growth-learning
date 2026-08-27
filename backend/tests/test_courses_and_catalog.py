@@ -25,6 +25,7 @@ from app.models import (
     Family,
     FamilyMember,
     FamilyRole,
+    KnowledgePoint,
     LearningRecord,
     LiteracyEstimate,
     ScienceExperiment,
@@ -273,6 +274,11 @@ async def test_catalog_import_is_idempotent_preserves_ids_and_historical_links(
             ).all()
         )
         assert after_ids == old_ids
+        assert set(
+            await session.scalars(
+                select(KnowledgePoint.subject).where(KnowledgePoint.id.in_(old_ids.values()))
+            )
+        ) == {"chinese"}
         assert await session.scalar(select(func.count()).select_from(CharacterCatalogEntry)) == 1200
         assert await session.scalar(select(func.count()).select_from(CourseUnit)) == 4
         assert (
@@ -290,6 +296,18 @@ async def test_catalog_import_is_idempotent_preserves_ids_and_historical_links(
             birth_date=date(2022, 1, 1),
         )
         session.add(new_child)
+        session.add_all(
+            [
+                KnowledgePoint(
+                    subject="math",
+                    type="math_skill",
+                    title=f"测试数学知识点 {index}",
+                    canonical_key=f"math:test-skill-{index}",
+                    source_type="test",
+                )
+                for index in range(30)
+            ]
+        )
         await session.commit()
         new_frame = await latest_literacy_estimate(session, new_child.id)
         assert (new_frame.catalog_size, new_frame.catalog_version) == (

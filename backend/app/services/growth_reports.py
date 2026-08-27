@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.ai.base import AICompletionRequest, AIMessage, AIProvider
 from app.models import (
+    AssessmentKind,
     AssessmentSession,
     ChildKnowledgeState,
     ChildReviewSchedule,
@@ -17,6 +18,8 @@ from app.models import (
     GrowthEvent,
     GrowthReport,
     GrowthReportVersion,
+    KnowledgePoint,
+    KnowledgeType,
     LearningRecord,
     LiteracyEstimate,
     MasteryLevel,
@@ -52,7 +55,14 @@ async def build_report_snapshot(
     states = list(
         (
             await session.scalars(
-                select(ChildKnowledgeState).where(ChildKnowledgeState.child_id == child_id)
+                select(ChildKnowledgeState).where(
+                    ChildKnowledgeState.child_id == child_id,
+                    ChildKnowledgeState.knowledge_point_id.in_(
+                        select(KnowledgePoint.id).where(
+                            KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER
+                        )
+                    ),
+                )
             )
         ).all()
     )
@@ -66,6 +76,11 @@ async def build_report_snapshot(
                 LearningRecord.child_id == child_id,
                 LearningRecord.learned_at >= start_at,
                 LearningRecord.learned_at < end_exclusive,
+                LearningRecord.knowledge_point_id.in_(
+                    select(KnowledgePoint.id).where(
+                        KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER
+                    )
+                ),
             )
         )
         or 0
@@ -77,6 +92,11 @@ async def build_report_snapshot(
             .where(
                 ChildReviewSchedule.child_id == child_id,
                 ChildReviewSchedule.next_review_at <= cutoff,
+                ChildReviewSchedule.knowledge_point_id.in_(
+                    select(KnowledgePoint.id).where(
+                        KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER
+                    )
+                ),
             )
         )
         or 0
@@ -87,6 +107,7 @@ async def build_report_snapshot(
                 select(AssessmentSession).where(
                     AssessmentSession.child_id == child_id,
                     AssessmentSession.status == "completed",
+                    AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
                     AssessmentSession.completed_at >= start_at,
                     AssessmentSession.completed_at < end_exclusive,
                 )

@@ -3,19 +3,54 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Protocol
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     AssessmentItem,
+    AssessmentKind,
     AssessmentOutcome,
+    AssessmentSession,
     ChildKnowledgeState,
+    KnowledgePoint,
+    KnowledgeType,
     LearningRecord,
     MasteryLevel,
 )
 
 ALGORITHM_VERSION = "v1"
+CHINESE_CHARACTER_POLICY_KEY = "chinese-character-v1"
+
+
+class MasteryPolicy(Protocol):
+    """A bounded projection algorithm for explicitly supported knowledge types."""
+
+    key: str
+    supported_knowledge_types: frozenset[str]
+
+    def recompute(
+        self,
+        learning_records: list[LearningRecord],
+        assessment_items: list[AssessmentItem],
+    ) -> "MasteryProjection": ...
+
+
+class MasteryPolicyRegistry:
+    """Small explicit registry; unsupported domains intentionally have no projection."""
+
+    def __init__(self) -> None:
+        self._by_knowledge_type: dict[str, MasteryPolicy] = {}
+
+    def register(self, policy: MasteryPolicy) -> None:
+        for knowledge_type in policy.supported_knowledge_types:
+            if knowledge_type in self._by_knowledge_type:
+                raise ValueError(f"Mastery policy already registered for {knowledge_type}")
+            self._by_knowledge_type[knowledge_type] = policy
+
+    def for_knowledge_type(self, knowledge_type: str) -> MasteryPolicy | None:
+        return self._by_knowledge_type.get(knowledge_type)
 
 
 @dataclass(frozen=True)
@@ -119,6 +154,28 @@ def project_mastery(
     )
 
 
+class ChineseCharacterMasteryPolicy:
+    """Compatibility wrapper around the unchanged Chinese-character V1 algorithm."""
+
+    key = CHINESE_CHARACTER_POLICY_KEY
+    supported_knowledge_types = frozenset({KnowledgeType.CHINESE_CHARACTER})
+
+    def recompute(
+        self,
+        learning_records: list[LearningRecord],
+        assessment_items: list[AssessmentItem],
+    ) -> MasteryProjection:
+        return project_mastery(learning_records, assessment_items)
+
+
+mastery_policies = MasteryPolicyRegistry()
+mastery_policies.register(ChineseCharacterMasteryPolicy())
+
+
+def mastery_policy_for_type(knowledge_type: str) -> MasteryPolicy | None:
+    return mastery_policies.for_knowledge_type(knowledge_type)
+
+
 async def recompute_child_knowledge_state(
     session: AsyncSession,
     child_id: uuid.UUID,
@@ -127,6 +184,14 @@ async def recompute_child_knowledge_state(
     ensure_state: bool = False,
 ) -> ChildKnowledgeState | None:
     """Rebuild one projection while preserving its family-managed priority flag."""
+
+    point = await session.get(KnowledgePoint, knowledge_point_id)
+    if point is None:
+        return None
+    policy = mastery_policy_for_type(point.type)
+    if policy is None:
+        # Generic evidence remains canonical even when no domain projection exists.
+        return None
 
     learning_records = list(
         (
@@ -141,9 +206,12 @@ async def recompute_child_knowledge_state(
     assessment_items = list(
         (
             await session.scalars(
-                select(AssessmentItem).where(
+                select(AssessmentItem)
+                .join(AssessmentSession, AssessmentSession.id == AssessmentItem.session_id)
+                .where(
                     AssessmentItem.child_id == child_id,
                     AssessmentItem.knowledge_point_id == knowledge_point_id,
+                    AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
                 )
             )
         ).all()
@@ -163,10 +231,13 @@ async def recompute_child_knowledge_state(
         )
         session.add(state)
 
-    projection = project_mastery(learning_records, assessment_items)
+    projection = policy.recompute(learning_records, assessment_items)
     for field, value in projection.__dict__.items():
         setattr(state, field, value)
     state.algorithm_version = ALGORITHM_VERSION
+    state.policy_key = policy.key
+    state.state_code = projection.mastery_level
+    state.dimensions_json = {}
     await session.flush()
     return state
 
@@ -181,6 +252,12 @@ async def recompute_child_states(session: AsyncSession, child_id: uuid.UUID | No
             query = query.where(model.child_id == child_id)
         point_pairs.update((await session.execute(query)).all())
 
+    projected = 0
     for state_child_id, point_id in point_pairs:
-        await recompute_child_knowledge_state(session, state_child_id, point_id, ensure_state=True)
-    return len(point_pairs)
+        projected += int(
+            await recompute_child_knowledge_state(
+                session, state_child_id, point_id, ensure_state=True
+            )
+            is not None
+        )
+    return projected

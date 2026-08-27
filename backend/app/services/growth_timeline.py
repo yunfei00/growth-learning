@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
+    AssessmentKind,
     AssessmentSession,
     ChildKnowledgeState,
     ExperimentEvidence,
@@ -19,6 +20,8 @@ from app.models import (
     GrowthEventCategory,
     GrowthEventType,
     GrowthSourceType,
+    KnowledgePoint,
+    KnowledgeType,
     LearningRecord,
     MasteryLevel,
     ReadingMode,
@@ -155,7 +158,12 @@ async def project_growth_events(session: AsyncSession, child_id: uuid.UUID) -> P
     introduced_count = int(
         await session.scalar(
             select(func.count(func.distinct(LearningRecord.knowledge_point_id))).where(
-                LearningRecord.child_id == child_id
+                LearningRecord.child_id == child_id,
+                LearningRecord.knowledge_point_id.in_(
+                    select(KnowledgePoint.id).where(
+                        KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER
+                    )
+                ),
             )
         )
         or 0
@@ -167,6 +175,11 @@ async def project_growth_events(session: AsyncSession, child_id: uuid.UUID) -> P
             .where(
                 ChildKnowledgeState.child_id == child_id,
                 ChildKnowledgeState.mastery_level == MasteryLevel.STABLE,
+                ChildKnowledgeState.knowledge_point_id.in_(
+                    select(KnowledgePoint.id).where(
+                        KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER
+                    )
+                ),
             )
         )
         or 0
@@ -178,7 +191,12 @@ async def project_growth_events(session: AsyncSession, child_id: uuid.UUID) -> P
         if count >= threshold:
             occurred = await session.scalar(
                 select(func.max(LearningRecord.learned_at)).where(
-                    LearningRecord.child_id == child_id
+                    LearningRecord.child_id == child_id,
+                    LearningRecord.knowledge_point_id.in_(
+                        select(KnowledgePoint.id).where(
+                            KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER
+                        )
+                    ),
                 )
             ) or datetime.now(UTC)
             made = await _emit(
@@ -201,6 +219,7 @@ async def project_growth_events(session: AsyncSession, child_id: uuid.UUID) -> P
                 select(AssessmentSession).where(
                     AssessmentSession.child_id == child_id,
                     AssessmentSession.status == "completed",
+                    AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
                 )
             )
         ).all()

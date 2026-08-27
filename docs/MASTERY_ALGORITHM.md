@@ -2,6 +2,8 @@
 
 Mastery V1 是基于已保存原始证据的确定性算法。它不调用 AI，不根据年龄或姓名推断能力，也不把单次答对解释为长期掌握。算法版本保存为 `v1`。
 
+Phase 16 后，本算法通过 `MasteryPolicyRegistry` 只注册给 `chinese_character`，策略键为 `chinese-character-v1`。拼音、数学、英语与科学可保存规范证据，但在各自策略完成验证前返回 `unavailable`，不生成 `ChildKnowledgeState` 或复习日程，也不把“算法未配置”显示为“未学习”。
+
 ## 输入证据
 
 - 学习证据：`introduced`、`relearned`、`parent_marked_seen`。

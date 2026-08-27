@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TodayTaskResponse(BaseModel):
+    subject: Literal["chinese", "math", "english", "science"]
     kind: Literal["new", "review", "reading", "science", "teacher"]
     title: str
     description: str

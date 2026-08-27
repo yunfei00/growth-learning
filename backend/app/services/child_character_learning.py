@@ -20,6 +20,7 @@ from app.models import (
     DailyPlanItem,
     KnowledgePoint,
     KnowledgeStatus,
+    KnowledgeType,
     LearningRecord,
     LearningSession,
     MasteryLevel,
@@ -41,11 +42,19 @@ from app.schemas.learning import (
     LearningSessionCreate,
     TimelineItem,
 )
-from app.services.mastery import recompute_child_knowledge_state
+from app.services.mastery import mastery_policy_for_type, recompute_child_knowledge_state
 from app.services.review_planning import (
     recompute_review_schedule,
     update_daily_learning_progress,
 )
+
+
+def _character_point_ids():
+    return (
+        select(KnowledgePoint.id)
+        .join(ChineseCharacter)
+        .where(KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER)
+    )
 
 
 def _state_response(
@@ -141,7 +150,10 @@ async def summarize_character_mastery(
         await session.scalar(
             select(func.count())
             .select_from(LearningRecord)
-            .where(LearningRecord.child_id == child_id)
+            .where(
+                LearningRecord.child_id == child_id,
+                LearningRecord.knowledge_point_id.in_(_character_point_ids()),
+            )
         )
         or 0
     )
@@ -149,7 +161,10 @@ async def summarize_character_mastery(
         await session.scalar(
             select(func.count())
             .select_from(AssessmentItem)
-            .where(AssessmentItem.child_id == child_id)
+            .where(
+                AssessmentItem.child_id == child_id,
+                AssessmentItem.knowledge_point_id.in_(_character_point_ids()),
+            )
         )
         or 0
     )
@@ -343,7 +358,8 @@ async def list_character_learning_history(
     distinct_characters = int(
         await session.scalar(
             select(func.count(func.distinct(LearningRecord.knowledge_point_id))).where(
-                LearningRecord.child_id == child_id
+                LearningRecord.child_id == child_id,
+                LearningRecord.knowledge_point_id.in_(_character_point_ids()),
             )
         )
         or 0
@@ -357,7 +373,10 @@ async def list_character_learning_history(
             LearningRecord.knowledge_point_id,
             func.min(LearningRecord.learned_at).label("first_learned_at"),
         )
-        .where(LearningRecord.child_id == child_id)
+        .where(
+            LearningRecord.child_id == child_id,
+            LearningRecord.knowledge_point_id.in_(_character_point_ids()),
+        )
         .group_by(LearningRecord.knowledge_point_id)
         .subquery()
     )
@@ -666,22 +685,50 @@ async def recommend_characters(
     ]
 
 
-async def _validate_enabled_points(session: AsyncSession, point_ids: set[uuid.UUID]) -> None:
-    available = set(
+async def _validate_enabled_points(
+    session: AsyncSession, point_ids: set[uuid.UUID]
+) -> dict[uuid.UUID, KnowledgePoint]:
+    rows = list(
         (
-            await session.scalars(
-                select(KnowledgePoint.id)
-                .join(ChineseCharacter)
+            await session.execute(
+                select(KnowledgePoint, ChineseCharacter)
+                .outerjoin(
+                    ChineseCharacter,
+                    ChineseCharacter.knowledge_point_id == KnowledgePoint.id,
+                )
                 .where(
                     KnowledgePoint.id.in_(point_ids),
                     KnowledgePoint.status == KnowledgeStatus.ACTIVE,
-                    ChineseCharacter.is_enabled.is_(True),
+                    or_(
+                        KnowledgePoint.type != KnowledgeType.CHINESE_CHARACTER,
+                        ChineseCharacter.is_enabled.is_(True),
+                    ),
                 )
             )
         ).all()
     )
-    if available != point_ids:
-        raise ValueError("One or more enabled characters were not found")
+    available = {point.id: point for point, _ in rows}
+    if set(available) != point_ids:
+        raise ValueError("One or more enabled knowledge points were not found")
+    return available
+
+
+def _projection_availability(
+    points: dict[uuid.UUID, KnowledgePoint],
+) -> tuple[str, list[uuid.UUID]]:
+    unavailable = sorted(
+        (
+            point_id
+            for point_id, point in points.items()
+            if mastery_policy_for_type(point.type) is None
+        ),
+        key=str,
+    )
+    if not unavailable:
+        return "configured", []
+    if len(unavailable) == len(points):
+        return "unavailable", unavailable
+    return "partially_unavailable", unavailable
 
 
 async def create_learning_session(
@@ -691,7 +738,7 @@ async def create_learning_session(
     payload: LearningSessionCreate,
 ) -> EvidenceSessionResponse:
     point_ids = {item.knowledge_point_id for item in payload.items}
-    await _validate_enabled_points(session, point_ids)
+    points = await _validate_enabled_points(session, point_ids)
     now = datetime.now(UTC)
     learning_session = LearningSession(
         child_id=child_id,
@@ -720,6 +767,7 @@ async def create_learning_session(
         await recompute_review_schedule(session, child_id, point_id)
     await update_daily_learning_progress(session, child_id, point_ids, now=now)
     await session.commit()
+    projection_status, unavailable = _projection_availability(points)
     return EvidenceSessionResponse(
         id=learning_session.id,
         child_id=child_id,
@@ -729,6 +777,8 @@ async def create_learning_session(
         started_at=learning_session.started_at,
         completed_at=learning_session.completed_at,
         created_at=learning_session.created_at,
+        mastery_projection=projection_status,
+        projection_unavailable_knowledge_point_ids=unavailable,
     )
 
 
@@ -739,13 +789,14 @@ async def create_assessment_session(
     payload: AssessmentSessionCreate,
 ) -> EvidenceSessionResponse:
     point_ids = {item.knowledge_point_id for item in payload.items}
-    await _validate_enabled_points(session, point_ids)
+    points = await _validate_enabled_points(session, point_ids)
     now = datetime.now(UTC)
     assessment_session = AssessmentSession(
         child_id=child_id,
         evaluator_user_id=evaluator_user_id,
         status=payload.status,
         source=payload.source,
+        assessment_kind=payload.assessment_kind,
         completed_at=now if payload.status != SessionStatus.IN_PROGRESS else None,
     )
     session.add(assessment_session)
@@ -760,6 +811,8 @@ async def create_assessment_session(
                 outcome=item.outcome,
                 response_time_ms=item.response_time_ms,
                 hint_used=item.hint_used,
+                skill_dimension=item.skill_dimension,
+                evidence_metadata=item.evidence_metadata,
                 assessed_at=now,
             )
         )
@@ -768,6 +821,7 @@ async def create_assessment_session(
         await recompute_child_knowledge_state(session, child_id, point_id)
         await recompute_review_schedule(session, child_id, point_id)
     await session.commit()
+    projection_status, unavailable = _projection_availability(points)
     return EvidenceSessionResponse(
         id=assessment_session.id,
         child_id=child_id,
@@ -777,4 +831,6 @@ async def create_assessment_session(
         started_at=assessment_session.started_at,
         completed_at=assessment_session.completed_at,
         created_at=assessment_session.created_at,
+        mastery_projection=projection_status,
+        projection_unavailable_knowledge_point_ids=unavailable,
     )

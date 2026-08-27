@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import (
     AchievementDefinition,
     ActivityKnowledgePoint,
+    AssessmentKind,
     AssessmentSession,
     Child,
     ChildAchievement,
@@ -22,6 +23,8 @@ from app.models import (
     ExperimentSession,
     FamilyRewardGoal,
     FamilyRewardSettings,
+    KnowledgePoint,
+    KnowledgeType,
     LearningActivity,
     LearningRecord,
     ReadingSession,
@@ -50,6 +53,11 @@ from app.services.teacher_collaboration import list_child_teacher_tasks
 ACHIEVEMENT_RULE_VERSION = "achievement-v1"
 REWARD_RULE_VERSION = "stars-v1"
 GROWTH_TREE_VERSION = "growth-tree-v1"
+
+
+def _character_point_ids():
+    return select(KnowledgePoint.id).where(KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER)
+
 
 ACHIEVEMENT_RULES: tuple[dict[str, object], ...] = (
     {
@@ -231,6 +239,7 @@ async def _rule_evidence(
             session,
             LearningRecord,
             LearningRecord.child_id == child_id,
+            LearningRecord.knowledge_point_id.in_(_character_point_ids()),
             id_column=LearningRecord.id,
             time_column=LearningRecord.learned_at,
         )
@@ -239,6 +248,7 @@ async def _rule_evidence(
             session,
             LearningRecord,
             LearningRecord.child_id == child_id,
+            LearningRecord.knowledge_point_id.in_(_character_point_ids()),
             id_column=LearningRecord.id,
             time_column=LearningRecord.learned_at,
             distinct_column=LearningRecord.knowledge_point_id,
@@ -249,6 +259,7 @@ async def _rule_evidence(
             ChildKnowledgeState,
             ChildKnowledgeState.child_id == child_id,
             ChildKnowledgeState.mastery_level == "stable",
+            ChildKnowledgeState.knowledge_point_id.in_(_character_point_ids()),
             id_column=ChildKnowledgeState.id,
             time_column=ChildKnowledgeState.updated_at,
         )
@@ -259,6 +270,7 @@ async def _rule_evidence(
             AssessmentSession.child_id == child_id,
             AssessmentSession.status == "completed",
             AssessmentSession.source == "daily_review",
+            AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
             id_column=AssessmentSession.id,
             time_column=AssessmentSession.completed_at,
         )
@@ -267,6 +279,7 @@ async def _rule_evidence(
             session,
             LearningRecord,
             LearningRecord.child_id == child_id,
+            LearningRecord.knowledge_point_id.in_(_character_point_ids()),
             id_column=LearningRecord.id,
             time_column=LearningRecord.learned_at,
             distinct_column=func.date(LearningRecord.learned_at),
@@ -577,6 +590,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
         )
         tasks.append(
             TodayTaskResponse(
+                subject="chinese",
                 kind="new",
                 title=f"学{plan.recommended_new_count}个新字",
                 description="按今天的课程顺序认识新朋友",
@@ -593,6 +607,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
         .where(
             AssessmentSession.child_id == child.id,
             AssessmentSession.status == "in_progress",
+            AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
             AssessmentSession.source.in_(["daily_review", "weekly_check", "monthly_assessment"]),
         )
         .order_by(AssessmentSession.started_at.desc())
@@ -610,6 +625,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
         )
         tasks.append(
             TodayTaskResponse(
+                subject="chinese",
                 kind="review",
                 title=f"复习{review_count}个字",
                 description="让已经认识的字长出新叶子",
@@ -626,6 +642,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
     reading = plan.reading
     tasks.append(
         TodayTaskResponse(
+            subject="chinese",
             kind="reading",
             title=reading.title or "读一个故事",
             description=(
@@ -652,6 +669,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
         urgent = bool(task.due_at and task.due_at <= datetime.now(UTC) + timedelta(days=1))
         tasks.append(
             TodayTaskResponse(
+                subject="chinese",
                 kind="teacher",
                 title=task.title,
                 description=f"{task.teacher.display_name}的小挑战",
@@ -678,6 +696,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
         title = str(science_session.experiment_snapshot.get("title", "科学实验"))
         tasks.append(
             TodayTaskResponse(
+                subject="science",
                 kind="science",
                 title=title,
                 description="实验还在等你继续探索",
@@ -692,6 +711,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
     elif science_available:
         tasks.append(
             TodayTaskResponse(
+                subject="science",
                 kind="science",
                 title="周末科学实验",
                 description="和爸爸妈妈一起选择一个小实验",
@@ -737,13 +757,25 @@ async def growth_tree(session: AsyncSession, child: Child) -> GrowthTreeResponse
                         )
                     )
                 ).label("completed_activities"),
-                func.count(func.distinct(ActivityKnowledgePoint.knowledge_point_id)).label("total"),
                 func.count(
                     func.distinct(
                         case(
                             (
-                                ChildKnowledgeState.mastery_level.in_(
-                                    ["introduced", "recognizing", "proficient", "stable"]
+                                KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER,
+                                ActivityKnowledgePoint.knowledge_point_id,
+                            )
+                        )
+                    )
+                ).label("total"),
+                func.count(
+                    func.distinct(
+                        case(
+                            (
+                                and_(
+                                    KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER,
+                                    ChildKnowledgeState.mastery_level.in_(
+                                        ["introduced", "recognizing", "proficient", "stable"]
+                                    ),
                                 ),
                                 ActivityKnowledgePoint.knowledge_point_id,
                             )
@@ -754,8 +786,11 @@ async def growth_tree(session: AsyncSession, child: Child) -> GrowthTreeResponse
                     func.distinct(
                         case(
                             (
-                                ChildKnowledgeState.mastery_level.in_(
-                                    ["introduced", "recognizing", "proficient"]
+                                and_(
+                                    KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER,
+                                    ChildKnowledgeState.mastery_level.in_(
+                                        ["introduced", "recognizing", "proficient"]
+                                    ),
                                 ),
                                 ActivityKnowledgePoint.knowledge_point_id,
                             )
@@ -766,7 +801,10 @@ async def growth_tree(session: AsyncSession, child: Child) -> GrowthTreeResponse
                     func.distinct(
                         case(
                             (
-                                ChildKnowledgeState.mastery_level == "stable",
+                                and_(
+                                    KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER,
+                                    ChildKnowledgeState.mastery_level == "stable",
+                                ),
                                 ActivityKnowledgePoint.knowledge_point_id,
                             )
                         )
@@ -779,6 +817,10 @@ async def growth_tree(session: AsyncSession, child: Child) -> GrowthTreeResponse
             .outerjoin(
                 ActivityKnowledgePoint,
                 ActivityKnowledgePoint.activity_id == LearningActivity.id,
+            )
+            .outerjoin(
+                KnowledgePoint,
+                KnowledgePoint.id == ActivityKnowledgePoint.knowledge_point_id,
             )
             .outerjoin(
                 ChildKnowledgeState,
@@ -797,6 +839,7 @@ async def growth_tree(session: AsyncSession, child: Child) -> GrowthTreeResponse
             )
             .where(
                 ChildCourseEnrollment.child_id == child.id,
+                Course.subject == "chinese",
                 ChildCourseEnrollment.status != "archived",
                 Course.status != "archived",
                 CourseUnit.status != "archived",

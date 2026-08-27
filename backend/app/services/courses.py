@@ -1,6 +1,7 @@
 """Course ownership, path, progress, and canonical-evidence services."""
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, or_, select
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     ActivityKnowledgePoint,
+    ActivityType,
     CatalogRelease,
     ChildCourseEnrollment,
     ChildKnowledgeState,
@@ -23,6 +25,7 @@ from app.models import (
     DailyPlanStatus,
     EnrollmentStatus,
     KnowledgePoint,
+    KnowledgeStatus,
     LearningActivity,
     LearningActivityType,
     LearningRecord,
@@ -44,8 +47,70 @@ from app.schemas.course import (
     EnrollmentResponse,
     PathCopyResponse,
 )
-from app.services.mastery import recompute_child_knowledge_state
+from app.services.mastery import mastery_policy_for_type, recompute_child_knowledge_state
 from app.services.review_planning import recompute_review_schedule
+
+
+@dataclass(frozen=True)
+class ActivityEvidenceHandler:
+    """Translate a course activity into canonical, append-only learning evidence."""
+
+    activity_type: ActivityType
+    first_evidence_type: LearningActivityType
+    repeat_evidence_type: LearningActivityType
+
+    def evidence_type(self, *, has_prior_evidence: bool) -> LearningActivityType:
+        return self.repeat_evidence_type if has_prior_evidence else self.first_evidence_type
+
+
+class ActivityHandlerRegistry:
+    """Explicit boundary between course orchestration and evidence semantics."""
+
+    def __init__(self, handlers: tuple[ActivityEvidenceHandler, ...]) -> None:
+        self._handlers = {handler.activity_type.value: handler for handler in handlers}
+
+    @property
+    def supported_activity_types(self) -> tuple[str, ...]:
+        return tuple(self._handlers)
+
+    def resolve(self, activity_type: str) -> ActivityEvidenceHandler | None:
+        return self._handlers.get(activity_type)
+
+
+ACTIVITY_HANDLER_REGISTRY = ActivityHandlerRegistry(
+    (
+        ActivityEvidenceHandler(
+            ActivityType.CHARACTER_LEARNING,
+            LearningActivityType.INTRODUCED,
+            LearningActivityType.RELEARNED,
+        ),
+        ActivityEvidenceHandler(
+            ActivityType.CHARACTER_REVIEW,
+            LearningActivityType.INTRODUCED,
+            LearningActivityType.RELEARNED,
+        ),
+        ActivityEvidenceHandler(
+            ActivityType.KNOWLEDGE_LEARNING,
+            LearningActivityType.INTRODUCED,
+            LearningActivityType.REVIEWED,
+        ),
+        ActivityEvidenceHandler(
+            ActivityType.GUIDED_PRACTICE,
+            LearningActivityType.GUIDED_PRACTICE,
+            LearningActivityType.GUIDED_PRACTICE,
+        ),
+        ActivityEvidenceHandler(
+            ActivityType.INDEPENDENT_PRACTICE,
+            LearningActivityType.INDEPENDENT_PRACTICE,
+            LearningActivityType.INDEPENDENT_PRACTICE,
+        ),
+        ActivityEvidenceHandler(
+            ActivityType.KNOWLEDGE_REVIEW,
+            LearningActivityType.REVIEWED,
+            LearningActivityType.REVIEWED,
+        ),
+    )
+)
 
 
 async def _teacher_profile(session: AsyncSession, user_id: uuid.UUID) -> TeacherProfile | None:
@@ -53,36 +118,40 @@ async def _teacher_profile(session: AsyncSession, user_id: uuid.UUID) -> Teacher
 
 
 async def visible_courses(
-    session: AsyncSession, child_id: uuid.UUID, family_id: uuid.UUID
+    session: AsyncSession,
+    child_id: uuid.UUID,
+    family_id: uuid.UUID,
+    subject: str | None = None,
 ) -> list[Course]:
     teacher_ids = select(TeacherChildRelation.teacher_id).where(
         TeacherChildRelation.child_id == child_id,
         TeacherChildRelation.status == TeacherRelationStatus.ACTIVE,
     )
+    query = select(Course).where(
+        Course.status != CourseStatus.ARCHIVED,
+        or_(
+            Course.source_type == CourseSourceType.SYSTEM,
+            and_(
+                Course.source_type.in_(
+                    [
+                        CourseSourceType.FAMILY,
+                        CourseSourceType.TEXTBOOK_REFERENCE,
+                    ]
+                ),
+                Course.family_id == family_id,
+            ),
+            and_(
+                Course.source_type == CourseSourceType.TEACHER,
+                Course.teacher_id.in_(teacher_ids),
+            ),
+        ),
+    )
+    if subject is not None:
+        query = query.where(Course.subject == subject)
     return list(
         (
             await session.scalars(
-                select(Course)
-                .where(
-                    Course.status != CourseStatus.ARCHIVED,
-                    or_(
-                        Course.source_type == CourseSourceType.SYSTEM,
-                        and_(
-                            Course.source_type.in_(
-                                [
-                                    CourseSourceType.FAMILY,
-                                    CourseSourceType.TEXTBOOK_REFERENCE,
-                                ]
-                            ),
-                            Course.family_id == family_id,
-                        ),
-                        and_(
-                            Course.source_type == CourseSourceType.TEACHER,
-                            Course.teacher_id.in_(teacher_ids),
-                        ),
-                    ),
-                )
-                .order_by(Course.source_type, Course.created_at, Course.id)
+                query.order_by(Course.subject, Course.source_type, Course.created_at, Course.id)
             )
         ).all()
     )
@@ -117,9 +186,12 @@ async def create_course(
     family_id: uuid.UUID | None = None,
     teacher_id: uuid.UUID | None = None,
 ) -> Course:
-    if payload.source_type == CourseSourceType.TEACHER and teacher_id is None:
+    if payload.source_type == CourseSourceType.SYSTEM:
+        if family_id is not None or teacher_id is not None:
+            raise ValueError("System course cannot have a family or teacher owner")
+    elif payload.source_type == CourseSourceType.TEACHER and teacher_id is None:
         raise ValueError("Teacher course requires an active teacher profile")
-    if payload.source_type != CourseSourceType.TEACHER and family_id is None:
+    elif payload.source_type != CourseSourceType.TEACHER and family_id is None:
         raise ValueError("Family course requires a family owner")
     point_ids = {
         point.knowledge_point_id
@@ -127,15 +199,23 @@ async def create_course(
         for activity in unit.activities
         for point in activity.knowledge_points
     }
-    existing = set(
+    point_rows = list(
         (
-            await session.scalars(select(KnowledgePoint.id).where(KnowledgePoint.id.in_(point_ids)))
+            await session.execute(
+                select(KnowledgePoint.id, KnowledgePoint.subject).where(
+                    KnowledgePoint.id.in_(point_ids),
+                    KnowledgePoint.status == KnowledgeStatus.ACTIVE,
+                )
+            )
         ).all()
     )
-    if existing != point_ids:
-        raise ValueError("One or more canonical knowledge points do not exist")
+    if {row.id for row in point_rows} != point_ids:
+        raise ValueError("One or more active canonical knowledge points do not exist")
+    mismatched = [row.id for row in point_rows if row.subject != payload.subject]
+    if mismatched:
+        raise ValueError("Course subject must match every linked knowledge point subject")
     course = Course(
-        subject="chinese",
+        subject=payload.subject,
         title=payload.title.strip(),
         description=payload.description,
         source_type=payload.source_type,
@@ -185,19 +265,16 @@ async def create_course(
     return course
 
 
-async def teacher_courses(session: AsyncSession, user_id: uuid.UUID) -> list[Course]:
+async def teacher_courses(
+    session: AsyncSession, user_id: uuid.UUID, subject: str | None = None
+) -> list[Course]:
     profile = await _teacher_profile(session, user_id)
     if profile is None:
         raise LookupError("Teacher mode is not enabled")
-    return list(
-        (
-            await session.scalars(
-                select(Course)
-                .where(Course.teacher_id == profile.id)
-                .order_by(Course.created_at.desc())
-            )
-        ).all()
-    )
+    query = select(Course).where(Course.teacher_id == profile.id)
+    if subject is not None:
+        query = query.where(Course.subject == subject)
+    return list((await session.scalars(query.order_by(Course.created_at.desc()))).all())
 
 
 async def _course_enrollment(
@@ -229,18 +306,14 @@ async def course_response(
     unit_responses: list[CourseUnitResponse] = []
     total_activities = 0
     total_completed = 0
-    all_point_levels: dict[uuid.UUID, str] = {}
+    all_point_states: dict[uuid.UUID, ChildKnowledgeState] = {}
     if child_id is not None:
-        all_point_levels = dict(
-            (
-                await session.execute(
-                    select(
-                        ChildKnowledgeState.knowledge_point_id,
-                        ChildKnowledgeState.mastery_level,
-                    ).where(ChildKnowledgeState.child_id == child_id)
-                )
-            ).all()
-        )
+        all_point_states = {
+            state.knowledge_point_id: state
+            for state in await session.scalars(
+                select(ChildKnowledgeState).where(ChildKnowledgeState.child_id == child_id)
+            )
+        }
     for unit in units:
         activities = list(
             (
@@ -252,17 +325,19 @@ async def course_response(
             ).all()
         )
         activity_responses: list[CourseActivityResponse] = []
-        unit_point_ids: set[uuid.UUID] = set()
         unit_completed = 0
         for activity in activities:
             mappings = list(
                 (
                     await session.execute(
-                        select(ActivityKnowledgePoint, ChineseCharacter)
+                        select(ActivityKnowledgePoint, KnowledgePoint, ChineseCharacter)
                         .join(
+                            KnowledgePoint,
+                            KnowledgePoint.id == ActivityKnowledgePoint.knowledge_point_id,
+                        )
+                        .outerjoin(
                             ChineseCharacter,
-                            ChineseCharacter.knowledge_point_id
-                            == ActivityKnowledgePoint.knowledge_point_id,
+                            ChineseCharacter.knowledge_point_id == KnowledgePoint.id,
                         )
                         .where(ActivityKnowledgePoint.activity_id == activity.id)
                         .order_by(ActivityKnowledgePoint.order_index)
@@ -279,7 +354,31 @@ async def course_response(
                 )
             progress_status = progress.status if progress else "pending"
             unit_completed += progress_status == "completed"
-            unit_point_ids.update(mapping.knowledge_point_id for mapping, _ in mappings)
+            point_responses: list[CoursePointResponse] = []
+            for mapping, point, character in mappings:
+                policy = mastery_policy_for_type(point.type)
+                state = all_point_states.get(point.id) if policy is not None else None
+                point_responses.append(
+                    CoursePointResponse(
+                        knowledge_point_id=point.id,
+                        title=point.title,
+                        subject=point.subject,
+                        knowledge_type=point.type,
+                        character=character.character if character is not None else None,
+                        pinyin=character.pinyin if character is not None else None,
+                        role=mapping.role,
+                        order_index=mapping.order_index,
+                        mastery_level=(
+                            state.mastery_level
+                            if state is not None
+                            else MasteryLevel.UNLEARNED
+                            if policy is not None
+                            else None
+                        ),
+                        mastery_policy_key=policy.key if policy is not None else None,
+                        projection_status=("configured" if policy is not None else "unavailable"),
+                    )
+                )
             activity_responses.append(
                 CourseActivityResponse(
                     id=activity.id,
@@ -289,24 +388,22 @@ async def course_response(
                     order_index=activity.order_index,
                     status=activity.status,
                     progress_status=progress_status,
-                    points=[
-                        CoursePointResponse(
-                            knowledge_point_id=mapping.knowledge_point_id,
-                            character=character.character,
-                            pinyin=character.pinyin,
-                            role=mapping.role,
-                            order_index=mapping.order_index,
-                            mastery_level=all_point_levels.get(
-                                mapping.knowledge_point_id, MasteryLevel.UNLEARNED
-                            ),
-                        )
-                        for mapping, character in mappings
-                    ],
+                    points=point_responses,
                 )
             )
+        unit_points = [point for activity in activity_responses for point in activity.points]
         levels = [
-            all_point_levels.get(point_id, MasteryLevel.UNLEARNED) for point_id in unit_point_ids
+            point.mastery_level
+            for point in unit_points
+            if point.projection_status == "configured" and point.mastery_level is not None
         ]
+        unavailable_count = len(
+            {
+                point.knowledge_point_id
+                for point in unit_points
+                if point.projection_status == "unavailable"
+            }
+        )
         introduced = sum(level != MasteryLevel.UNLEARNED for level in levels)
         stable = sum(level == MasteryLevel.STABLE for level in levels)
         unit_responses.append(
@@ -321,20 +418,26 @@ async def course_response(
                 introduced_count=introduced,
                 stable_count=stable,
                 unlearned_count=len(levels) - introduced,
+                projection_unavailable_count=unavailable_count,
                 activities=activity_responses,
             )
         )
         total_activities += len(activities)
         total_completed += unit_completed
     unique_points = {
-        point.knowledge_point_id
+        point.knowledge_point_id: point
         for unit in unit_responses
         for activity in unit.activities
         for point in activity.points
     }
     course_levels = [
-        all_point_levels.get(point_id, MasteryLevel.UNLEARNED) for point_id in unique_points
+        point.mastery_level
+        for point in unique_points.values()
+        if point.projection_status == "configured" and point.mastery_level is not None
     ]
+    projection_unavailable_count = sum(
+        point.projection_status == "unavailable" for point in unique_points.values()
+    )
     introduced_count = sum(level != MasteryLevel.UNLEARNED for level in course_levels)
     stable_count = sum(level == MasteryLevel.STABLE for level in course_levels)
     return CourseResponse(
@@ -359,6 +462,7 @@ async def course_response(
         introduced_count=introduced_count,
         stable_count=stable_count,
         unlearned_count=len(course_levels) - introduced_count,
+        projection_unavailable_count=projection_unavailable_count,
         units=unit_responses,
         created_at=course.created_at,
         updated_at=course.updated_at,
@@ -478,6 +582,11 @@ async def complete_character_activity(
     activity_id: uuid.UUID,
     actor_user_id: uuid.UUID,
 ) -> CourseActivityCompletionResponse:
+    """Complete any registered evidence-producing course activity.
+
+    The legacy name is kept for API compatibility. Unsupported activities remain
+    viewable but cannot accidentally invent learning evidence.
+    """
     row = (
         await session.execute(
             select(ChildCourseEnrollment, LearningActivity)
@@ -488,13 +597,18 @@ async def complete_character_activity(
                 ChildCourseEnrollment.child_id == child_id,
                 ChildCourseEnrollment.status == EnrollmentStatus.ACTIVE,
                 LearningActivity.id == activity_id,
-                LearningActivity.activity_type.in_(["character_learning", "character_review"]),
+                LearningActivity.activity_type.in_(
+                    ACTIVITY_HANDLER_REGISTRY.supported_activity_types
+                ),
             )
         )
     ).one_or_none()
     if row is None:
         raise LookupError("Active course activity not found")
     enrollment, activity = row
+    handler = ACTIVITY_HANDLER_REGISTRY.resolve(activity.activity_type)
+    if handler is None:
+        raise LookupError("Activity does not produce canonical learning evidence")
     progress = await session.scalar(
         select(CourseActivityProgress).where(
             CourseActivityProgress.enrollment_id == enrollment.id,
@@ -554,11 +668,7 @@ async def complete_character_activity(
                 child_id=child_id,
                 knowledge_point_id=point_id,
                 actor_user_id=actor_user_id,
-                activity_type=(
-                    LearningActivityType.RELEARNED
-                    if point_id in existing
-                    else LearningActivityType.INTRODUCED
-                ),
+                activity_type=handler.evidence_type(has_prior_evidence=point_id in existing),
                 source="course",
                 learned_at=now,
             )

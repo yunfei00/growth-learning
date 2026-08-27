@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import (
     ActivityKnowledgePoint,
     AssessmentItem,
+    AssessmentKind,
     AssessmentOutcome,
     AssessmentSession,
     AssessmentSessionPlan,
@@ -32,6 +33,7 @@ from app.models import (
     KnowledgePoint,
     KnowledgePointRole,
     KnowledgeStatus,
+    KnowledgeType,
     LearningActivity,
     LearningRecord,
     LiteracyEstimate,
@@ -53,7 +55,7 @@ from app.schemas.learning import (
     ReviewScheduleResponse,
 )
 from app.services.daily_reading import daily_reading_response, ensure_daily_reading_task
-from app.services.mastery import recompute_child_knowledge_state
+from app.services.mastery import mastery_policy_for_type, recompute_child_knowledge_state
 
 REVIEW_ALGORITHM_VERSION = "review-v1"
 PLAN_ALGORITHM_VERSION = "plan-v1"
@@ -134,6 +136,14 @@ def project_review_schedule(
 async def recompute_review_schedule(
     session: AsyncSession, child_id: uuid.UUID, knowledge_point_id: uuid.UUID
 ) -> ChildReviewSchedule | None:
+    point = await session.get(KnowledgePoint, knowledge_point_id)
+    if point is None or mastery_policy_for_type(point.type) is None:
+        return await session.scalar(
+            select(ChildReviewSchedule).where(
+                ChildReviewSchedule.child_id == child_id,
+                ChildReviewSchedule.knowledge_point_id == knowledge_point_id,
+            )
+        )
     learning = list(
         (
             await session.scalars(
@@ -147,9 +157,12 @@ async def recompute_review_schedule(
     assessments = list(
         (
             await session.scalars(
-                select(AssessmentItem).where(
+                select(AssessmentItem)
+                .join(AssessmentSession, AssessmentSession.id == AssessmentItem.session_id)
+                .where(
                     AssessmentItem.child_id == child_id,
                     AssessmentItem.knowledge_point_id == knowledge_point_id,
+                    AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
                 )
             )
         ).all()
@@ -355,6 +368,11 @@ async def _recent_retention(
                 select(AssessmentItem).where(
                     AssessmentItem.child_id == child_id,
                     AssessmentItem.assessed_at >= now - timedelta(days=7),
+                    AssessmentItem.knowledge_point_id.in_(
+                        select(KnowledgePoint.id).where(
+                            KnowledgePoint.type == KnowledgeType.CHINESE_CHARACTER
+                        )
+                    ),
                 )
             )
         ).all()
@@ -1204,6 +1222,7 @@ async def assessment_history(
                 select(AssessmentSession)
                 .where(
                     AssessmentSession.child_id == child_id,
+                    AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
                     AssessmentSession.source.in_(
                         [
                             AssessmentSource.DAILY_REVIEW,

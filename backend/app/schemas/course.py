@@ -18,8 +18,9 @@ class CourseActivityInput(BaseModel):
     activity_type: str = Field(
         default="character_learning",
         pattern=(
-            "^(character_learning|character_review|recognition_check|reading|"
-            "science_reference|offline_instruction)$"
+            "^(knowledge_learning|guided_practice|independent_practice|knowledge_review|"
+            "knowledge_check|listening|speaking|character_learning|character_review|"
+            "recognition_check|reading|science_reference|offline_instruction)$"
         ),
     )
     instructions: str | None = Field(default=None, max_length=2000)
@@ -35,9 +36,10 @@ class CourseUnitInput(BaseModel):
 
 class CourseCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    subject: str = Field(default="chinese", pattern="^(chinese|math|english|science)$")
     title: str = Field(min_length=1, max_length=160)
     description: str | None = Field(default=None, max_length=4000)
-    source_type: str = Field(pattern="^(family|teacher|textbook_reference)$")
+    source_type: str = Field(pattern="^(system|family|teacher|textbook_reference)$")
     recommended_age_min: int | None = Field(default=None, ge=0, le=18)
     recommended_age_max: int | None = Field(default=None, ge=0, le=18)
     reference_metadata: dict[str, str] = Field(default_factory=dict)
@@ -56,11 +58,16 @@ class CourseCreate(BaseModel):
 
 class CoursePointResponse(BaseModel):
     knowledge_point_id: uuid.UUID
-    character: str
-    pinyin: str
+    title: str
+    subject: str
+    knowledge_type: str
+    character: str | None
+    pinyin: str | None
     role: str
     order_index: int
-    mastery_level: str
+    mastery_level: str | None
+    mastery_policy_key: str | None
+    projection_status: str
 
 
 class CourseActivityResponse(BaseModel):
@@ -85,6 +92,7 @@ class CourseUnitResponse(BaseModel):
     introduced_count: int
     stable_count: int
     unlearned_count: int
+    projection_unavailable_count: int
     activities: list[CourseActivityResponse]
 
 
@@ -108,6 +116,7 @@ class CourseResponse(BaseModel):
     introduced_count: int
     stable_count: int
     unlearned_count: int
+    projection_unavailable_count: int
     units: list[CourseUnitResponse]
     created_at: datetime
     updated_at: datetime

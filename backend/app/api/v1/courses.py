@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from app.api.dependencies import CurrentUser, DbSession, SystemAdmin
@@ -11,6 +12,7 @@ from app.models import (
     ChildCourseEnrollment,
     Course,
     CourseSourceType,
+    CourseSubject,
     EnrollmentStatus,
     TeacherProfile,
 )
@@ -46,10 +48,13 @@ router = APIRouter(tags=["courses"])
 
 @router.get("/courses", response_model=list[CourseResponse])
 async def list_available_courses(
-    child_id: uuid.UUID, current_user: CurrentUser, session: DbSession
+    child_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: DbSession,
+    subject: Annotated[CourseSubject | None, Query()] = None,
 ) -> list[CourseResponse]:
     child, _ = await get_authorized_child(session, current_user, child_id)
-    courses = await visible_courses(session, child.id, child.family_id)
+    courses = await visible_courses(session, child.id, child.family_id, subject)
     return [await course_response(session, course, child.id) for course in courses]
 
 
@@ -81,14 +86,14 @@ async def create_family_course(
         CourseSourceType.TEXTBOOK_REFERENCE,
     ):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Family endpoint accepts family or textbook_reference courses",
         )
     try:
         course = await create_course(session, payload, current_user.id, family_id=family_id)
     except ValueError as error:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from error
     return await course_response(session, course, None)
 
@@ -115,10 +120,12 @@ async def update_family_course(
 
 @router.get("/teacher/courses", response_model=list[CourseResponse])
 async def list_teacher_courses(
-    current_user: CurrentUser, session: DbSession
+    current_user: CurrentUser,
+    session: DbSession,
+    subject: Annotated[CourseSubject | None, Query()] = None,
 ) -> list[CourseResponse]:
     try:
-        courses = await teacher_courses(session, current_user.id)
+        courses = await teacher_courses(session, current_user.id, subject)
     except LookupError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     return [await course_response(session, course, None) for course in courses]
@@ -137,14 +144,14 @@ async def create_teacher_course(
         )
     if payload.source_type != CourseSourceType.TEACHER:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Teacher endpoint accepts teacher courses",
         )
     try:
         course = await create_course(session, payload, current_user.id, teacher_id=profile.id)
     except ValueError as error:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from error
     return await course_response(session, course, None)
 
@@ -294,17 +301,40 @@ async def import_admin_catalog(_admin: SystemAdmin, session: DbSession) -> Catal
 
 
 @router.get("/admin/courses", response_model=list[CourseResponse])
-async def list_admin_courses(_admin: SystemAdmin, session: DbSession) -> list[CourseResponse]:
+async def list_admin_courses(
+    _admin: SystemAdmin,
+    session: DbSession,
+    subject: Annotated[CourseSubject | None, Query()] = None,
+) -> list[CourseResponse]:
+    filters = [Course.source_type == CourseSourceType.SYSTEM]
+    if subject is not None:
+        filters.append(Course.subject == subject)
     courses = list(
         (
             await session.scalars(
-                select(Course)
-                .where(Course.source_type == CourseSourceType.SYSTEM)
-                .order_by(Course.created_at)
+                select(Course).where(*filters).order_by(Course.subject, Course.created_at)
             )
         ).all()
     )
     return [await course_response(session, course, None) for course in courses]
+
+
+@router.post("/admin/courses", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
+async def create_admin_course(
+    payload: CourseCreate, admin: SystemAdmin, session: DbSession
+) -> CourseResponse:
+    if payload.source_type != CourseSourceType.SYSTEM:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Admin endpoint accepts system courses",
+        )
+    try:
+        course = await create_course(session, payload, admin.id)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from error
+    return await course_response(session, course, None)
 
 
 @router.patch("/admin/courses/{course_id}", response_model=CourseResponse)
