@@ -181,6 +181,7 @@ jobs:
           IDS = {
               "user": uuid.UUID("00000000-0000-0000-0000-000000000001"),
               "family": uuid.UUID("00000000-0000-0000-0000-000000000100"),
+              "family_member": uuid.UUID("00000000-0000-0000-0000-000000000099"),
               "child": uuid.UUID("00000000-0000-0000-0000-000000000101"),
               "point": uuid.UUID("00000000-0000-0000-0000-000000000102"),
               "learning_session": uuid.UUID("00000000-0000-0000-0000-000000000103"),
@@ -194,7 +195,7 @@ jobs:
               engine = create_async_engine(get_settings().database_url)
               async with engine.begin() as connection:
                   await connection.execute(text("INSERT INTO families (id, name) VALUES (:id, 'Phase 16 Legacy Family')"), {"id": IDS["family"]})
-                  await connection.execute(text("INSERT INTO family_members (family_id, user_id, role) VALUES (:family, :user, 'admin')"), {"family": IDS["family"], "user": IDS["user"]})
+                  await connection.execute(text("INSERT INTO family_members (id, family_id, user_id, role) VALUES (:id, :family, :user, 'admin')"), {"id": IDS["family_member"], "family": IDS["family"], "user": IDS["user"]})
                   await connection.execute(text("INSERT INTO children (id, family_id, display_name, birth_date) VALUES (:id, :family, 'Legacy Child', DATE '2021-01-01')"), {"id": IDS["child"], "family": IDS["family"]})
                   await connection.execute(text("INSERT INTO knowledge_points (id, type, status, title, canonical_key, source_type) VALUES (:id, 'chinese_character', 'active', '人', 'zh-char:人', 'legacy-fixture')"), {"id": IDS["point"]})
                   await connection.execute(text("INSERT INTO chinese_characters (knowledge_point_id, character, pinyin, common_words, tags) VALUES (:id, '人', 'rén', CAST(:words AS json), CAST(:tags AS json))"), {"id": IDS["point"], "words": json.dumps(["人民"]), "tags": json.dumps([])})
