@@ -173,6 +173,122 @@ export type AdminKnowledgePage = {
   pages: number;
 };
 
+export type PinyinKind = "initial" | "final" | "tone" | "whole";
+export type PinyinState = "unlearned" | "introduced" | "practicing" | "proficient" | "stable";
+export type PinyinDimension = "recognition" | "listening" | "tone" | "blending" | "pronunciation";
+
+export type PinyinItem = {
+  knowledge_point_id: string;
+  symbol: string;
+  kind: PinyinKind;
+  subcategory: string;
+  display_text: string;
+  example_text: string | null;
+  order_index: number;
+  status: "active" | "archived";
+  audio_status: "curated" | "tts_fallback" | "missing";
+  state_code: PinyinState;
+  learned: boolean;
+};
+
+export type PinyinItemPage = {
+  items: PinyinItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type PinyinNavigationItem = {
+  knowledge_point_id: string;
+  display_text: string;
+};
+
+export type PinyinItemDetail = PinyinItem & {
+  canonical_key: string;
+  pronunciation_cue: string | null;
+  example_pinyin: string | null;
+  description: string | null;
+  parent_tip: string | null;
+  audio_key: string | null;
+  catalog_version: string;
+  metadata: Record<string, string | number | boolean>;
+  audio: {
+    mode: "curated" | "tts_fallback" | "missing";
+    audio_url: string | null;
+    speech_text: string | null;
+  };
+  position: number;
+  total: number;
+  previous: PinyinNavigationItem | null;
+  next: PinyinNavigationItem | null;
+  confusing: PinyinNavigationItem[];
+  listening_options: PinyinNavigationItem[];
+  policy_key: string;
+  dimensions: Record<string, unknown>;
+};
+
+export type PinyinOverview = {
+  child_id: string;
+  catalog_version: string;
+  total: number;
+  learned: number;
+  stable: number;
+  groups: Array<{
+    kind: PinyinKind;
+    label: string;
+    total: number;
+    learned: number;
+    stable: number;
+  }>;
+  blending_state: PinyinState;
+  blending_attempts: number;
+};
+
+export type PinyinToday = {
+  plan_id: string;
+  child_id: string;
+  plan_date: string;
+  new_items: PinyinItem[];
+  review_items: PinyinItem[];
+  completed_count: number;
+  target_count: number;
+  status: "pending" | "in_progress" | "completed";
+};
+
+export type PinyinPractice = {
+  id: string;
+  practice_key: string;
+  initial_knowledge_point_id: string;
+  final_knowledge_point_id: string;
+  initial: string;
+  underlying_final: string;
+  display_final: string;
+  display_syllable: string;
+  pronunciation_cue: string;
+  order_index: number;
+  metadata: Record<string, string | number | boolean>;
+};
+
+export type PinyinHistory = {
+  child_id: string;
+  items: Array<{
+    session_id: string;
+    source: string;
+    actor_display_name: string;
+    occurred_at: string;
+    evidence: Array<{
+      evidence_id: string;
+      evidence_type: "learning" | "assessment";
+      knowledge_point_id: string;
+      display_text: string;
+      dimension: string | null;
+      outcome: string;
+      occurred_at: string;
+    }>;
+  }>;
+};
+
 export type FamilyRole = "admin" | "companion";
 
 export type Family = {
@@ -1386,6 +1502,141 @@ export function createAdminKnowledge(payload: {
   });
 }
 
+export function listAdminPinyin(filters: {
+  kind?: PinyinKind | "";
+  status?: "active" | "archived" | "";
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PinyinItemPage> {
+  const query = new URLSearchParams({
+    page: String(filters.page ?? 1),
+    page_size: String(filters.pageSize ?? 50),
+  });
+  if (filters.kind) query.set("kind", filters.kind);
+  if (filters.status) query.set("status", filters.status);
+  if (filters.search) query.set("search", filters.search);
+  return request<PinyinItemPage>(`/api/v1/admin/pinyin?${query.toString()}`);
+}
+
+export function getAdminPinyin(id: string): Promise<PinyinItemDetail> {
+  return request<PinyinItemDetail>(`/api/v1/admin/pinyin/${id}`);
+}
+
+export function updateAdminPinyin(
+  id: string,
+  payload: Partial<{
+    status: "active" | "archived";
+    pronunciation_cue: string | null;
+    example_text: string | null;
+    example_pinyin: string | null;
+    description: string | null;
+    parent_tip: string | null;
+    audio_key: string | null;
+  }>,
+): Promise<PinyinItemDetail> {
+  return request<PinyinItemDetail>(`/api/v1/admin/pinyin/${id}`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function importPinyinFoundation(): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  relations_created: number;
+  practices_created: number;
+  catalog_version: string;
+  catalog_size: number;
+  course_created: boolean;
+  errors: string[];
+}> {
+  return request("/api/v1/admin/pinyin/import-foundation", { method: "POST" });
+}
+
+export function listChildPinyinItems(
+  childId: string,
+  kind?: PinyinKind,
+): Promise<PinyinItemPage> {
+  const query = new URLSearchParams({ page: "1", page_size: "100" });
+  if (kind) query.set("kind", kind);
+  return request<PinyinItemPage>(
+    `/api/v1/children/${childId}/pinyin/items?${query.toString()}`,
+  );
+}
+
+export function getPinyinOverview(childId: string): Promise<PinyinOverview> {
+  return request<PinyinOverview>(`/api/v1/children/${childId}/pinyin/overview`);
+}
+
+export function getPinyinToday(childId: string): Promise<PinyinToday | null> {
+  return request<PinyinToday | null>(`/api/v1/children/${childId}/pinyin/today`);
+}
+
+export function getPinyinItemDetail(
+  childId: string,
+  knowledgePointId: string,
+): Promise<PinyinItemDetail> {
+  return request<PinyinItemDetail>(
+    `/api/v1/children/${childId}/pinyin/items/${knowledgePointId}`,
+  );
+}
+
+export function getPinyinPractices(): Promise<{ items: PinyinPractice[]; total: number }> {
+  return request<{ items: PinyinPractice[]; total: number }>("/api/v1/pinyin/practices");
+}
+
+export function getPinyinHistory(childId: string): Promise<PinyinHistory> {
+  return request<PinyinHistory>(`/api/v1/children/${childId}/pinyin/history`);
+}
+
+export function recordPinyinLearning(
+  childId: string,
+  knowledgePointId: string,
+  activityType: "introduced" | "reviewed" = "introduced",
+): Promise<EvidenceSession> {
+  return request<EvidenceSession>(`/api/v1/children/${childId}/learning-sessions`, {
+    method: "POST",
+    body: jsonBody({
+      status: "completed",
+      source: "pinyin_learning",
+      items: [{ knowledge_point_id: knowledgePointId, activity_type: activityType }],
+    }),
+  });
+}
+
+export function recordPinyinAssessment(
+  childId: string,
+  payload: {
+    knowledgePointId: string;
+    outcome: AssessmentOutcome;
+    dimension: PinyinDimension;
+    assessmentKind: "recognition" | "practice_check" | "listening_check" | "oral_check";
+    responseTimeMs?: number;
+    metadata?: Record<string, string | number | boolean>;
+  },
+): Promise<EvidenceSession> {
+  return request<EvidenceSession>(`/api/v1/children/${childId}/assessment-sessions`, {
+    method: "POST",
+    body: jsonBody({
+      status: "completed",
+      source: `pinyin_${payload.dimension}`,
+      assessment_kind: payload.assessmentKind,
+      items: [
+        {
+          knowledge_point_id: payload.knowledgePointId,
+          outcome: payload.outcome,
+          response_time_ms: payload.responseTimeMs,
+          hint_used: payload.outcome === "hinted_correct",
+          skill_dimension: payload.dimension,
+          evidence_metadata: payload.metadata ?? {},
+        },
+      ],
+    }),
+  });
+}
+
 export function getCharacterMasterySummary(childId: string): Promise<CharacterMasterySummary> {
   return request<CharacterMasterySummary>(`/api/v1/children/${childId}/characters/summary`);
 }
@@ -2425,7 +2676,7 @@ export type CatalogRelease = {
 
 export type ChildTodayTask = {
   subject: Subject;
-  kind: "new" | "review" | "reading" | "science" | "teacher";
+  kind: "new" | "review" | "pinyin" | "reading" | "science" | "teacher";
   title: string;
   description: string;
   status: "pending" | "in_progress" | "completed" | "needs_story" | "optional";

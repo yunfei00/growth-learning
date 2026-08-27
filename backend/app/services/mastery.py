@@ -1,8 +1,8 @@
 """Deterministic mastery projection built only from preserved raw evidence."""
 
 import uuid
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Protocol
 
 from sqlalchemy import select
@@ -22,6 +22,8 @@ from app.models import (
 
 ALGORITHM_VERSION = "v1"
 CHINESE_CHARACTER_POLICY_KEY = "chinese-character-v1"
+PINYIN_POLICY_KEY = "pinyin-v1"
+PINYIN_DIMENSIONS = frozenset({"recognition", "listening", "tone", "blending", "pronunciation"})
 
 
 class MasteryPolicy(Protocol):
@@ -29,11 +31,14 @@ class MasteryPolicy(Protocol):
 
     key: str
     supported_knowledge_types: frozenset[str]
+    supported_assessment_kinds: frozenset[str]
 
     def recompute(
         self,
         learning_records: list[LearningRecord],
         assessment_items: list[AssessmentItem],
+        *,
+        knowledge_type: str | None = None,
     ) -> "MasteryProjection": ...
 
 
@@ -69,6 +74,8 @@ class MasteryProjection:
     consecutive_correct: int
     consecutive_incorrect: int
     average_response_time_ms: float | None
+    state_code: str | None = None
+    dimensions_json: dict[str, object] = field(default_factory=dict)
 
 
 def project_mastery(
@@ -159,17 +166,152 @@ class ChineseCharacterMasteryPolicy:
 
     key = CHINESE_CHARACTER_POLICY_KEY
     supported_knowledge_types = frozenset({KnowledgeType.CHINESE_CHARACTER})
+    supported_assessment_kinds = frozenset({AssessmentKind.RECOGNITION})
 
     def recompute(
         self,
         learning_records: list[LearningRecord],
         assessment_items: list[AssessmentItem],
+        *,
+        knowledge_type: str | None = None,
     ) -> MasteryProjection:
+        del knowledge_type
         return project_mastery(learning_records, assessment_items)
+
+
+def _utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def pinyin_dimension_state(items: list[AssessmentItem]) -> str:
+    if not items:
+        return "unlearned"
+    ordered = sorted(items, key=lambda item: (_utc(item.assessed_at), str(item.id)))
+    independent_correct = [item for item in ordered if item.outcome == AssessmentOutcome.CORRECT]
+    correct_dates = {_utc(item.assessed_at).date() for item in independent_correct}
+    span_days = 0.0
+    if independent_correct:
+        first = min(_utc(item.assessed_at) for item in independent_correct)
+        last = max(_utc(item.assessed_at) for item in independent_correct)
+        span_days = (last - first).total_seconds() / 86400
+    if (
+        len(independent_correct) >= 3
+        and len(correct_dates) >= 3
+        and span_days >= 7
+        and ordered[-1].outcome in {AssessmentOutcome.CORRECT, AssessmentOutcome.HINTED_CORRECT}
+    ):
+        return "stable"
+    if len(independent_correct) >= 2 and len(correct_dates) >= 2:
+        return "proficient"
+    return "practicing"
+
+
+class PinyinMasteryPolicy:
+    """Deterministic multi-dimensional Pinyin policy with cross-day stability."""
+
+    key = PINYIN_POLICY_KEY
+    supported_knowledge_types = frozenset(
+        {
+            KnowledgeType.PINYIN_INITIAL,
+            KnowledgeType.PINYIN_FINAL,
+            KnowledgeType.PINYIN_TONE,
+            KnowledgeType.PINYIN_SYLLABLE,
+        }
+    )
+    supported_assessment_kinds = frozenset(
+        {
+            AssessmentKind.RECOGNITION,
+            AssessmentKind.PRACTICE_CHECK,
+            AssessmentKind.LISTENING_CHECK,
+            AssessmentKind.ORAL_CHECK,
+        }
+    )
+
+    def recompute(
+        self,
+        learning_records: list[LearningRecord],
+        assessment_items: list[AssessmentItem],
+        *,
+        knowledge_type: str | None = None,
+    ) -> MasteryProjection:
+        required = (
+            ("tone", "listening")
+            if knowledge_type == KnowledgeType.PINYIN_TONE
+            else ("recognition", "listening")
+        )
+        by_dimension = {
+            dimension: [item for item in assessment_items if item.skill_dimension == dimension]
+            for dimension in PINYIN_DIMENSIONS
+        }
+        dimensions = {
+            dimension: pinyin_dimension_state(items)
+            for dimension, items in by_dimension.items()
+            if items
+        }
+        required_states = [dimensions.get(dimension, "unlearned") for dimension in required]
+        has_evidence = bool(learning_records or assessment_items)
+        state_code = "introduced" if learning_records else "unlearned"
+        if assessment_items:
+            state_code = "practicing"
+        if all(state in {"proficient", "stable"} for state in required_states):
+            state_code = "proficient"
+        if all(state == "stable" for state in required_states):
+            state_code = "stable"
+        legacy_level = {
+            "unlearned": MasteryLevel.UNLEARNED,
+            "introduced": MasteryLevel.INTRODUCED,
+            "practicing": MasteryLevel.RECOGNIZING,
+            "proficient": MasteryLevel.PROFICIENT,
+            "stable": MasteryLevel.STABLE,
+        }[state_code]
+        ordered_learning = sorted(
+            learning_records, key=lambda record: (_utc(record.learned_at), str(record.id))
+        )
+        ordered_items = sorted(
+            assessment_items, key=lambda item: (_utc(item.assessed_at), str(item.id))
+        )
+        counts = {outcome.value: 0 for outcome in AssessmentOutcome}
+        response_times: list[int] = []
+        consecutive_correct = 0
+        consecutive_incorrect = 0
+        for item in ordered_items:
+            counts[item.outcome] += 1
+            if item.response_time_ms is not None:
+                response_times.append(item.response_time_ms)
+            if item.outcome == AssessmentOutcome.CORRECT:
+                consecutive_correct += 1
+                consecutive_incorrect = 0
+            elif item.outcome == AssessmentOutcome.INCORRECT:
+                consecutive_incorrect += 1
+                consecutive_correct = 0
+            else:
+                consecutive_correct = 0
+                consecutive_incorrect = 0
+        rank = {"unlearned": 0.0, "practicing": 0.35, "proficient": 0.7, "stable": 1.0}
+        score = round(sum(rank[state] for state in required_states) / len(required_states), 4)
+        return MasteryProjection(
+            mastery_level=legacy_level,
+            mastery_score=score,
+            first_introduced_at=(ordered_learning[0].learned_at if ordered_learning else None),
+            last_learning_at=(ordered_learning[-1].learned_at if ordered_learning else None),
+            last_assessed_at=(ordered_items[-1].assessed_at if ordered_items else None),
+            correct_count=counts[AssessmentOutcome.CORRECT],
+            hinted_correct_count=counts[AssessmentOutcome.HINTED_CORRECT],
+            uncertain_count=counts[AssessmentOutcome.UNCERTAIN],
+            incorrect_count=counts[AssessmentOutcome.INCORRECT],
+            consecutive_correct=consecutive_correct,
+            consecutive_incorrect=consecutive_incorrect,
+            average_response_time_ms=(
+                round(sum(response_times) / len(response_times), 2) if response_times else None
+            ),
+            state_code=state_code if has_evidence else "unlearned",
+            dimensions_json=dimensions,
+        )
 
 
 mastery_policies = MasteryPolicyRegistry()
 mastery_policies.register(ChineseCharacterMasteryPolicy())
+mastery_policies.register(PinyinMasteryPolicy())
 
 
 def mastery_policy_for_type(knowledge_type: str) -> MasteryPolicy | None:
@@ -211,7 +353,7 @@ async def recompute_child_knowledge_state(
                 .where(
                     AssessmentItem.child_id == child_id,
                     AssessmentItem.knowledge_point_id == knowledge_point_id,
-                    AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
+                    AssessmentSession.assessment_kind.in_(policy.supported_assessment_kinds),
                 )
             )
         ).all()
@@ -231,13 +373,17 @@ async def recompute_child_knowledge_state(
         )
         session.add(state)
 
-    projection = policy.recompute(learning_records, assessment_items)
-    for field, value in projection.__dict__.items():
-        setattr(state, field, value)
-    state.algorithm_version = ALGORITHM_VERSION
+    projection = policy.recompute(learning_records, assessment_items, knowledge_type=point.type)
+    for field_name, value in projection.__dict__.items():
+        if field_name in {"state_code", "dimensions_json"}:
+            continue
+        setattr(state, field_name, value)
+    state.algorithm_version = (
+        ALGORITHM_VERSION if policy.key == CHINESE_CHARACTER_POLICY_KEY else policy.key
+    )
     state.policy_key = policy.key
-    state.state_code = projection.mastery_level
-    state.dimensions_json = {}
+    state.state_code = projection.state_code or projection.mastery_level
+    state.dimensions_json = projection.dimensions_json
     await session.flush()
     return state
 

@@ -10,6 +10,7 @@ import { ApiClientError, type ChildToday, getChildToday, type Subject } from "@/
 const ICONS: Record<string, string> = {
   new: "🌱",
   review: "🔁",
+  pinyin: "🔊",
   reading: "📖",
   science: "🔬",
   teacher: "🧑‍🏫",

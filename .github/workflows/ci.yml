@@ -154,6 +154,8 @@ jobs:
                   "family_reward_settings", "family_reward_goals",
                   "platform_invitations", "platform_audit_logs",
                   "family_invitations", "adult_child_relations",
+                  "pinyin_catalog_releases", "pinyin_items", "pinyin_practice_items",
+                  "pinyin_daily_plans", "pinyin_daily_plan_items",
               }
               missing = required - tables
               if missing:
@@ -227,6 +229,39 @@ jobs:
               assert tuple(state) == ("chinese-character-v1", "recognizing", "recognizing", 1)
               assert learning_count == 1 and assessment_count == 1
               print("Phase 16 legacy UUID/evidence/state backfill verified")
+
+          asyncio.run(main())
+          PY
+
+      - name: Verify Phase 17 additive migration preserves Phase 16 data
+        run: |
+          python -m alembic downgrade 20260827_0016
+          python -m alembic upgrade head
+          python - <<'PY'
+          import asyncio
+          from sqlalchemy import inspect, text
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from app.core.config import get_settings
+
+          async def main():
+              engine = create_async_engine(get_settings().database_url)
+              async with engine.connect() as connection:
+                  tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+                  point = (await connection.execute(text("SELECT id::text, subject, type FROM knowledge_points WHERE canonical_key = 'zh-char:人'"))).one()
+                  character_count = await connection.scalar(text("SELECT count(*) FROM chinese_characters WHERE knowledge_point_id = CAST(:id AS uuid)"), {"id": point.id})
+                  learning_count = await connection.scalar(text("SELECT count(*) FROM learning_records WHERE knowledge_point_id = CAST(:id AS uuid)"), {"id": point.id})
+                  assessment_count = await connection.scalar(text("SELECT count(*) FROM assessment_items WHERE knowledge_point_id = CAST(:id AS uuid)"), {"id": point.id})
+                  state = (await connection.execute(text("SELECT policy_key, state_code, mastery_level, correct_count FROM child_knowledge_states WHERE knowledge_point_id = CAST(:id AS uuid)"), {"id": point.id})).one()
+              await engine.dispose()
+              required = {
+                  "pinyin_catalog_releases", "pinyin_items", "pinyin_practice_items",
+                  "pinyin_daily_plans", "pinyin_daily_plan_items",
+              }
+              assert required <= tables
+              assert point.subject == "chinese" and point.type == "chinese_character"
+              assert character_count == learning_count == assessment_count == 1
+              assert tuple(state) == ("chinese-character-v1", "recognizing", "recognizing", 1)
+              print("Phase 17 additive migration preserved Phase 16 UUID/evidence/state")
 
           asyncio.run(main())
           PY

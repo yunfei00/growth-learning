@@ -201,11 +201,24 @@ Growth Learning V1 的 Phase 1–12 已收敛到 `1.0.0`。每阶段都以迁移
 
 退出条件：迁移、数据保护、类型约束、课程隔离、evidence、mastery boundary、前后端和生产烟测全部通过。完整设计见 [Phase 16 多学科基础](MULTISUBJECT_FOUNDATION.md)。
 
+## Phase 17：儿童拼音学习系统 V1
+
+- Chinese subject 下的 23 声母、24 韵母、5 声调、16 整体认读，版本为 `pinyin-foundation-v1`
+- 16 Unit `拼音启蒙` 系统课程与 18 个受控拼读练习，不把全部音节组合变成强制 Stable 知识点
+- 一次一个的大符号、音频优先、前后导航、听音选择、声调手势和 reduced-motion 拼读体验
+- 正式音频优先；缺失时只使用包含汉字的 zh-CN 发音线索，禁止 Latin 字母进入默认英文 TTS
+- `pinyin-v1` 五维 evidence 与跨自然日确定性掌握；`pinyin-review-v1` 独立复习
+- Today 小任务、学习记录、多孩子隔离、多家长共享与真实 actor/evaluator attribution
+- `/admin/pinyin` 专属维护页、幂等目录导入和 additive Alembic 迁移
+- 汉字目录、识字分母、汉字复习、故事已知字和字符成就继续只认 `ChineseCharacter`
+
+退出条件：目录/领域/evidence/mastery/isolation 自动化测试、前端 lint/typecheck/build、CI、生产导入与小范围 smoke 全部通过；Issue 记录证据并关闭。设计见 [拼音学习模型](PINYIN_LEARNING_MODEL.md)、[拼音 Mastery Policy](PINYIN_MASTERY_POLICY.md)、[音频策略](PINYIN_AUDIO_STRATEGY.md) 和 [Canonical Catalog](PINYIN_CANONICAL_CATALOG.md)。
+
 ## V2 Backlog
 
 - 更完整的可访问性、性能预算、外部安全评估与可观测性
 - 任务队列、可观测性和依赖就绪探针
 - 掌握/复习算法评估指标与受控实验
 - 多设备同步、离线容错和数据冲突策略
-- 完整数学、英语、拼音与写字课程
+- 完整数学、英语与写字课程；拼音 V1 后续扩充真人录音和受控练习素材
 - 更大的合法课程体系、孩子独立账号、通知与受控的更复杂 AI

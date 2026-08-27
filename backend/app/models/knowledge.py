@@ -1,9 +1,20 @@
 """System-owned canonical knowledge catalog models."""
 
 import uuid
+from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -40,6 +51,13 @@ class RelationType(StrEnum):
     PREREQUISITE = "prerequisite"
     CONFUSING = "confusing"
     DERIVED = "derived"
+
+
+class PinyinKind(StrEnum):
+    INITIAL = "initial"
+    FINAL = "final"
+    TONE = "tone"
+    WHOLE = "whole"
 
 
 class KnowledgePoint(TimestampMixin, Base):
@@ -89,6 +107,9 @@ class KnowledgePoint(TimestampMixin, Base):
     chinese_character: Mapped["ChineseCharacter | None"] = relationship(
         back_populates="knowledge_point", uselist=False, passive_deletes=True
     )
+    pinyin_item: Mapped["PinyinItem | None"] = relationship(
+        back_populates="knowledge_point", uselist=False, passive_deletes=True
+    )
 
 
 class ChineseCharacter(TimestampMixin, Base):
@@ -118,6 +139,89 @@ class ChineseCharacter(TimestampMixin, Base):
     is_enabled: Mapped[bool] = mapped_column(default=True, server_default="true", nullable=False)
 
     knowledge_point: Mapped[KnowledgePoint] = relationship(back_populates="chinese_character")
+
+
+class PinyinCatalogRelease(TimestampMixin, Base):
+    """Versioned provenance for the curated Pinyin foundation catalog."""
+
+    __tablename__ = "pinyin_catalog_releases"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    catalog_version: Mapped[str] = mapped_column(
+        String(80), unique=True, index=True, nullable=False
+    )
+    source_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_reference: Mapped[str | None] = mapped_column(String(500))
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    item_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    practice_item_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_current: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+
+
+class PinyinItem(TimestampMixin, Base):
+    """Domain detail for one canonical initial, final, tone, or whole syllable."""
+
+    __tablename__ = "pinyin_items"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('initial', 'final', 'tone', 'whole')",
+            name="ck_pinyin_items_kind",
+        ),
+        CheckConstraint("order_index >= 0", name="ck_pinyin_items_order"),
+    )
+
+    knowledge_point_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("knowledge_points.id", ondelete="RESTRICT"), primary_key=True
+    )
+    symbol: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
+    subcategory: Mapped[str] = mapped_column(String(40), index=True, nullable=False)
+    display_text: Mapped[str] = mapped_column(String(32), nullable=False)
+    pronunciation_cue: Mapped[str | None] = mapped_column(String(160))
+    example_text: Mapped[str | None] = mapped_column(String(120))
+    example_pinyin: Mapped[str | None] = mapped_column(String(160))
+    description: Mapped[str | None] = mapped_column(Text)
+    parent_tip: Mapped[str | None] = mapped_column(Text)
+    order_index: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
+    audio_key: Mapped[str | None] = mapped_column(String(255))
+    catalog_version: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
+
+    knowledge_point: Mapped[KnowledgePoint] = relationship(back_populates="pinyin_item")
+
+
+class PinyinPracticeItem(TimestampMixin, Base):
+    """A small curated blending exercise; it is not a required-stable knowledge point."""
+
+    __tablename__ = "pinyin_practice_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "initial_knowledge_point_id",
+            "final_knowledge_point_id",
+            "display_syllable",
+            name="uq_pinyin_practice_components",
+        ),
+        CheckConstraint("order_index >= 0", name="ck_pinyin_practice_items_order"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    practice_key: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
+    initial_knowledge_point_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("knowledge_points.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    final_knowledge_point_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("knowledge_points.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    display_syllable: Mapped[str] = mapped_column(String(32), nullable=False)
+    underlying_final: Mapped[str] = mapped_column(String(32), nullable=False)
+    display_final: Mapped[str] = mapped_column(String(32), nullable=False)
+    pronunciation_cue: Mapped[str] = mapped_column(String(160), nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
+    catalog_version: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
 
 
 class KnowledgeRelation(TimestampMixin, Base):

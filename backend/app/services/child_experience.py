@@ -47,6 +47,7 @@ from app.schemas.experience import (
     StarLedgerResponse,
     TodayTaskResponse,
 )
+from app.services.pinyin_learning import get_or_create_pinyin_today
 from app.services.review_planning import get_or_create_daily_plan
 from app.services.teacher_collaboration import list_child_teacher_tasks
 
@@ -639,6 +640,30 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
                 source_id=in_progress_assessment.id if in_progress_assessment else plan.id,
             )
         )
+    pinyin = await get_or_create_pinyin_today(session, child.id)
+    await session.commit()
+    if pinyin is not None and pinyin.target_count:
+        pinyin_items = [*pinyin.new_items, *pinyin.review_items]
+        next_item = pinyin_items[min(pinyin.completed_count, len(pinyin_items) - 1)]
+        symbols = " ".join(item.display_text for item in pinyin_items)
+        tasks.append(
+            TodayTaskResponse(
+                subject="chinese",
+                kind="pinyin",
+                title=f"拼音 {symbols}",
+                description=f"{pinyin.target_count}个小任务 · 约5分钟",
+                status=pinyin.status,
+                count=pinyin.target_count,
+                cta_label="继续拼音" if pinyin.status == "in_progress" else "开始拼音",
+                href=(
+                    f"/learn/pinyin/{next_item.knowledge_point_id}?source=today"
+                    if pinyin.status != "completed"
+                    else "/learn/pinyin?view=today"
+                ),
+                source_type="pinyin_daily_plan",
+                source_id=pinyin.plan_id,
+            )
+        )
     reading = plan.reading
     tasks.append(
         TodayTaskResponse(
@@ -723,7 +748,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
                 source_id=None,
             )
         )
-    order = {"teacher": 0, "review": 1, "new": 2, "reading": 3, "science": 4}
+    order = {"teacher": 0, "review": 1, "new": 2, "pinyin": 3, "reading": 4, "science": 5}
     tasks.sort(key=lambda item: (not item.urgent, order[item.kind]))
     continue_task = next((item for item in tasks if item.status == "in_progress"), None)
     completed_count = sum(item.status == "completed" for item in tasks)

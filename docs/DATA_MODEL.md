@@ -13,6 +13,20 @@
 
 ## 已实现实体
 
+### Phase 17 拼音实体
+
+拼音属于 `subject=chinese`，不会增加 `pinyin` 学科。68 个规范知识点以稳定 `canonical_key` 存在于 `knowledge_points`，细节保存在一对一 `pinyin_items`。
+
+| 表 | 作用 |
+| --- | --- |
+| `pinyin_catalog_releases` | `pinyin-foundation-v1` 来源、数量、导入时间与当前版本 |
+| `pinyin_items` | 声母、韵母、声调、整体认读的显示、中文语音线索、例子、家长提示、顺序与可替换 `audio_key` |
+| `pinyin_practice_items` | 小规模拼读练习；保存 underlying/display 韵母，不把数百音节变成 Stable 目标 |
+| `pinyin_daily_plans` | 每个 Child 每个本地日期唯一的小任务，默认最多 3 新内容与 5 个到期复习 |
+| `pinyin_daily_plan_items` | 固定当天的 new/review 项与幂等完成状态 |
+
+拼音仍复用 `learning_records`、`assessment_items`、`child_knowledge_states` 和 `child_review_schedules`。状态的 `policy_key=pinyin-v1`，复习的 `algorithm_version=pinyin-review-v1`；recognition、listening、tone、blending、pronunciation 分维度保存在原始 evidence 与派生 `dimensions_json`。详见 [拼音 Mastery Policy](PINYIN_MASTERY_POLICY.md)。
+
 ### `users`
 
 登录成年人账户。

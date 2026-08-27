@@ -58,6 +58,7 @@ from app.services.daily_reading import daily_reading_response, ensure_daily_read
 from app.services.mastery import mastery_policy_for_type, recompute_child_knowledge_state
 
 REVIEW_ALGORITHM_VERSION = "review-v1"
+PINYIN_REVIEW_ALGORITHM_VERSION = "pinyin-review-v1"
 PLAN_ALGORITHM_VERSION = "plan-v1"
 SAMPLING_VERSION = "sampling-v1"
 LITERACY_ESTIMATION_VERSION = "literacy-v1"
@@ -137,7 +138,8 @@ async def recompute_review_schedule(
     session: AsyncSession, child_id: uuid.UUID, knowledge_point_id: uuid.UUID
 ) -> ChildReviewSchedule | None:
     point = await session.get(KnowledgePoint, knowledge_point_id)
-    if point is None or mastery_policy_for_type(point.type) is None:
+    policy = mastery_policy_for_type(point.type) if point is not None else None
+    if point is None or policy is None:
         return await session.scalar(
             select(ChildReviewSchedule).where(
                 ChildReviewSchedule.child_id == child_id,
@@ -162,7 +164,7 @@ async def recompute_review_schedule(
                 .where(
                     AssessmentItem.child_id == child_id,
                     AssessmentItem.knowledge_point_id == knowledge_point_id,
-                    AssessmentSession.assessment_kind == AssessmentKind.RECOGNITION,
+                    AssessmentSession.assessment_kind.in_(policy.supported_assessment_kinds),
                 )
             )
         ).all()
@@ -181,7 +183,17 @@ async def recompute_review_schedule(
         session.add(schedule)
     for field, value in projection.__dict__.items():
         setattr(schedule, field, value)
-    schedule.algorithm_version = REVIEW_ALGORITHM_VERSION
+    schedule.algorithm_version = (
+        PINYIN_REVIEW_ALGORITHM_VERSION
+        if point.type
+        in {
+            KnowledgeType.PINYIN_INITIAL,
+            KnowledgeType.PINYIN_FINAL,
+            KnowledgeType.PINYIN_TONE,
+            KnowledgeType.PINYIN_SYLLABLE,
+        }
+        else REVIEW_ALGORITHM_VERSION
+    )
     await session.flush()
     return schedule
 

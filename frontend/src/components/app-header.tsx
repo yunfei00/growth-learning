@@ -6,11 +6,12 @@ import { useEffect, useState } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
 import { useAuth } from "@/components/auth-provider";
+import { CHILD_MODE_KEY } from "@/lib/experience-mode";
 import { resolveAppHeaderMode } from "@/lib/header-mode";
 
 const PARENT_PRIMARY = [
   ["/home", "首页", "⌂"],
-  ["/learn/characters", "学习", "字"],
+  ["/learn", "学习", "字"],
   ["/read", "阅读", "读"],
   ["/science", "科学", "科"],
   ["/growth", "成长", "树"],
@@ -23,8 +24,6 @@ const CHILD_PRIMARY = [
   ["/kids/growth-tree", "成长树", "🌳"],
   ["/kids/achievements", "成就", "🏅"],
 ] as const;
-
-const CHILD_MODE_KEY = "growth-learning:experience-mode";
 
 function NavLinks({
   items,

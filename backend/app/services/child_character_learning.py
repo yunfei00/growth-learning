@@ -43,6 +43,7 @@ from app.schemas.learning import (
     TimelineItem,
 )
 from app.services.mastery import mastery_policy_for_type, recompute_child_knowledge_state
+from app.services.pinyin_learning import update_pinyin_daily_progress
 from app.services.review_planning import (
     recompute_review_schedule,
     update_daily_learning_progress,
@@ -766,6 +767,7 @@ async def create_learning_session(
         await recompute_child_knowledge_state(session, child_id, point_id)
         await recompute_review_schedule(session, child_id, point_id)
     await update_daily_learning_progress(session, child_id, point_ids, now=now)
+    await update_pinyin_daily_progress(session, child_id, point_ids, now=now)
     await session.commit()
     projection_status, unavailable = _projection_availability(points)
     return EvidenceSessionResponse(
@@ -820,6 +822,7 @@ async def create_assessment_session(
     for point_id in point_ids:
         await recompute_child_knowledge_state(session, child_id, point_id)
         await recompute_review_schedule(session, child_id, point_id)
+    await update_pinyin_daily_progress(session, child_id, point_ids, now=now)
     await session.commit()
     projection_status, unavailable = _projection_availability(points)
     return EvidenceSessionResponse(

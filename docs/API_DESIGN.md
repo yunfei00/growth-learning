@@ -201,6 +201,25 @@ Provider 未配置时 context 返回 `provider_configured=false`，生成返回 
 
 实验档案维护保留 `created_at` 和 `completed_at`，只推进 `updated_at`；所有写操作都保持 `status=completed`。媒体不通过公共 `/static` 或 `/media` 暴露。
 
+### Pinyin learning V1
+
+所有 child 端点先验证实时家庭成员关系；跨家庭返回 `404`。音频接口也必须鉴权，不公开对象存储键。
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/pinyin/items` | 已启用的正式拼音目录，支持 kind/subcategory 分页 |
+| `GET` | `/api/v1/children/{child_id}/pinyin/items` | 带独立孩子状态的目录 |
+| `GET` | `/api/v1/children/{child_id}/pinyin/items/{point_id}` | 一次一个的大符号详情、前后导航、易混淆项、少量听音选项和安全音频决策 |
+| `GET` | `/api/v1/children/{child_id}/pinyin/overview` | 声母/韵母/声调/整体认读分别返回已学习与稳定数，拼读单列 |
+| `GET` | `/api/v1/children/{child_id}/pinyin/today` | 幂等创建/读取 3 新 + 最多 5 复习的小任务 |
+| `GET` | `/api/v1/children/{child_id}/pinyin/history` | 按会话返回学习/测评及真实陪伴人 attribution |
+| `GET` | `/api/v1/pinyin/practices` | 18 个受控拼读练习及 `ü` underlying/display 规则 |
+| `GET` | `/api/v1/pinyin/items/{point_id}/audio` | 仅在存在 curated `audio_key` 时读取私有正式音频 |
+| `GET/PATCH` | `/api/v1/admin/pinyin[/{point_id}]` | 搜索、类型/状态筛选、归档、提示/例子/家长提示/audio_key 维护 |
+| `POST` | `/api/v1/admin/pinyin/import-foundation` | 幂等导入 `pinyin-foundation-v1` 与 16 Unit 系统课程 |
+
+学习与测评继续使用通用 `/learning-sessions` 和 `/assessment-sessions`。播放声音只产生 exposure，不自动写 `correct`；家长发音观察使用 `assessment_kind=oral_check`、`skill_dimension=pronunciation`，不表示机器语音评分。
+
 ## 错误约定
 
 - `400/422`：请求内容无效。

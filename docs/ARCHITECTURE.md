@@ -41,7 +41,8 @@ app/core          配置、日志、安全等横切能力
 - `platform access`：邀请制准入、账号生命周期、session version、认证限流与安全审计；不进入家庭私有域
 - `families`：家庭、成员、儿童档案、授权
 - `family collaboration`：已有账号家庭邀请、成员权限、逐孩子关系、多家庭/多孩子选择和真实 evidence 动态投影
-- `knowledge`：通用知识点、汉字目录和知识关系
+- `knowledge`：通用知识点、汉字/拼音目录和知识关系
+- `pinyin`：Chinese subject 下的版本化拼音目录、语音策略、练习、Today 与独立掌握投影
 - `curriculum`：未来的学科、能力、课程和活动
 - `learning`：学习/复习/测评原始事件与掌握状态计算
 - `reading`：故事生成、规则校验、阅读会话
@@ -101,7 +102,7 @@ existing User --accept hashed FamilyInvitation--> FamilyMember(role)
 
 ## 5.2 系统知识与孩子状态分离
 
-`KnowledgePoint` 是跨学科规范主表，使用受约束的 `subject + type` 区分语文、数学、英语与科学；`ChineseCharacter` 是一对一的汉字属性，`KnowledgeRelation` 表达知识间关系。它们属于系统目录，不引用 Child。孩子学习事实由 `LearningRecord`、`AssessmentItem` 通过 `child_id + knowledge_point_id` 建立上下文，不污染共享知识。`ChildKnowledgeState` 由显式 Mastery Policy 派生；当前只有汉字策略，未支持学科不会伪造状态。详见 [Phase 16 多学科基础](MULTISUBJECT_FOUNDATION.md)。
+`KnowledgePoint` 是跨学科规范主表，使用受约束的 `subject + type` 区分语文、数学、英语与科学；`ChineseCharacter` 与 `PinyinItem` 分别是一对一的汉字、拼音属性，`KnowledgeRelation` 表达知识间关系。它们属于系统目录，不引用 Child。孩子学习事实由 `LearningRecord`、`AssessmentItem` 通过 `child_id + knowledge_point_id` 建立上下文，不污染共享知识。`ChildKnowledgeState` 由显式 Mastery Policy 派生；当前汉字使用 `chinese-character-v1`，拼音使用 `pinyin-v1`，未支持学科不会伪造状态。详见 [Phase 16 多学科基础](MULTISUBJECT_FOUNDATION.md) 与 [拼音学习模型](PINYIN_LEARNING_MODEL.md)。
 
 ## 5.3 Mastery V1 计算边界
 

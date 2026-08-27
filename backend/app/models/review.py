@@ -38,6 +38,11 @@ class PlanItemStatus(StrEnum):
     COMPLETED = "completed"
 
 
+class PinyinPlanItemKind(StrEnum):
+    NEW = "new"
+    REVIEW = "review"
+
+
 class AssessmentSource(StrEnum):
     QUICK_TEST = "quick_test"
     DAILY_REVIEW = "daily_review"
@@ -177,6 +182,71 @@ class DailyPlanItem(TimestampMixin, Base):
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     selection_reason: Mapped[str] = mapped_column(String(80), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PinyinDailyPlan(TimestampMixin, Base):
+    """Small, resumable Pinyin selection independent from the character plan."""
+
+    __tablename__ = "pinyin_daily_plans"
+    __table_args__ = (
+        UniqueConstraint("child_id", "plan_date", name="uq_pinyin_daily_plan_child_date"),
+        CheckConstraint(
+            "status IN ('pending', 'in_progress', 'completed')",
+            name="ck_pinyin_daily_plans_status",
+        ),
+        CheckConstraint(
+            "new_count >= 0 AND review_count >= 0 AND completed_count >= 0",
+            name="ck_pinyin_daily_plans_counts",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    child_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("children.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    plan_date: Mapped[date] = mapped_column(Date, nullable=False)
+    timezone: Mapped[str] = mapped_column(
+        String(64), default="Asia/Shanghai", server_default="Asia/Shanghai", nullable=False
+    )
+    new_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    review_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    completed_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(
+        String(20), default=DailyPlanStatus.PENDING, server_default="pending", nullable=False
+    )
+    algorithm_version: Mapped[str] = mapped_column(
+        String(30), default="pinyin-plan-v1", server_default="pinyin-plan-v1", nullable=False
+    )
+
+
+class PinyinDailyPlanItem(TimestampMixin, Base):
+    __tablename__ = "pinyin_daily_plan_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "pinyin_daily_plan_id",
+            "knowledge_point_id",
+            name="uq_pinyin_daily_plan_item_point",
+        ),
+        CheckConstraint("item_kind IN ('new', 'review')", name="ck_pinyin_daily_plan_items_kind"),
+        CheckConstraint(
+            "status IN ('pending', 'completed')", name="ck_pinyin_daily_plan_items_status"
+        ),
+        CheckConstraint("position >= 0", name="ck_pinyin_daily_plan_items_position"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    pinyin_daily_plan_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("pinyin_daily_plans.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    knowledge_point_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("knowledge_points.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    item_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default=PlanItemStatus.PENDING, server_default="pending", nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
