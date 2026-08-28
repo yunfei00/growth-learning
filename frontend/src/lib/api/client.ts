@@ -289,6 +289,154 @@ export type PinyinHistory = {
   }>;
 };
 
+export type MathState = "unlearned" | "introduced" | "practicing" | "proficient" | "stable";
+export type MathMode = "practice" | "assessment";
+export type MathDimension = "understanding" | "independent" | "transfer";
+
+export type MathSkill = {
+  knowledge_point_id: string;
+  canonical_key: string;
+  domain: string;
+  skill_code: string;
+  title: string;
+  difficulty_level: number;
+  order_index: number;
+  status: "active" | "archived";
+  representation_types: string[];
+  template_count: number;
+  state_code: MathState;
+  learned: boolean;
+};
+
+export type MathSkillPage = {
+  items: MathSkill[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type MathTemplate = {
+  id: string;
+  template_key: string;
+  representation_type: string;
+  difficulty: number;
+  generator_version: string;
+  status: "active" | "archived";
+};
+
+export type MathSkillDetail = MathSkill & {
+  child_instruction: string;
+  parent_tip: string;
+  recommended_age_min: number | null;
+  recommended_age_max: number | null;
+  generator_key: string | null;
+  settings: Record<string, unknown>;
+  catalog_version: string;
+  templates: MathTemplate[];
+  prerequisites: Array<{ knowledge_point_id: string; title: string }>;
+  position: number;
+  total: number;
+  previous: { knowledge_point_id: string; title: string } | null;
+  next: { knowledge_point_id: string; title: string } | null;
+  policy_key: string;
+  dimensions: Record<string, unknown>;
+  mastery_explanation: string[];
+  common_difficulties: string[];
+  last_learning_at: string | null;
+  last_assessed_at: string | null;
+  next_review_at: string | null;
+};
+
+export type MathOverview = {
+  child_id: string;
+  catalog_version: string;
+  total: number;
+  learned: number;
+  stable: number;
+  groups: Array<{
+    domain: string;
+    label: string;
+    total: number;
+    learned: number;
+    proficient: number;
+    stable: number;
+    state_code: MathState;
+  }>;
+};
+
+export type MathToday = {
+  plan_id: string;
+  child_id: string;
+  plan_date: string;
+  items: Array<MathSkill & { item_kind: "new" | "review"; problem_count: number; completed: boolean }>;
+  completed_count: number;
+  target_count: number;
+  status: "pending" | "in_progress" | "completed";
+  estimated_minutes: number;
+};
+
+export type MathProblem = {
+  attempt_id: string;
+  template_key: string;
+  generator_version: string;
+  seed: number;
+  representation_type: string;
+  render_payload: {
+    kind: string;
+    instruction: string;
+    representation_type: string;
+    visual: Record<string, unknown>;
+    options: Array<Record<string, unknown> & { value: unknown; label: string }>;
+  };
+  answered: boolean;
+};
+
+export type MathSession = {
+  session_id: string;
+  child_id: string;
+  knowledge_point_id: string;
+  skill_title: string;
+  mode: MathMode;
+  dimension: MathDimension;
+  problems: MathProblem[];
+  completed_count: number;
+  total_count: number;
+  completed: boolean;
+};
+
+export type MathAttemptResult = {
+  attempt_id: string;
+  outcome: AssessmentOutcome;
+  first_answer_correct: boolean;
+  attempt_count: number;
+  hint_used: boolean;
+  feedback: string;
+  session_completed: boolean;
+  mastery_state: MathState | null;
+};
+
+export type MathHistory = {
+  child_id: string;
+  items: Array<{
+    session_id: string;
+    mode: MathMode | "offline";
+    actor_display_name: string;
+    occurred_at: string;
+    skills: Array<{
+      knowledge_point_id: string;
+      title: string;
+      domain: string;
+      problem_count: number;
+      correct: number;
+      hinted_correct: number;
+      uncertain: number;
+      incorrect: number;
+      representations: string[];
+    }>;
+  }>;
+};
+
 export type FamilyRole = "admin" | "companion";
 
 export type Family = {
@@ -1637,6 +1785,122 @@ export function recordPinyinAssessment(
   });
 }
 
+export function listChildMathSkills(childId: string, domain?: string): Promise<MathSkillPage> {
+  const query = new URLSearchParams({ page: "1", page_size: "100" });
+  if (domain) query.set("domain", domain);
+  return request<MathSkillPage>(`/api/v1/children/${childId}/math/skills?${query}`);
+}
+
+export function getMathOverview(childId: string): Promise<MathOverview> {
+  return request<MathOverview>(`/api/v1/children/${childId}/math/overview`);
+}
+
+export function getMathToday(childId: string): Promise<MathToday | null> {
+  return request<MathToday | null>(`/api/v1/children/${childId}/math/today`);
+}
+
+export function getMathSkillDetail(childId: string, knowledgePointId: string): Promise<MathSkillDetail> {
+  return request<MathSkillDetail>(`/api/v1/children/${childId}/math/skills/${knowledgePointId}`);
+}
+
+export function getMathHistory(childId: string): Promise<MathHistory> {
+  return request<MathHistory>(`/api/v1/children/${childId}/math/history`);
+}
+
+export function startMathSession(
+  childId: string,
+  payload: {
+    knowledgePointId: string;
+    mode: MathMode;
+    problemCount: number;
+    dimension: MathDimension;
+    seed?: number;
+  },
+): Promise<MathSession> {
+  return request<MathSession>(`/api/v1/children/${childId}/math/sessions`, {
+    method: "POST",
+    body: jsonBody({
+      knowledge_point_id: payload.knowledgePointId,
+      mode: payload.mode,
+      problem_count: payload.problemCount,
+      dimension: payload.dimension,
+      seed: payload.seed,
+    }),
+  });
+}
+
+export function answerMathAttempt(
+  childId: string,
+  sessionId: string,
+  attemptId: string,
+  payload: { submittedAnswer: unknown; hintUsed: boolean; responseTimeMs?: number },
+): Promise<MathAttemptResult> {
+  return request<MathAttemptResult>(
+    `/api/v1/children/${childId}/math/sessions/${sessionId}/attempts/${attemptId}/answer`,
+    {
+      method: "POST",
+      body: jsonBody({
+        submitted_answer: payload.submittedAnswer,
+        hint_used: payload.hintUsed,
+        response_time_ms: payload.responseTimeMs,
+      }),
+    },
+  );
+}
+
+export function recordMathOfflineObservation(
+  childId: string,
+  knowledgePointId: string,
+  outcome: "correct" | "hinted_correct" | "uncertain",
+): Promise<{ assessment_item_id: string; outcome: string; mastery_state: MathState }> {
+  return request(`/api/v1/children/${childId}/math/skills/${knowledgePointId}/offline-observations`, {
+    method: "POST",
+    body: jsonBody({ outcome }),
+  });
+}
+
+export function listAdminMath(filters: {
+  domain?: string;
+  status?: "active" | "archived" | "";
+  search?: string;
+  pageSize?: number;
+} = {}): Promise<MathSkillPage> {
+  const query = new URLSearchParams({ page: "1", page_size: String(filters.pageSize ?? 100) });
+  if (filters.domain) query.set("domain", filters.domain);
+  if (filters.status) query.set("status", filters.status);
+  if (filters.search) query.set("search", filters.search);
+  return request<MathSkillPage>(`/api/v1/admin/math?${query}`);
+}
+
+export function getAdminMath(id: string): Promise<MathSkillDetail> {
+  return request<MathSkillDetail>(`/api/v1/admin/math/${id}`);
+}
+
+export function updateAdminMath(
+  id: string,
+  payload: Partial<Pick<MathSkillDetail, "status" | "title" | "child_instruction" | "parent_tip" | "recommended_age_min" | "recommended_age_max">>,
+): Promise<MathSkillDetail> {
+  return request<MathSkillDetail>(`/api/v1/admin/math/${id}`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function importMathFoundation(): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  relations_created: number;
+  templates_created: number;
+  catalog_version: string;
+  catalog_size: number;
+  template_count: number;
+  course_created: boolean;
+  errors: string[];
+}> {
+  return request("/api/v1/admin/math/import-foundation", { method: "POST" });
+}
+
 export function getCharacterMasterySummary(childId: string): Promise<CharacterMasterySummary> {
   return request<CharacterMasterySummary>(`/api/v1/children/${childId}/characters/summary`);
 }
@@ -2676,7 +2940,7 @@ export type CatalogRelease = {
 
 export type ChildTodayTask = {
   subject: Subject;
-  kind: "new" | "review" | "pinyin" | "reading" | "science" | "teacher";
+  kind: "new" | "review" | "pinyin" | "math" | "reading" | "science" | "teacher";
   title: string;
   description: string;
   status: "pending" | "in_progress" | "completed" | "needs_story" | "optional";

@@ -283,4 +283,23 @@ assessment-only state from being mislabeled as something the child formally lear
 
 ## 19. V1 release boundary
 
-V1 固定为 `1.0.0`，Alembic head 为 `20260823_0013`。Release SHA 同时绑定 CI、前后端镜像 label、后端健康响应、生产部署、E2E 和恢复演练。角色边界见 [V1 角色与隐私矩阵](ROLE_PRIVACY_MATRIX.md)，发布/回滚门禁见 [V1 发布清单](RELEASE_CHECKLIST.md)。后续功能不增加第二套 mastery、课程或成长事实；未来工作进入 V2 backlog 或普通维护 release。
+V1 固定为 `1.0.0`，当前 Alembic head 为 `20260828_0018`。Release SHA 同时绑定 CI、前后端镜像 label、后端健康响应、生产部署、E2E 和恢复演练。角色边界见 [V1 角色与隐私矩阵](ROLE_PRIVACY_MATRIX.md)，发布/回滚门禁见 [V1 发布清单](RELEASE_CHECKLIST.md)。后续功能不增加第二套 mastery、课程或成长事实；未来工作进入 V2 backlog 或普通维护 release。
+
+## 20. Phase 18 Math Foundation
+
+```text
+KnowledgePoint(type=math_skill, subject=math) ──> MathSkill
+                │                                  └──> MathProblemTemplate
+                │                                         │ template + seed + version
+                │                                         ▼
+                ├── LearningRecord <── practice ── MathExerciseAttempt
+                └── AssessmentItem <── check aggregation ──┘
+                                      │
+                                      └── math-v1 ChildKnowledgeState
+```
+
+数学知识点表示能力，不表示一道算式。题目由小型确定性 registry 生成并保存完整快照；Practice
+允许提示和重试但不创建 `AssessmentItem`，Check 保存首次答案并聚合为 canonical assessment。
+`math-v1` 要求独立、多 representation、跨自然日证据，速度不参与掌握度。完整边界见
+[Math Learning Model V1](MATH_LEARNING_MODEL_V1.md) 与
+[Math Evidence Model V1](MATH_EVIDENCE_MODEL_V1.md)。

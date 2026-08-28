@@ -75,6 +75,17 @@ from app.models.learning import (
     MasteryLevel,
     SessionStatus,
 )
+from app.models.math import (
+    MathAttemptMode,
+    MathCatalogRelease,
+    MathDailyPlan,
+    MathDailyPlanItem,
+    MathDomain,
+    MathExerciseAttempt,
+    MathProblemTemplate,
+    MathRepresentationType,
+    MathSkill,
+)
 from app.models.platform import (
     InvitationPurpose,
     InvitationStoredStatus,
@@ -224,6 +235,15 @@ __all__ = [
     "LearningSession",
     "MasteryLevel",
     "SessionStatus",
+    "MathAttemptMode",
+    "MathCatalogRelease",
+    "MathDailyPlan",
+    "MathDailyPlanItem",
+    "MathDomain",
+    "MathExerciseAttempt",
+    "MathProblemTemplate",
+    "MathRepresentationType",
+    "MathSkill",
     "AssessmentSessionPlan",
     "AssessmentSessionTarget",
     "AssessmentSource",

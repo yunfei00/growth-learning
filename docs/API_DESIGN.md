@@ -300,3 +300,21 @@ Teacher Course 可见性不能替代 `TeacherChildRelation`；Family Admin 未�
 | `GET` | `/docs` | FastAPI OpenAPI UI；生产经 `/growth/api/docs` 有意开放用于当前自托管验收 |
 
 健康响应不返回环境、数据库、对象存储、AI 配置、author 或 secret。家庭私有 API 的权限矩阵见 [V1 角色与隐私矩阵](ROLE_PRIVACY_MATRIX.md)。
+
+### Math Foundation V1
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/math/skills` | 已认证用户查看启用的能力型数学目录 |
+| `GET` | `/api/v1/children/{child_id}/math/overview` | 家庭鉴权后的领域总览，不返回总分或排名 |
+| `GET` | `/api/v1/children/{child_id}/math/skills[/{point_id}]` | 孩子状态、路径导航、模板摘要和可解释掌握依据 |
+| `GET` | `/api/v1/children/{child_id}/math/today` | 幂等创建/读取小任务，不创建学习证据 |
+| `POST` | `/api/v1/children/{child_id}/math/sessions` | 服务端按模板、seed、version 生成并持久化 1–5 道题 |
+| `POST` | `.../math/sessions/{session_id}/attempts/{attempt_id}/answer` | 保存首次答案、提示、重试；完成后按 mode 写 canonical evidence |
+| `POST` | `.../math/skills/{point_id}/offline-observations` | 家长记录动手活动的独立完成/需要提示/暂时不会；仍由 math-v1 综合判断 |
+| `GET` | `/api/v1/children/{child_id}/math/history` | 按日期、Session、Skill 聚合的家长记录 |
+| `GET/POST/PATCH` | `/api/v1/admin/math[...]` | System Admin 搜索/筛选/归档/维护 Skill 或运行幂等导入 |
+
+答案由后端确定性生成器重新比较，不接受客户端提供 expected answer。System Admin 不能通过孩子端点读取
+私有数学历史，也不能修改 mastery。通用 `/assessment-sessions` 拒绝 `math_skill`，防止绕过生成器、
+首次答案和 attempt 聚合直接写入数学正确结果；屏幕外真实活动仅能通过受控 observation 入口记录。

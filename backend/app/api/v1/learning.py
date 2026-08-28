@@ -36,6 +36,7 @@ from app.services.ai_learning_assistant import LearningAssistantError, generate_
 from app.services.authorization import get_authorized_child
 from app.services.character_catalog import get_character
 from app.services.child_character_learning import (
+    UnsupportedAssessmentFlowError,
     create_assessment_session,
     create_learning_session,
     get_character_mastery_detail,
@@ -184,7 +185,7 @@ async def submit_assessment_items(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from error
 
 
@@ -438,5 +439,9 @@ async def record_assessment_session(
     await get_authorized_child(session, current_user, child_id)
     try:
         return await create_assessment_session(session, child_id, current_user.id, payload)
+    except UnsupportedAssessmentFlowError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from error
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error

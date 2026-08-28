@@ -156,6 +156,8 @@ jobs:
                   "family_invitations", "adult_child_relations",
                   "pinyin_catalog_releases", "pinyin_items", "pinyin_practice_items",
                   "pinyin_daily_plans", "pinyin_daily_plan_items",
+                  "math_catalog_releases", "math_skills", "math_problem_templates",
+                  "math_exercise_attempts", "math_daily_plans", "math_daily_plan_items",
               }
               missing = required - tables
               if missing:
@@ -262,6 +264,51 @@ jobs:
               assert character_count == learning_count == assessment_count == 1
               assert tuple(state) == ("chinese-character-v1", "recognizing", "recognizing", 1)
               print("Phase 17 additive migration preserved Phase 16 UUID/evidence/state")
+
+          asyncio.run(main())
+          PY
+
+      - name: Verify Phase 18 additive migration and deterministic Math catalog
+        run: |
+          python -m alembic downgrade 20260828_0017
+          python -m alembic upgrade head
+          python -m app.cli.math import-foundation
+          python -m app.cli.math import-foundation
+          python - <<'PY'
+          import asyncio
+          from sqlalchemy import inspect, text
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from app.core.config import get_settings
+
+          async def main():
+              engine = create_async_engine(get_settings().database_url)
+              async with engine.connect() as connection:
+                  tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+                  counts = {
+                      "skills": await connection.scalar(text("SELECT count(*) FROM math_skills")),
+                      "templates": await connection.scalar(text("SELECT count(*) FROM math_problem_templates")),
+                      "releases": await connection.scalar(text("SELECT count(*) FROM math_catalog_releases WHERE is_current")),
+                      "course_units": await connection.scalar(text("SELECT count(*) FROM course_units WHERE course_id = (SELECT id FROM courses WHERE system_key = 'system-math-foundation-v1')")),
+                      "legacy_character": await connection.scalar(text("SELECT count(*) FROM chinese_characters WHERE character = '人'")),
+                      "legacy_learning": await connection.scalar(text("SELECT count(*) FROM learning_records")),
+                      "legacy_assessment": await connection.scalar(text("SELECT count(*) FROM assessment_items")),
+                  }
+              await engine.dispose()
+              required = {
+                  "math_catalog_releases", "math_skills", "math_problem_templates",
+                  "math_exercise_attempts", "math_daily_plans", "math_daily_plan_items",
+              }
+              assert required <= tables
+              assert counts == {
+                  "skills": 68,
+                  "templates": 153,
+                  "releases": 1,
+                  "course_units": 19,
+                  "legacy_character": 1,
+                  "legacy_learning": 1,
+                  "legacy_assessment": 1,
+              }
+              print("Phase 18 Math catalog is idempotent and Phase 16/17 evidence is preserved")
 
           asyncio.run(main())
           PY

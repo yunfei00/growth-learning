@@ -111,7 +111,8 @@ async def test_admin_knowledge_filters_type_subject_constraints_and_empty_state(
         math_page = await admin.get("/api/v1/admin/knowledge?subject=math")
         assert math_page.status_code == 200
         assert [item["id"] for item in math_page.json()["items"]] == [math["id"]]
-        assert math_page.json()["items"][0]["mastery_projection_status"] == "unavailable"
+        assert math_page.json()["items"][0]["mastery_projection_status"] == "configured"
+        assert math_page.json()["items"][0]["mastery_policy_key"] == "math-v1"
         pinyin_page = await admin.get("/api/v1/admin/knowledge?type=pinyin_initial&search=b")
         assert [item["id"] for item in pinyin_page.json()["items"]] == [pinyin["id"]]
         assert (await admin.get(f"/api/v1/admin/knowledge/{english['id']}")).status_code == 200
@@ -142,7 +143,7 @@ async def test_admin_knowledge_filters_type_subject_constraints_and_empty_state(
         assert character_via_generic.status_code == 422
 
 
-async def test_generic_evidence_is_preserved_without_fake_mastery_or_review_schedule(
+async def test_generic_learning_projects_math_but_generic_assessment_cannot_bypass_generator(
     test_app: FastAPI,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -179,9 +180,8 @@ async def test_generic_evidence_is_preserved_without_fake_mastery_or_review_sche
             },
         )
         assert learning.status_code == 201, learning.text
-        assert learning.json()["mastery_projection"] == "unavailable"
+        assert learning.json()["mastery_projection"] == "partially_unavailable"
         assert set(learning.json()["projection_unavailable_knowledge_point_ids"]) == {
-            math["id"],
             english["id"],
         }
         assessment = await parent.post(
@@ -199,8 +199,8 @@ async def test_generic_evidence_is_preserved_without_fake_mastery_or_review_sche
                 ],
             },
         )
-        assert assessment.status_code == 201, assessment.text
-        assert assessment.json()["mastery_projection"] == "unavailable"
+        assert assessment.status_code == 422, assessment.text
+        assert "deterministic Math session" in assessment.json()["detail"]
         character_summary = await parent.get(f"/api/v1/children/{child['id']}/characters/summary")
         assert character_summary.status_code == 200
         assert character_summary.json()["total_enabled"] == 0
@@ -229,34 +229,38 @@ async def test_generic_evidence_is_preserved_without_fake_mastery_or_review_sche
                 )
                 == 2
             )
-            item = await session.scalar(
-                select(AssessmentItem).where(
+            assert not await session.scalar(
+                select(AssessmentItem.id).where(
                     AssessmentItem.knowledge_point_id == uuid.UUID(math["id"])
                 )
             )
-            assert item is not None
-            assert item.skill_dimension == "accuracy"
-            assert item.evidence_metadata == {
-                "problem_count": 5,
-                "representation": "objects",
-            }
+            state = await session.scalar(
+                select(ChildKnowledgeState).where(
+                    ChildKnowledgeState.child_id == child_id,
+                    ChildKnowledgeState.knowledge_point_id == uuid.UUID(math["id"]),
+                )
+            )
+            assert state is not None
+            assert state.policy_key == "math-v1" and state.state_code == "introduced"
             assert not await session.scalar(
                 select(ChildKnowledgeState.id).where(
                     ChildKnowledgeState.child_id == child_id,
-                    ChildKnowledgeState.knowledge_point_id.in_(point_ids),
+                    ChildKnowledgeState.knowledge_point_id == uuid.UUID(english["id"]),
                 )
             )
-            assert not await session.scalar(
-                select(ChildReviewSchedule.id).where(
+            math_schedule = await session.scalar(
+                select(ChildReviewSchedule).where(
                     ChildReviewSchedule.child_id == child_id,
-                    ChildReviewSchedule.knowledge_point_id.in_(point_ids),
+                    ChildReviewSchedule.knowledge_point_id == uuid.UUID(math["id"]),
                 )
             )
+            assert math_schedule is not None
+            assert math_schedule.algorithm_version == "math-review-v1"
 
         math_detail = await admin.get(f"/api/v1/admin/knowledge/{math['id']}")
         assert math_detail.json()["learning_evidence_count"] == 1
-        assert math_detail.json()["assessment_evidence_count"] == 1
-        assert math_detail.json()["child_state_count"] == 0
+        assert math_detail.json()["assessment_evidence_count"] == 0
+        assert math_detail.json()["child_state_count"] == 1
 
 
 async def test_system_course_subject_isolation_generic_completion_and_filtering(
@@ -312,11 +316,9 @@ async def test_system_course_subject_isolation_generic_completion_and_filtering(
         assert created.status_code == 201, created.text
         course = created.json()
         assert course["subject"] == "math"
-        assert course["projection_unavailable_count"] == 1
-        assert course["units"][0]["activities"][0]["points"][0]["mastery_level"] is None
-        assert (
-            course["units"][0]["activities"][0]["points"][0]["projection_status"] == "unavailable"
-        )
+        assert course["projection_unavailable_count"] == 0
+        assert course["units"][0]["activities"][0]["points"][0]["mastery_level"] == "unlearned"
+        assert course["units"][0]["activities"][0]["points"][0]["projection_status"] == "configured"
 
         math_courses = await parent.get(f"/api/v1/courses?child_id={child['id']}&subject=math")
         assert [item["id"] for item in math_courses.json()] == [course["id"]]
@@ -354,9 +356,11 @@ async def test_system_course_subject_isolation_generic_completion_and_filtering(
                 )
                 == 1
             )
-            assert not await session.scalar(
-                select(ChildKnowledgeState.id).where(
+            state = await session.scalar(
+                select(ChildKnowledgeState).where(
                     ChildKnowledgeState.child_id == child_id,
                     ChildKnowledgeState.knowledge_point_id == point_id,
                 )
             )
+            assert state is not None
+            assert state.policy_key == "math-v1" and state.state_code == "introduced"

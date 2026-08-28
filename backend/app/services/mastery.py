@@ -24,6 +24,8 @@ ALGORITHM_VERSION = "v1"
 CHINESE_CHARACTER_POLICY_KEY = "chinese-character-v1"
 PINYIN_POLICY_KEY = "pinyin-v1"
 PINYIN_DIMENSIONS = frozenset({"recognition", "listening", "tone", "blending", "pronunciation"})
+MATH_POLICY_KEY = "math-v1"
+MATH_DIMENSIONS = frozenset({"understanding", "independent", "transfer", "representation"})
 
 
 class MasteryPolicy(Protocol):
@@ -309,9 +311,163 @@ class PinyinMasteryPolicy:
         )
 
 
+class MathMasteryPolicy:
+    """Math-specific projection requiring independent, varied, cross-day evidence."""
+
+    key = MATH_POLICY_KEY
+    supported_knowledge_types = frozenset({KnowledgeType.MATH_SKILL})
+    supported_assessment_kinds = frozenset({AssessmentKind.MATH_CHECK})
+
+    def recompute(
+        self,
+        learning_records: list[LearningRecord],
+        assessment_items: list[AssessmentItem],
+        *,
+        knowledge_type: str | None = None,
+    ) -> MasteryProjection:
+        del knowledge_type
+        ordered_learning = sorted(
+            learning_records, key=lambda record: (_utc(record.learned_at), str(record.id))
+        )
+        ordered_items = sorted(
+            assessment_items, key=lambda item: (_utc(item.assessed_at), str(item.id))
+        )
+        counts = {outcome.value: 0 for outcome in AssessmentOutcome}
+        response_times: list[int] = []
+        independent_items: list[AssessmentItem] = []
+        representations: set[str] = set()
+        independent_representations: set[str] = set()
+        independent_problem_count = 0
+        for item in ordered_items:
+            counts[item.outcome] += 1
+            if item.response_time_ms is not None:
+                response_times.append(item.response_time_ms)
+            metadata = item.evidence_metadata or {}
+            representations.update(str(value) for value in metadata.get("representations", []))
+            if item.outcome == AssessmentOutcome.CORRECT and not item.hint_used:
+                independent_items.append(item)
+                independent_representations.update(
+                    str(value) for value in metadata.get("representations", [])
+                )
+                independent_problem_count += int(
+                    metadata.get("first_answer_correct_count", metadata.get("correct_attempts", 1))
+                )
+
+        independent_dates = {_utc(item.assessed_at).date() for item in independent_items}
+        span_days = 0.0
+        if independent_items:
+            first = min(_utc(item.assessed_at) for item in independent_items)
+            last = max(_utc(item.assessed_at) for item in independent_items)
+            span_days = (last - first).total_seconds() / 86400
+        latest_success = bool(
+            ordered_items
+            and ordered_items[-1].outcome == AssessmentOutcome.CORRECT
+            and not ordered_items[-1].hint_used
+        )
+
+        has_evidence = bool(ordered_learning or ordered_items)
+        state_code = "introduced" if ordered_learning else "unlearned"
+        if ordered_items:
+            state_code = "practicing"
+        if independent_problem_count >= 2 and independent_items:
+            state_code = "proficient"
+        stable = (
+            independent_problem_count >= 6
+            and len(independent_items) >= 3
+            and len(independent_dates) >= 3
+            and span_days >= 7
+            and len(independent_representations) >= 3
+            and latest_success
+        )
+        if stable:
+            state_code = "stable"
+
+        understanding_state = "unlearned"
+        if ordered_learning:
+            understanding_state = "introduced"
+        if ordered_items:
+            understanding_state = "practicing"
+        if independent_problem_count >= 2:
+            understanding_state = "proficient"
+        if stable:
+            understanding_state = "stable"
+        independent_state = "unlearned"
+        if independent_items:
+            independent_state = "practicing"
+        if independent_problem_count >= 2:
+            independent_state = "proficient"
+        if stable:
+            independent_state = "stable"
+        transfer_state = "unlearned"
+        if independent_representations:
+            transfer_state = "practicing"
+        if len(independent_representations) >= 2 and independent_problem_count >= 2:
+            transfer_state = "proficient"
+        if stable:
+            transfer_state = "stable"
+
+        legacy_level = {
+            "unlearned": MasteryLevel.UNLEARNED,
+            "introduced": MasteryLevel.INTRODUCED,
+            "practicing": MasteryLevel.RECOGNIZING,
+            "proficient": MasteryLevel.PROFICIENT,
+            "stable": MasteryLevel.STABLE,
+        }[state_code]
+        consecutive_correct = 0
+        consecutive_incorrect = 0
+        for item in ordered_items:
+            if item.outcome == AssessmentOutcome.CORRECT and not item.hint_used:
+                consecutive_correct += 1
+                consecutive_incorrect = 0
+            elif item.outcome == AssessmentOutcome.INCORRECT:
+                consecutive_incorrect += 1
+                consecutive_correct = 0
+            else:
+                consecutive_correct = 0
+                consecutive_incorrect = 0
+        score = {
+            "unlearned": 0.0,
+            "introduced": 0.15,
+            "practicing": 0.4,
+            "proficient": 0.75,
+            "stable": 1.0,
+        }[state_code]
+        return MasteryProjection(
+            mastery_level=legacy_level,
+            mastery_score=score,
+            first_introduced_at=ordered_learning[0].learned_at if ordered_learning else None,
+            last_learning_at=ordered_learning[-1].learned_at if ordered_learning else None,
+            last_assessed_at=ordered_items[-1].assessed_at if ordered_items else None,
+            correct_count=counts[AssessmentOutcome.CORRECT],
+            hinted_correct_count=counts[AssessmentOutcome.HINTED_CORRECT],
+            uncertain_count=counts[AssessmentOutcome.UNCERTAIN],
+            incorrect_count=counts[AssessmentOutcome.INCORRECT],
+            consecutive_correct=consecutive_correct,
+            consecutive_incorrect=consecutive_incorrect,
+            average_response_time_ms=(
+                round(sum(response_times) / len(response_times), 2) if response_times else None
+            ),
+            state_code=state_code if has_evidence else "unlearned",
+            dimensions_json={
+                "understanding": understanding_state,
+                "independent": independent_state,
+                "transfer": transfer_state,
+                "representation": {
+                    "state": transfer_state,
+                    "types": sorted(representations),
+                    "independent_types": sorted(independent_representations),
+                },
+                "independent_problem_count": independent_problem_count,
+                "independent_dates": len(independent_dates),
+                "evidence_span_days": round(span_days, 2),
+            },
+        )
+
+
 mastery_policies = MasteryPolicyRegistry()
 mastery_policies.register(ChineseCharacterMasteryPolicy())
 mastery_policies.register(PinyinMasteryPolicy())
+mastery_policies.register(MathMasteryPolicy())
 
 
 def mastery_policy_for_type(knowledge_type: str) -> MasteryPolicy | None:

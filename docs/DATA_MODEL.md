@@ -308,3 +308,16 @@ session 引用。
 ## Phase 13 档案与识字内容扩展
 
 Phase 13 的 additive migration 为 `20260823_0013`，仅向 `chinese_characters` 添加可空的 `parent_tip`。`simple_meaning`、`common_words`、`example_sentence` 与 `parent_tip` 均由知识库人工维护，并可作为后续 AI 辅助生成的上下文。LearningRecord、AssessmentItem、ChildKnowledgeState、历史 Story/Science/Growth 快照及原有汉字 UUID 保持不变。实验媒体仍由 `experiment_media_assets` 关联私有 MinIO 对象，替换不改变媒体在档案中的稳定 ID。
+
+## Phase 18 数学启蒙数据
+
+`math_catalog_releases` 固定 `math-foundation-v1` 的项目自有来源和数量；`math_skills` 与
+`KnowledgePoint(type=math_skill, subject=math)` 一对一，保存领域、能力代码、儿童指令、家长提示、
+表示方式与稳定路径顺序。`math_problem_templates` 保存 generator key/version 和受控配置，不创建
+`3+2=?` 这类知识点。
+
+`math_exercise_attempts` 是题目级原始证据，保存 session、template、seed、generator version、
+render snapshot、expected/first/submitted answer、提示、重试、结果和 actor/evaluator。Practice 只追加
+`LearningRecord`；Assessment 在同一 Skill 的尝试结束时生成一条 `AssessmentItem`。`math_daily_plans`
+和 `math_daily_plan_items` 只保存每天 1 个新 Skill、少量到期复习和 3–5 道题的可恢复选择。
+`ChildKnowledgeState` 与 `ChildReviewSchedule` 仍是可重建投影，不存在竞争性的 `MathMastery` 表。

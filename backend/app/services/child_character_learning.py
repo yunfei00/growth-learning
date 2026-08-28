@@ -732,6 +732,10 @@ def _projection_availability(
     return "partially_unavailable", unavailable
 
 
+class UnsupportedAssessmentFlowError(ValueError):
+    """The subject has a stricter evidence workflow than the generic endpoint."""
+
+
 async def create_learning_session(
     session: AsyncSession,
     child_id: uuid.UUID,
@@ -792,6 +796,10 @@ async def create_assessment_session(
 ) -> EvidenceSessionResponse:
     point_ids = {item.knowledge_point_id for item in payload.items}
     points = await _validate_enabled_points(session, point_ids)
+    if any(point.type == KnowledgeType.MATH_SKILL for point in points.values()):
+        raise UnsupportedAssessmentFlowError(
+            "Math skill assessment must use the deterministic Math session endpoint"
+        )
     now = datetime.now(UTC)
     assessment_session = AssessmentSession(
         child_id=child_id,

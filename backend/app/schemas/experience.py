@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class TodayTaskResponse(BaseModel):
     subject: Literal["chinese", "math", "english", "science"]
-    kind: Literal["new", "review", "pinyin", "reading", "science", "teacher"]
+    kind: Literal["new", "review", "pinyin", "math", "reading", "science", "teacher"]
     title: str
     description: str
     status: Literal["pending", "in_progress", "completed", "needs_story", "optional"]

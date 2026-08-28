@@ -214,11 +214,30 @@ Growth Learning V1 的 Phase 1–12 已收敛到 `1.0.0`。每阶段都以迁移
 
 退出条件：目录/领域/evidence/mastery/isolation 自动化测试、前端 lint/typecheck/build、CI、生产导入与小范围 smoke 全部通过；Issue 记录证据并关闭。设计见 [拼音学习模型](PINYIN_LEARNING_MODEL.md)、[拼音 Mastery Policy](PINYIN_MASTERY_POLICY.md)、[音频策略](PINYIN_AUDIO_STRATEGY.md) 和 [Canonical Catalog](PINYIN_CANONICAL_CATALOG.md)。
 
+## Phase 18：儿童数学启蒙系统 V1
+
+- `math-foundation-v1`：68 个能力型 Skill、11 个领域和 19 Unit「数学启蒙」路径
+- concrete → visual → symbolic 的一题一屏练习，SVG/CSS 图形、十格框与中文听题
+- `math-generator-v1` 通过 template + seed + version 确定性生成，保存完整问题快照
+- `MathExerciseAttempt` 保留首次答案、提示、重试和 actor；Practice 与 Check 严格分离
+- `math-v1` 三维 evidence 与多 representation、跨自然日稳定条件；`math-review-v1` 独立复习
+- Today 小任务、家长历史、多孩子隔离、多家长共享与 `/admin/math`
+- 数学 KnowledgePoint 不进入汉字、拼音、Story known characters 或识字成就
+
+退出条件：Catalog/Generator/Evidence/Mastery/Isolation/Regression 自动化测试、前端
+lint/typecheck/build、CI、生产导入和小范围正式 Child smoke 全绿；Issue 写入真实证据并关闭。
+
+设计见 [Math Learning Model V1](MATH_LEARNING_MODEL_V1.md)、
+[Math Evidence Model V1](MATH_EVIDENCE_MODEL_V1.md)、
+[Math Mastery Policy V1](MATH_MASTERY_POLICY_V1.md)、
+[Math Problem Generator V1](MATH_PROBLEM_GENERATOR_V1.md) 和
+[Math Curriculum Foundation V1](MATH_CURRICULUM_FOUNDATION_V1.md)。
+
 ## V2 Backlog
 
 - 更完整的可访问性、性能预算、外部安全评估与可观测性
 - 任务队列、可观测性和依赖就绪探针
 - 掌握/复习算法评估指标与受控实验
 - 多设备同步、离线容错和数据冲突策略
-- 完整数学、英语与写字课程；拼音 V1 后续扩充真人录音和受控练习素材
+- 数学 V1 后续课程、英语与写字课程；拼音 V1 后续扩充真人录音和受控练习素材
 - 更大的合法课程体系、孩子独立账号、通知与受控的更复杂 AI

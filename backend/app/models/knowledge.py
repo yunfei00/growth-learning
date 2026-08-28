@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -19,6 +20,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.identity import TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.math import MathSkill
 
 
 class KnowledgeType(StrEnum):
@@ -108,6 +112,9 @@ class KnowledgePoint(TimestampMixin, Base):
         back_populates="knowledge_point", uselist=False, passive_deletes=True
     )
     pinyin_item: Mapped["PinyinItem | None"] = relationship(
+        back_populates="knowledge_point", uselist=False, passive_deletes=True
+    )
+    math_skill: Mapped["MathSkill | None"] = relationship(
         back_populates="knowledge_point", uselist=False, passive_deletes=True
     )
 

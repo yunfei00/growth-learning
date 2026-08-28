@@ -47,6 +47,7 @@ from app.schemas.experience import (
     StarLedgerResponse,
     TodayTaskResponse,
 )
+from app.services.math_learning import get_or_create_math_today
 from app.services.pinyin_learning import get_or_create_pinyin_today
 from app.services.review_planning import get_or_create_daily_plan
 from app.services.teacher_collaboration import list_child_teacher_tasks
@@ -641,6 +642,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
             )
         )
     pinyin = await get_or_create_pinyin_today(session, child.id)
+    math_today = await get_or_create_math_today(session, child.id)
     await session.commit()
     if pinyin is not None and pinyin.target_count:
         pinyin_items = [*pinyin.new_items, *pinyin.review_items]
@@ -662,6 +664,30 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
                 ),
                 source_type="pinyin_daily_plan",
                 source_id=pinyin.plan_id,
+            )
+        )
+    if math_today is not None and math_today.target_count:
+        next_item = next(
+            (item for item in math_today.items if not item.completed),
+            math_today.items[0],
+        )
+        total_problems = sum(item.problem_count for item in math_today.items)
+        tasks.append(
+            TodayTaskResponse(
+                subject="math",
+                kind="math",
+                title=f"数学 · {next_item.title}",
+                description=f"{total_problems}道小练习 · 约{math_today.estimated_minutes}分钟",
+                status=math_today.status,
+                count=total_problems,
+                cta_label="继续数学" if math_today.status == "in_progress" else "开始数学",
+                href=(
+                    f"/learn/math/{next_item.knowledge_point_id}?source=today"
+                    if math_today.status != "completed"
+                    else "/learn/math?view=today"
+                ),
+                source_type="math_daily_plan",
+                source_id=math_today.plan_id,
             )
         )
     reading = plan.reading
@@ -748,7 +774,15 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
                 source_id=None,
             )
         )
-    order = {"teacher": 0, "review": 1, "new": 2, "pinyin": 3, "reading": 4, "science": 5}
+    order = {
+        "teacher": 0,
+        "review": 1,
+        "new": 2,
+        "pinyin": 3,
+        "math": 4,
+        "reading": 5,
+        "science": 6,
+    }
     tasks.sort(key=lambda item: (not item.urgent, order[item.kind]))
     continue_task = next((item for item in tasks if item.status == "in_progress"), None)
     completed_count = sum(item.status == "completed" for item in tasks)
