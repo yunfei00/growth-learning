@@ -38,7 +38,7 @@ test("English playback fixes an en-US voice without using browser language defau
 test("speaking is a parent observation and independent assessment remains distinct", () => {
   assert.match(detail, /recordEnglishSpeakingObservation/);
   assert.match(detail, /不使用自动语音评分/);
-  assert.match(detail, /begin\("assessment", value\.dimension\)/);
+  assert.match(detail, /begin\("assessment", "meaning"\)/);
   assert.match(detail, /!childMode/);
 });
 

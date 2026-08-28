@@ -161,23 +161,6 @@ function EnglishDetailContent() {
 
   if (!item) return <main className="center-state section-shell">{error || "正在准备声音和图片…"}</main>;
   const problem = session?.problems[index];
-  const assessmentDimensions: Array<{ dimension: EnglishDimension; label: string }> =
-    item.kind === "word" || item.kind === "phrase"
-      ? [
-          { dimension: "listening", label: "听力检查" },
-          { dimension: "meaning", label: "理解检查" },
-        ]
-      : item.kind === "letter"
-        ? [
-            { dimension: "letter_name", label: "字母名称检查" },
-            { dimension: "case_matching", label: "大小写配对检查" },
-          ]
-        : [
-            {
-              dimension: item.category === "cvc" ? "decoding" : "sound_recognition",
-              label: item.category === "cvc" ? "拼读检查" : "辨音检查",
-            },
-          ];
 
   return <main className="english-detail-page section-shell">
     <div className="english-detail-topline"><button onClick={() => router.back()} type="button">← 返回英语声音乐园</button><span>{item.position} / {item.total}</span></div>
@@ -185,7 +168,7 @@ function EnglishDetailContent() {
     {message ? <p className="english-feedback" role="status">{message}</p> : null}
     {!problem ? <section className="english-item-intro">
       <div className="english-item-stage"><EnglishVisualCard label={item.meaning_zh} visual={item.visual} /><div><p className="eyebrow">{item.category_label}</p><h1>{item.text}</h1><p className="english-meaning">{item.meaning_zh}</p>{item.kind === "letter" ? <p className="english-letter-pair">{String(item.metadata.uppercase ?? item.text)} · {String(item.metadata.lowercase ?? item.text.toLowerCase())}</p> : null}{item.kind === "phonics" && Array.isArray(item.metadata.segments) ? <p className="english-segments">{item.metadata.segments.map(String).join(" · ")}</p> : null}<span className={`english-state state-${item.state_code}`}>{STATE_LABELS[item.state_code]}</span></div></div>
-      <div className="english-start-actions"><button className="listen" disabled={!item.audio.available} onClick={() => play(item.audio)} type="button">🔊 听一听</button><button disabled={working} onClick={() => void begin("practice")} type="button">开始声音练习</button>{!childMode ? assessmentDimensions.map((value) => <button className="secondary" disabled={working} key={value.dimension} onClick={() => void begin("assessment", value.dimension)} type="button">{value.label}</button>) : null}</div>
+      <div className="english-start-actions"><button className="listen" disabled={!item.audio.available} onClick={() => play(item.audio)} type="button">🔊 听一听</button><button disabled={working} onClick={() => void begin("practice")} type="button">开始声音练习</button>{!childMode && ["word", "phrase"].includes(item.kind) ? <><button className="secondary" disabled={working} onClick={() => void begin("assessment", "listening")} type="button">听力检查</button><button className="secondary" disabled={working} onClick={() => void begin("assessment", "meaning")} type="button">理解检查</button></> : null}{!childMode && item.kind === "letter" ? <><button className="secondary" disabled={working} onClick={() => void begin("assessment", "letter_name")} type="button">字母名称检查</button><button className="secondary" disabled={working} onClick={() => void begin("assessment", "case_matching")} type="button">大小写配对检查</button></> : null}{!childMode && item.kind === "phonics" ? <button className="secondary" disabled={working} onClick={() => void begin("assessment", item.category === "cvc" ? "decoding" : "sound_recognition")} type="button">{item.category === "cvc" ? "拼读检查" : "辨音检查"}</button> : null}</div>
       {item.example_text ? <article className="english-example-card"><p className="eyebrow">放进小场景</p><strong>{item.example_text}</strong><span>{item.example_meaning_zh}</span></article> : null}
       {!childMode && ["word", "phrase"].includes(item.kind) ? <article className="english-speaking-card"><h2>家长观察：孩子愿意说吗？</h2><p>只记录自然表现，不做自动发音评分，也不要求标准口音。</p><div><button disabled={working} onClick={() => void observeSpeaking("can_say")} type="button">能自然说</button><button disabled={working} onClick={() => void observeSpeaking("willing_to_repeat")} type="button">愿意跟读</button><button disabled={working} onClick={() => void observeSpeaking("needs_prompt")} type="button">需要提示</button><button disabled={working} onClick={() => void observeSpeaking("not_yet")} type="button">暂时不说</button></div></article> : null}
       {!childMode ? <aside className="english-parent-detail"><h2>家长提示</h2><p>{item.parent_tip}</p><h3>系统怎样判断</h3><ul>{item.mastery_explanation.map((value) => <li key={value}>{value}</li>)}</ul><p>当前策略：{item.policy_key} · 音频：{item.audio.strategy} · {item.audio.accent}</p><small>视觉来源：{item.visual.source} · {item.visual.license}</small></aside> : null}
