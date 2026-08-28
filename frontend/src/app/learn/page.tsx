@@ -8,9 +8,11 @@ import { ChildSwitcher } from "@/components/child-switcher";
 import { ProtectedPage } from "@/components/protected-page";
 import {
   getCharacterMasterySummary,
+  getEnglishOverview,
   getMathOverview,
   getPinyinOverview,
   type CharacterMasterySummary,
+  type EnglishOverview,
   type MathOverview,
   type PinyinOverview,
 } from "@/lib/api/client";
@@ -20,6 +22,7 @@ function LearningHubContent() {
   const [characters, setCharacters] = useState<CharacterMasterySummary | null>(null);
   const [pinyin, setPinyin] = useState<PinyinOverview | null>(null);
   const [math, setMath] = useState<MathOverview | null>(null);
+  const [english, setEnglish] = useState<EnglishOverview | null>(null);
 
   useEffect(() => {
     if (!activeChild) return;
@@ -28,10 +31,12 @@ function LearningHubContent() {
         getCharacterMasterySummary(activeChild.id),
         getPinyinOverview(activeChild.id),
         getMathOverview(activeChild.id),
-      ]).then(([characterValue, pinyinValue, mathValue]) => {
+        getEnglishOverview(activeChild.id),
+      ]).then(([characterValue, pinyinValue, mathValue, englishValue]) => {
         setCharacters(characterValue);
         setPinyin(pinyinValue);
         setMath(mathValue);
+        setEnglish(englishValue);
       });
     }, 0);
     return () => window.clearTimeout(timer);
@@ -62,6 +67,12 @@ function LearningHubContent() {
         </div>
       </section>
       <section className="learning-subject-section">
+        <div className="learning-subject-heading english"><span>A</span><div><h2>英语</h2><p>从听懂声音、图片和动作开始，再连接字母与自然拼读。</p></div></div>
+        <div className="learning-entry-grid compact">
+          <Link className="learning-entry-card english" href="/learn/english"><span aria-hidden="true">🔊</span><div><h3>英语启蒙</h3><p>词汇 · 字母 · Phonics · 短句</p><small>{english ? `听懂 ${english.understood_words} 词 · 学过 ${english.letters_learned} 个字母` : "正在读取进度…"}</small></div></Link>
+        </div>
+      </section>
+      <section className="learning-subject-section">
         <div className="learning-subject-heading math"><span>数</span><div><h2>数学</h2><p>从数量、操作和图形开始，慢慢理解关系。</p></div></div>
         <div className="learning-entry-grid compact">
           <Link className="learning-entry-card math" href="/learn/math">
@@ -73,7 +84,6 @@ function LearningHubContent() {
         <div className="learning-subject-heading science"><span>科</span><div><h2>科学</h2><p>从生活里的问题开始观察和实验。</p></div></div>
         <div className="learning-entry-grid compact">
           <Link className="learning-entry-card science" href="/science"><span aria-hidden="true">🔬</span><div><h3>科学实验</h3><p>周末一起动手探索</p></div></Link>
-          <article className="learning-entry-card unavailable"><span aria-hidden="true">A</span><div><h3>英语</h3><p>暂未配置课程</p></div></article>
         </div>
       </section>
     </main>

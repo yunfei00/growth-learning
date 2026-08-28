@@ -321,3 +321,16 @@ render snapshot、expected/first/submitted answer、提示、重试、结果和 
 `LearningRecord`；Assessment 在同一 Skill 的尝试结束时生成一条 `AssessmentItem`。`math_daily_plans`
 和 `math_daily_plan_items` 只保存每天 1 个新 Skill、少量到期复习和 3–5 道题的可恢复选择。
 `ChildKnowledgeState` 与 `ChildReviewSchedule` 仍是可重建投影，不存在竞争性的 `MathMastery` 表。
+
+## Phase 19 英语启蒙数据
+
+`english_catalog_releases` 固定 `english-foundation-v1` 的项目自有来源、目录数量与当前版本。
+`english_items` 与英语 `KnowledgePoint` 一对一，保存 kind、文本、中文解释、儿童/家长提示、分类、
+例子、音频/视觉 key、`en-US` 口音、顺序、版本和 provenance。`english_practice_items` 保存受控
+generator 配置，不把题目或单词组合复制成 KnowledgePoint。
+
+`english_exercise_attempts` 保存 session、template、seed、generator version、prompt/options snapshot、
+expected/first/submitted answer、重试、提示、音频重播、结果、actor/evaluator 和时间。Practice 聚合为
+`LearningRecord`，Assessment 聚合为 `AssessmentItem`；两者不互相伪装。`english_daily_plans` 与
+`english_daily_plan_items` 保存可恢复的 5～10 分钟 Today 选择。四类英语 mastery 与
+`english-review-v1` 继续写入通用可重建投影，不建立竞争性的英语总分表。

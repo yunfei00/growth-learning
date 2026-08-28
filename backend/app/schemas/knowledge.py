@@ -15,6 +15,7 @@ KNOWLEDGE_TYPE_SUBJECTS = {
     "english_letter": "english",
     "english_word": "english",
     "english_phonics": "english",
+    "english_phrase": "english",
     "science_concept": "science",
 }
 
@@ -163,7 +164,7 @@ class KnowledgePointCreate(BaseModel):
         pattern=(
             "^(chinese_character|pinyin_initial|pinyin_final|pinyin_tone|"
             "pinyin_syllable|math_skill|english_letter|english_word|"
-            "english_phonics|science_concept)$"
+            "english_phonics|english_phrase|science_concept)$"
         )
     )
     title: str = Field(min_length=1, max_length=120)

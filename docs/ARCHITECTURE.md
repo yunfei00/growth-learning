@@ -303,3 +303,21 @@ KnowledgePoint(type=math_skill, subject=math) ──> MathSkill
 `math-v1` 要求独立、多 representation、跨自然日证据，速度不参与掌握度。完整边界见
 [Math Learning Model V1](MATH_LEARNING_MODEL_V1.md) 与
 [Math Evidence Model V1](MATH_EVIDENCE_MODEL_V1.md)。
+
+## 21. Phase 19 English Foundation
+
+```text
+KnowledgePoint(subject=english, type=letter|word|phonics|phrase) ──> EnglishItem
+                │                                                    └──> EnglishPracticeItem
+                │                                                           │ template + seed + version
+                ├── LearningRecord <── practice ── EnglishExerciseAttempt <──┘
+                └── AssessmentItem <── independent check aggregation
+                                      │
+                                      ├── kind-specific English policy
+                                      └── english-review-v1
+```
+
+目录和 Course 是系统共享内容，所有 evidence、Today、History 和派生投影以 `child_id` 隔离。
+`EnglishExerciseAttempt` 是题目级权威过程；音频重播与显式提示分开存储。Phonics audio provider
+禁止使用 letter name 代替 phoneme。System Admin 维护内容但不读取家庭私有进度。完整设计见
+[English Foundation V1](ENGLISH_FOUNDATION_V1.md)。

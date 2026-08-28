@@ -47,6 +47,7 @@ from app.schemas.experience import (
     StarLedgerResponse,
     TodayTaskResponse,
 )
+from app.services.english_learning import get_or_create_english_today
 from app.services.math_learning import get_or_create_math_today
 from app.services.pinyin_learning import get_or_create_pinyin_today
 from app.services.review_planning import get_or_create_daily_plan
@@ -643,6 +644,7 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
         )
     pinyin = await get_or_create_pinyin_today(session, child.id)
     math_today = await get_or_create_math_today(session, child.id)
+    english_today = await get_or_create_english_today(session, child.id)
     await session.commit()
     if pinyin is not None and pinyin.target_count:
         pinyin_items = [*pinyin.new_items, *pinyin.review_items]
@@ -688,6 +690,33 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
                 ),
                 source_type="math_daily_plan",
                 source_id=math_today.plan_id,
+            )
+        )
+    if english_today is not None and english_today.target_count:
+        next_item = next(
+            (item for item in english_today.items if not item.completed),
+            english_today.items[0],
+        )
+        total_exercises = sum(item.exercise_count for item in english_today.items)
+        tasks.append(
+            TodayTaskResponse(
+                subject="english",
+                kind="english",
+                title=f"英语 · {next_item.text}",
+                description=(
+                    f"{english_today.target_count}个内容 · {total_exercises}次听看练习 · "
+                    f"约{english_today.estimated_minutes}分钟"
+                ),
+                status=english_today.status,
+                count=total_exercises,
+                cta_label=("继续英语" if english_today.status == "in_progress" else "开始英语"),
+                href=(
+                    f"/learn/english/{next_item.knowledge_point_id}?source=today"
+                    if english_today.status != "completed"
+                    else "/learn/english?view=today"
+                ),
+                source_type="english_daily_plan",
+                source_id=english_today.plan_id,
             )
         )
     reading = plan.reading
@@ -780,8 +809,9 @@ async def child_today(session: AsyncSession, child: Child, user: User) -> ChildT
         "new": 2,
         "pinyin": 3,
         "math": 4,
-        "reading": 5,
-        "science": 6,
+        "english": 5,
+        "reading": 6,
+        "science": 7,
     }
     tasks.sort(key=lambda item: (not item.urgent, order[item.kind]))
     continue_task = next((item for item in tasks if item.status == "in_progress"), None)

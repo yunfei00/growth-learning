@@ -23,7 +23,7 @@ const SUBJECT_LABELS: Record<Subject, string> = {
 const TYPES_BY_SUBJECT: Record<Subject, KnowledgeType[]> = {
   chinese: ["pinyin_initial", "pinyin_final", "pinyin_tone", "pinyin_syllable"],
   math: ["math_skill"],
-  english: ["english_letter", "english_word", "english_phonics"],
+  english: ["english_letter", "english_word", "english_phonics", "english_phrase"],
   science: ["science_concept"],
 };
 
@@ -36,6 +36,7 @@ const TYPE_LABELS: Record<KnowledgeType, string> = {
   math_skill: "数学能力点",
   english_letter: "英文字母",
   english_word: "英语单词",
+  english_phrase: "英语短句",
   english_phonics: "自然拼读",
   science_concept: "科学概念",
 };

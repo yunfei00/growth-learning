@@ -22,6 +22,7 @@ const NAV_GROUPS = [
       ["/admin/characters", "汉字"],
       ["/admin/pinyin", "拼音"],
       ["/admin/math", "数学"],
+      ["/admin/english", "英语"],
       ["/admin/science", "科学实验"],
       ["/admin/courses", "课程与 Catalog"],
     ],

@@ -233,11 +233,39 @@ lint/typecheck/build、CI、生产导入和小范围正式 Child smoke 全绿；
 [Math Problem Generator V1](MATH_PROBLEM_GENERATOR_V1.md) 和
 [Math Curriculum Foundation V1](MATH_CURRICULUM_FOUNDATION_V1.md)。
 
+## Phase 19：儿童英语启蒙系统 V1
+
+- `english-foundation-v1`：132 词、26 字母、44 phonics、15 短句和 21 Unit「英语启蒙」路径
+- 声音/视觉优先的一题一屏体验；固定 `en-US`，声音重播不算提示
+- curated 音频优先；普通内容可受控 TTS，phonics 只用正式音素或安全示例词，绝不回退到字母名称
+- `english-generator-v1` 保存确定性 prompt/options/answer 快照；Practice 与 Assessment 严格分离
+- 四个英语 mastery policy 与分维度、跨自然日稳定条件；`english-review-v1` 独立复习
+- Today 5～10 分钟小任务、口语家长观察、家庭协作、兄弟/跨家庭隔离和真实 actor attribution
+- `/admin/english` 支持内容、资源状态、归档与幂等导入，不能修改孩子 mastery
+- 英语 KnowledgePoint 不进入汉字、拼音、数学、Story known characters 或识字成就
+
+退出条件：Catalog/Audio/Visual/Generator/Evidence/Mastery/Isolation/Regression 自动化测试、前端
+lint/typecheck/build、CI、生产导入与真实登录态 smoke 全绿；Issue 写入证据并关闭。完整设计见
+[English Foundation V1](ENGLISH_FOUNDATION_V1.md)。
+
+## Post-Phase-19 Product Iteration
+
+进入真实家庭使用阶段：
+
+- bug 修复
+- UI/UX 调整
+- 内容质量提升
+- 音频/图片素材完善
+- 学习数据观察
+- mastery/review 策略评估
+- 性能与稳定性
+- 安全和备份
+
 ## V2 Backlog
 
 - 更完整的可访问性、性能预算、外部安全评估与可观测性
 - 任务队列、可观测性和依赖就绪探针
 - 掌握/复习算法评估指标与受控实验
 - 多设备同步、离线容错和数据冲突策略
-- 数学 V1 后续课程、英语与写字课程；拼音 V1 后续扩充真人录音和受控练习素材
+- 数学与英语 V1 后续课程、写字课程；拼音/英语后续扩充真人录音和受控素材
 - 更大的合法课程体系、孩子独立账号、通知与受控的更复杂 AI

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">太阳</title>
+  <rect width="240" height="240" rx="42" fill="#fff9df"/>
+  <g stroke="#e6a400" stroke-width="11" stroke-linecap="round">
+    <path d="M120 21v28m0 142v28M21 120h28m142 0h28M50 50l20 20m100 100 20 20M190 50l-20 20M70 170l-20 20"/>
+  </g>
+  <circle cx="120" cy="120" r="58" fill="#ffd54c" stroke="#e6a400" stroke-width="8"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">狗</title>
+  <rect width="240" height="240" rx="42" fill="#eef8ff"/>
+  <path d="M66 92C39 69 36 42 55 34c24-9 46 19 51 40h28c5-21 27-49 51-40 19 8 16 35-11 58 13 13 20 31 20 51 0 43-33 72-74 72s-74-29-74-72c0-20 7-38 20-51Z" fill="#b97843" stroke="#51331f" stroke-width="7"/>
+  <circle cx="91" cy="128" r="8" fill="#13241d"/><circle cx="149" cy="128" r="8" fill="#13241d"/>
+  <ellipse cx="120" cy="151" rx="17" ry="13" fill="#3d2b25"/>
+  <path d="M120 164c0 16-14 25-28 14m28-14c0 16 14 25 28 14" fill="none" stroke="#51331f" stroke-width="5" stroke-linecap="round"/>
+</svg>

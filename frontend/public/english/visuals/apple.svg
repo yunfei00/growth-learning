@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">苹果</title>
+  <rect width="240" height="240" rx="42" fill="#fff7f2"/>
+  <path d="M123 72c5-24 22-36 38-39" fill="none" stroke="#5f4824" stroke-width="10" stroke-linecap="round"/>
+  <path d="M127 57c23-22 49-15 57-8-11 24-37 31-57 8Z" fill="#55a95a" stroke="#285b31" stroke-width="6"/>
+  <path d="M120 79c31-27 78-7 78 43 0 55-44 90-78 90s-78-35-78-90c0-50 47-70 78-43Z" fill="#e94f49" stroke="#7c2828" stroke-width="8"/>
+  <path d="M79 109c5-13 15-22 27-25" fill="none" stroke="#ff9c8c" stroke-width="9" stroke-linecap="round"/>
+</svg>

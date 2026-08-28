@@ -18,6 +18,17 @@ from app.models.course import (
     KnowledgePointRole,
     LearningActivity,
 )
+from app.models.english import (
+    EnglishAttemptMode,
+    EnglishCatalogRelease,
+    EnglishDailyPlan,
+    EnglishDailyPlanItem,
+    EnglishExerciseAttempt,
+    EnglishItem,
+    EnglishKind,
+    EnglishPracticeItem,
+    EnglishVisualType,
+)
 from app.models.experience import (
     AchievementDefinition,
     ChildAchievement,
@@ -181,6 +192,15 @@ __all__ = [
     "EnrollmentStatus",
     "KnowledgePointRole",
     "LearningActivity",
+    "EnglishAttemptMode",
+    "EnglishCatalogRelease",
+    "EnglishDailyPlan",
+    "EnglishDailyPlanItem",
+    "EnglishExerciseAttempt",
+    "EnglishItem",
+    "EnglishKind",
+    "EnglishPracticeItem",
+    "EnglishVisualType",
     "Child",
     "Family",
     "FamilyInvitation",

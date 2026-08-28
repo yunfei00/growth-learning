@@ -92,6 +92,7 @@ wait_for_services "${INFRA_SERVICES[@]}"
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.characters import-chinese-catalog
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.pinyin import-foundation
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.math import-foundation
+"${compose[@]}" run --rm --no-deps backend python -m app.cli.english import-foundation
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.science import-starter
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.review
 "${compose[@]}" run --rm --no-deps backend python -m app.cli.growth rebuild-growth-events

@@ -800,6 +800,19 @@ async def create_assessment_session(
         raise UnsupportedAssessmentFlowError(
             "Math skill assessment must use the deterministic Math session endpoint"
         )
+    if any(
+        point.type
+        in {
+            KnowledgeType.ENGLISH_LETTER,
+            KnowledgeType.ENGLISH_WORD,
+            KnowledgeType.ENGLISH_PHONICS,
+            KnowledgeType.ENGLISH_PHRASE,
+        }
+        for point in points.values()
+    ):
+        raise UnsupportedAssessmentFlowError(
+            "English assessment must use the English exercise session endpoint"
+        )
     now = datetime.now(UTC)
     assessment_session = AssessmentSession(
         child_id=child_id,

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">猫</title>
+  <rect width="240" height="240" rx="42" fill="#fff7df"/>
+  <path d="M58 90 75 39l38 35h14l38-35 17 51c12 15 18 33 18 53 0 43-36 72-80 72s-80-29-80-72c0-20 6-38 18-53Z" fill="#d9904b" stroke="#593b26" stroke-width="7"/>
+  <circle cx="91" cy="128" r="8" fill="#14261f"/><circle cx="149" cy="128" r="8" fill="#14261f"/>
+  <path d="m120 143-8 7h16Z" fill="#d95f76"/><path d="M120 151c-3 11-12 15-21 15m21-15c3 11 12 15 21 15" fill="none" stroke="#593b26" stroke-width="5" stroke-linecap="round"/>
+  <path d="M82 151H47m38 13H53m105-13h35m-38 13h32" stroke="#593b26" stroke-width="4" stroke-linecap="round"/>
+</svg>

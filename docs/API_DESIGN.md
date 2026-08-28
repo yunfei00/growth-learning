@@ -318,3 +318,22 @@ Teacher Course 可见性不能替代 `TeacherChildRelation`；Family Admin 未�
 答案由后端确定性生成器重新比较，不接受客户端提供 expected answer。System Admin 不能通过孩子端点读取
 私有数学历史，也不能修改 mastery。通用 `/assessment-sessions` 拒绝 `math_skill`，防止绕过生成器、
 首次答案和 attempt 聚合直接写入数学正确结果；屏幕外真实活动仅能通过受控 observation 入口记录。
+
+### English Foundation V1
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/v1/english/items` | 已认证用户查看启用的英语目录，支持 kind/category 分页 |
+| `GET` | `/api/v1/children/{child_id}/english/overview` | 词汇、字母、phonics、短句分组进度，不返回英语总分 |
+| `GET` | `/api/v1/children/{child_id}/english/items[/{point_id}]` | 孩子状态、音频/视觉决策、详情和稳定前后导航 |
+| `GET` | `/api/v1/children/{child_id}/english/today` | 幂等创建/读取 3 个新内容和最多 6 个到期复习 |
+| `POST/GET` | `/api/v1/children/{child_id}/english/sessions[...]` | 创建或恢复确定性 Practice/Assessment 题目快照 |
+| `POST` | `.../english/sessions/{session_id}/attempts/{attempt_id}/answer` | 保存首次答案、重试、提示与声音重播，按 mode 聚合 evidence |
+| `POST` | `.../english/items/{point_id}/speaking-observations` | 家长保存自然口语观察；不做自动语音评分 |
+| `GET` | `/api/v1/children/{child_id}/english/history` | 按 Session 返回练习、独立检查、口语观察与真实 actor |
+| `GET` | `/api/v1/english/items/{point_id}/audio` | 仅在有 curated key 时鉴权读取正式音频 |
+| `GET/POST/PATCH` | `/api/v1/admin/english[...]` | System Admin 筛选/维护/归档内容和运行幂等导入 |
+
+通用 `/assessment-sessions` 拒绝四种英语 KnowledgeType，防止绕过题目快照与首次答案。System Admin
+不因平台角色获得孩子私有 History，也不能通过维护接口修改 mastery。Phonics 音频没有正式资源时
+只返回安全示例词或 unavailable，不把 letter name 伪装成 phoneme。

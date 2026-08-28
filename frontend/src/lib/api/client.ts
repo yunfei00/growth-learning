@@ -145,6 +145,7 @@ export type KnowledgeType =
   | "english_letter"
   | "english_word"
   | "english_phonics"
+  | "english_phrase"
   | "science_concept";
 
 export type AdminKnowledgePoint = {
@@ -433,6 +434,211 @@ export type MathHistory = {
       uncertain: number;
       incorrect: number;
       representations: string[];
+    }>;
+  }>;
+};
+
+export type EnglishKind = "letter" | "word" | "phonics" | "phrase";
+export type EnglishState = "unlearned" | "introduced" | "practicing" | "proficient" | "stable";
+export type EnglishMode = "practice" | "assessment";
+export type EnglishDimension =
+  | "listening"
+  | "meaning"
+  | "speaking"
+  | "uppercase_recognition"
+  | "lowercase_recognition"
+  | "case_matching"
+  | "letter_name"
+  | "sound_recognition"
+  | "grapheme_sound"
+  | "blending"
+  | "decoding"
+  | "expression";
+
+export type EnglishAudio = {
+  strategy: "curated" | "tts" | "safe_example_word" | "phonics_unavailable";
+  accent: string;
+  speech_text: string | null;
+  audio_url: string | null;
+  instruction_zh: string;
+  available: boolean;
+};
+
+export type EnglishVisual = {
+  visual_type: "static_image" | "icon" | "color_swatch" | "shape" | "emoji_fallback";
+  image_url: string | null;
+  visual_key: string | null;
+  source: string;
+  license: string;
+  attribution: string | null;
+  fallback: boolean;
+};
+
+export type EnglishItem = {
+  knowledge_point_id: string;
+  canonical_key: string;
+  kind: EnglishKind;
+  text: string;
+  normalized_text: string;
+  meaning_zh: string;
+  category: string;
+  category_label: string;
+  order_index: number;
+  status: "active" | "archived";
+  audio: EnglishAudio;
+  visual: EnglishVisual;
+  practice_count: number;
+  state_code: EnglishState;
+  learned: boolean;
+};
+
+export type EnglishItemPage = {
+  items: EnglishItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+};
+
+export type EnglishItemDetail = EnglishItem & {
+  child_hint_zh: string;
+  parent_tip: string;
+  example_text: string | null;
+  example_meaning_zh: string | null;
+  image_key: string | null;
+  visual_key: string | null;
+  visual_type: EnglishVisual["visual_type"];
+  audio_key: string | null;
+  metadata: Record<string, unknown>;
+  catalog_version: string;
+  practices: Array<{
+    id: string;
+    template_key: string;
+    practice_kind: string;
+    generator_version: string;
+    status: "active" | "archived";
+  }>;
+  position: number;
+  total: number;
+  previous: { knowledge_point_id: string; text: string } | null;
+  next: { knowledge_point_id: string; text: string } | null;
+  policy_key: string;
+  dimensions: Record<string, unknown>;
+  mastery_explanation: string[];
+  last_learning_at: string | null;
+  last_assessed_at: string | null;
+  next_review_at: string | null;
+};
+
+export type EnglishOverview = {
+  child_id: string;
+  catalog_version: string;
+  total: number;
+  learned: number;
+  stable: number;
+  understood_words: number;
+  stable_words: number;
+  speaking_observed: number;
+  letters_learned: number;
+  letters_total: number;
+  phonics_practicing: number;
+  phrases_learned: number;
+  groups: Array<{
+    kind: EnglishKind;
+    label: string;
+    total: number;
+    learned: number;
+    proficient: number;
+    stable: number;
+    state_code: EnglishState;
+  }>;
+};
+
+export type EnglishToday = {
+  plan_id: string;
+  child_id: string;
+  plan_date: string;
+  items: Array<EnglishItem & {
+    item_kind: "new" | "review";
+    exercise_count: number;
+    completed: boolean;
+  }>;
+  completed_count: number;
+  target_count: number;
+  status: "pending" | "in_progress" | "completed";
+  estimated_minutes: number;
+};
+
+export type EnglishProblem = {
+  attempt_id: string;
+  template_key: string;
+  generator_version: string;
+  seed: number | null;
+  practice_kind: string;
+  dimension: string;
+  prompt: Record<string, unknown> & {
+    instruction?: string;
+    hide_target_text?: boolean;
+    text?: string;
+    audio?: EnglishAudio;
+    visual?: EnglishVisual;
+    segments?: string[];
+  };
+  options: Array<{
+    value: unknown;
+    position: number;
+    assessment_alt: string;
+    text?: string;
+    audio?: EnglishAudio;
+    visual?: EnglishVisual;
+  }>;
+  answered: boolean;
+};
+
+export type EnglishSession = {
+  session_id: string;
+  child_id: string;
+  knowledge_point_id: string;
+  item_text: string;
+  item_kind: EnglishKind;
+  mode: EnglishMode;
+  dimension: string;
+  problems: EnglishProblem[];
+  completed_count: number;
+  total_count: number;
+  completed: boolean;
+};
+
+export type EnglishAttemptResult = {
+  attempt_id: string;
+  outcome: AssessmentOutcome;
+  first_answer_correct: boolean;
+  attempt_count: number;
+  hint_used: boolean;
+  audio_replay_count: number;
+  feedback: string;
+  session_completed: boolean;
+  mastery_state: EnglishState | null;
+};
+
+export type EnglishHistory = {
+  child_id: string;
+  items: Array<{
+    session_id: string;
+    mode: EnglishMode | "observation";
+    actor_display_name: string;
+    occurred_at: string;
+    evidence: Array<{
+      knowledge_point_id: string;
+      text: string;
+      kind: EnglishKind;
+      dimension: string;
+      problem_count: number;
+      correct: number;
+      hinted_correct: number;
+      uncertain: number;
+      incorrect: number;
+      speaking_observations: number;
     }>;
   }>;
 };
@@ -1901,6 +2107,156 @@ export function importMathFoundation(): Promise<{
   return request("/api/v1/admin/math/import-foundation", { method: "POST" });
 }
 
+export function listChildEnglishItems(
+  childId: string,
+  kind?: EnglishKind,
+): Promise<EnglishItemPage> {
+  const query = new URLSearchParams({ page: "1", page_size: "250" });
+  if (kind) query.set("kind", kind);
+  return request<EnglishItemPage>(`/api/v1/children/${childId}/english/items?${query}`);
+}
+
+export function getEnglishOverview(childId: string): Promise<EnglishOverview> {
+  return request<EnglishOverview>(`/api/v1/children/${childId}/english/overview`);
+}
+
+export function getEnglishToday(childId: string): Promise<EnglishToday | null> {
+  return request<EnglishToday | null>(`/api/v1/children/${childId}/english/today`);
+}
+
+export function getEnglishItemDetail(
+  childId: string,
+  knowledgePointId: string,
+): Promise<EnglishItemDetail> {
+  return request<EnglishItemDetail>(
+    `/api/v1/children/${childId}/english/items/${knowledgePointId}`,
+  );
+}
+
+export function getEnglishHistory(childId: string): Promise<EnglishHistory> {
+  return request<EnglishHistory>(`/api/v1/children/${childId}/english/history`);
+}
+
+export function startEnglishSession(
+  childId: string,
+  payload: {
+    knowledgePointId: string;
+    mode: EnglishMode;
+    exerciseCount: number;
+    dimension?: EnglishDimension;
+    seed?: number;
+  },
+): Promise<EnglishSession> {
+  return request<EnglishSession>(`/api/v1/children/${childId}/english/sessions`, {
+    method: "POST",
+    body: jsonBody({
+      knowledge_point_id: payload.knowledgePointId,
+      mode: payload.mode,
+      exercise_count: payload.exerciseCount,
+      dimension: payload.dimension,
+      seed: payload.seed,
+    }),
+  });
+}
+
+export function answerEnglishAttempt(
+  childId: string,
+  sessionId: string,
+  attemptId: string,
+  payload: {
+    submittedAnswer: unknown;
+    hintUsed: boolean;
+    audioReplays: number;
+    responseTimeMs?: number;
+  },
+): Promise<EnglishAttemptResult> {
+  return request<EnglishAttemptResult>(
+    `/api/v1/children/${childId}/english/sessions/${sessionId}/attempts/${attemptId}/answer`,
+    {
+      method: "POST",
+      body: jsonBody({
+        submitted_answer: payload.submittedAnswer,
+        hint_used: payload.hintUsed,
+        audio_replays: payload.audioReplays,
+        response_time_ms: payload.responseTimeMs,
+      }),
+    },
+  );
+}
+
+export function recordEnglishSpeakingObservation(
+  childId: string,
+  knowledgePointId: string,
+  observation: "willing_to_repeat" | "can_say" | "needs_prompt" | "not_yet",
+): Promise<{ assessment_item_id: string; dimension: string; outcome: string; mastery_state: EnglishState }> {
+  return request(
+    `/api/v1/children/${childId}/english/items/${knowledgePointId}/speaking-observations`,
+    { method: "POST", body: jsonBody({ observation }) },
+  );
+}
+
+export function listAdminEnglish(filters: {
+  kind?: EnglishKind | "";
+  category?: string;
+  status?: "active" | "archived" | "";
+  audioStatus?: "curated" | "tts" | "phonics_missing" | "";
+  visualStatus?: "static" | "fallback" | "missing" | "";
+  search?: string;
+} = {}): Promise<EnglishItemPage> {
+  const query = new URLSearchParams({ page: "1", page_size: "250" });
+  if (filters.kind) query.set("kind", filters.kind);
+  if (filters.category) query.set("category", filters.category);
+  if (filters.status) query.set("status", filters.status);
+  if (filters.audioStatus) query.set("audio_status", filters.audioStatus);
+  if (filters.visualStatus) query.set("visual_status", filters.visualStatus);
+  if (filters.search) query.set("search", filters.search);
+  return request<EnglishItemPage>(`/api/v1/admin/english?${query}`);
+}
+
+export function getAdminEnglish(id: string): Promise<EnglishItemDetail> {
+  return request<EnglishItemDetail>(`/api/v1/admin/english/${id}`);
+}
+
+export function updateAdminEnglish(
+  id: string,
+  payload: Partial<
+    Pick<
+      EnglishItemDetail,
+      | "meaning_zh"
+      | "child_hint_zh"
+      | "parent_tip"
+      | "example_text"
+      | "example_meaning_zh"
+      | "category"
+      | "visual_type"
+      | "status"
+    >
+  > & { image_key?: string | null; visual_key?: string | null; audio_key?: string | null },
+): Promise<EnglishItemDetail> {
+  return request<EnglishItemDetail>(`/api/v1/admin/english/${id}`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function importEnglishFoundation(): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  practice_items_created: number;
+  catalog_version: string;
+  catalog_size: number;
+  letter_count: number;
+  word_count: number;
+  phonics_count: number;
+  phrase_count: number;
+  practice_item_count: number;
+  course_created: boolean;
+  errors: string[];
+}> {
+  return request("/api/v1/admin/english/import-foundation", { method: "POST" });
+}
+
 export function getCharacterMasterySummary(childId: string): Promise<CharacterMasterySummary> {
   return request<CharacterMasterySummary>(`/api/v1/children/${childId}/characters/summary`);
 }
@@ -2940,7 +3296,7 @@ export type CatalogRelease = {
 
 export type ChildTodayTask = {
   subject: Subject;
-  kind: "new" | "review" | "pinyin" | "math" | "reading" | "science" | "teacher";
+  kind: "new" | "review" | "pinyin" | "math" | "english" | "reading" | "science" | "teacher";
   title: string;
   description: string;
   status: "pending" | "in_progress" | "completed" | "needs_story" | "optional";

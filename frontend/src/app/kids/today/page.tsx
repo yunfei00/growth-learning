@@ -12,6 +12,7 @@ const ICONS: Record<string, string> = {
   review: "🔁",
   pinyin: "🔊",
   math: "数",
+  english: "🔊",
   reading: "📖",
   science: "🔬",
   teacher: "🧑‍🏫",

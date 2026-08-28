@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">球</title>
+  <rect width="240" height="240" rx="42" fill="#f4fbef"/>
+  <circle cx="120" cy="126" r="84" fill="#fff" stroke="#263d32" stroke-width="8"/>
+  <path d="m120 81 31 22-12 36h-38l-12-36Z" fill="#263d32"/>
+  <path d="m120 42v39m77 45-46-23m17 82-29-46m-67 46 29-46m-58-13 46-23" fill="none" stroke="#263d32" stroke-width="8"/>
+</svg>

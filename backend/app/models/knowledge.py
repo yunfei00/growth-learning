@@ -22,6 +22,7 @@ from app.db.base import Base
 from app.models.identity import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.english import EnglishItem
     from app.models.math import MathSkill
 
 
@@ -35,6 +36,7 @@ class KnowledgeType(StrEnum):
     ENGLISH_LETTER = "english_letter"
     ENGLISH_WORD = "english_word"
     ENGLISH_PHONICS = "english_phonics"
+    ENGLISH_PHRASE = "english_phrase"
     SCIENCE_CONCEPT = "science_concept"
 
 
@@ -72,7 +74,7 @@ class KnowledgePoint(TimestampMixin, Base):
         CheckConstraint(
             "type IN ('chinese_character', 'pinyin_initial', 'pinyin_final', "
             "'pinyin_tone', 'pinyin_syllable', 'math_skill', 'english_letter', "
-            "'english_word', 'english_phonics', 'science_concept')",
+            "'english_word', 'english_phonics', 'english_phrase', 'science_concept')",
             name="ck_knowledge_points_type",
         ),
         CheckConstraint(
@@ -83,7 +85,7 @@ class KnowledgePoint(TimestampMixin, Base):
             "(type IN ('chinese_character', 'pinyin_initial', 'pinyin_final', "
             "'pinyin_tone', 'pinyin_syllable') AND subject = 'chinese') OR "
             "(type = 'math_skill' AND subject = 'math') OR "
-            "(type IN ('english_letter', 'english_word', 'english_phonics') "
+            "(type IN ('english_letter', 'english_word', 'english_phonics', 'english_phrase') "
             "AND subject = 'english') OR "
             "(type = 'science_concept' AND subject = 'science')",
             name="ck_knowledge_points_type_subject",
@@ -115,6 +117,9 @@ class KnowledgePoint(TimestampMixin, Base):
         back_populates="knowledge_point", uselist=False, passive_deletes=True
     )
     math_skill: Mapped["MathSkill | None"] = relationship(
+        back_populates="knowledge_point", uselist=False, passive_deletes=True
+    )
+    english_item: Mapped["EnglishItem | None"] = relationship(
         back_populates="knowledge_point", uselist=False, passive_deletes=True
     )
 

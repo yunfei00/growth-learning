@@ -60,6 +60,7 @@ from app.services.mastery import mastery_policy_for_type, recompute_child_knowle
 REVIEW_ALGORITHM_VERSION = "review-v1"
 PINYIN_REVIEW_ALGORITHM_VERSION = "pinyin-review-v1"
 MATH_REVIEW_ALGORITHM_VERSION = "math-review-v1"
+ENGLISH_REVIEW_ALGORITHM_VERSION = "english-review-v1"
 PLAN_ALGORITHM_VERSION = "plan-v1"
 SAMPLING_VERSION = "sampling-v1"
 LITERACY_ESTIMATION_VERSION = "literacy-v1"
@@ -186,6 +187,13 @@ async def recompute_review_schedule(
         setattr(schedule, field, value)
     if point.type == KnowledgeType.MATH_SKILL:
         schedule.algorithm_version = MATH_REVIEW_ALGORITHM_VERSION
+    elif point.type in {
+        KnowledgeType.ENGLISH_LETTER,
+        KnowledgeType.ENGLISH_WORD,
+        KnowledgeType.ENGLISH_PHONICS,
+        KnowledgeType.ENGLISH_PHRASE,
+    }:
+        schedule.algorithm_version = ENGLISH_REVIEW_ALGORITHM_VERSION
     elif point.type in {
         KnowledgeType.PINYIN_INITIAL,
         KnowledgeType.PINYIN_FINAL,

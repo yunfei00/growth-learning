@@ -180,10 +180,8 @@ async def test_generic_learning_projects_math_but_generic_assessment_cannot_bypa
             },
         )
         assert learning.status_code == 201, learning.text
-        assert learning.json()["mastery_projection"] == "partially_unavailable"
-        assert set(learning.json()["projection_unavailable_knowledge_point_ids"]) == {
-            english["id"],
-        }
+        assert learning.json()["mastery_projection"] == "configured"
+        assert learning.json()["projection_unavailable_knowledge_point_ids"] == []
         assessment = await parent.post(
             f"/api/v1/children/{child['id']}/assessment-sessions",
             json={
@@ -242,12 +240,15 @@ async def test_generic_learning_projects_math_but_generic_assessment_cannot_bypa
             )
             assert state is not None
             assert state.policy_key == "math-v1" and state.state_code == "introduced"
-            assert not await session.scalar(
-                select(ChildKnowledgeState.id).where(
+            english_state = await session.scalar(
+                select(ChildKnowledgeState).where(
                     ChildKnowledgeState.child_id == child_id,
                     ChildKnowledgeState.knowledge_point_id == uuid.UUID(english["id"]),
                 )
             )
+            assert english_state is not None
+            assert english_state.policy_key == "english-word-v1"
+            assert english_state.state_code == "introduced"
             math_schedule = await session.scalar(
                 select(ChildReviewSchedule).where(
                     ChildReviewSchedule.child_id == child_id,

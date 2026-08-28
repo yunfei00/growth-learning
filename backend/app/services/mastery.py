@@ -26,6 +26,26 @@ PINYIN_POLICY_KEY = "pinyin-v1"
 PINYIN_DIMENSIONS = frozenset({"recognition", "listening", "tone", "blending", "pronunciation"})
 MATH_POLICY_KEY = "math-v1"
 MATH_DIMENSIONS = frozenset({"understanding", "independent", "transfer", "representation"})
+ENGLISH_WORD_POLICY_KEY = "english-word-v1"
+ENGLISH_LETTER_POLICY_KEY = "english-letter-v1"
+ENGLISH_PHONICS_POLICY_KEY = "english-phonics-v1"
+ENGLISH_PHRASE_POLICY_KEY = "english-phrase-v1"
+ENGLISH_DIMENSIONS = frozenset(
+    {
+        "listening",
+        "meaning",
+        "speaking",
+        "uppercase_recognition",
+        "lowercase_recognition",
+        "case_matching",
+        "letter_name",
+        "sound_recognition",
+        "grapheme_sound",
+        "blending",
+        "decoding",
+        "expression",
+    }
+)
 
 
 class MasteryPolicy(Protocol):
@@ -311,6 +331,145 @@ class PinyinMasteryPolicy:
         )
 
 
+def english_dimension_state(items: list[AssessmentItem]) -> str:
+    """A single English dimension becomes stable only across real time."""
+
+    if not items:
+        return "unlearned"
+    ordered = sorted(items, key=lambda item: (_utc(item.assessed_at), str(item.id)))
+    independent_correct = [
+        item for item in ordered if item.outcome == AssessmentOutcome.CORRECT and not item.hint_used
+    ]
+    dates = {_utc(item.assessed_at).date() for item in independent_correct}
+    span_days = 0.0
+    if independent_correct:
+        span_days = (
+            max(_utc(item.assessed_at) for item in independent_correct)
+            - min(_utc(item.assessed_at) for item in independent_correct)
+        ).total_seconds() / 86400
+    latest_success = bool(
+        ordered and ordered[-1].outcome == AssessmentOutcome.CORRECT and not ordered[-1].hint_used
+    )
+    if len(independent_correct) >= 3 and len(dates) >= 3 and span_days >= 7 and latest_success:
+        return "stable"
+    if len(independent_correct) >= 2 and len(dates) >= 2:
+        return "proficient"
+    return "practicing"
+
+
+class EnglishMasteryPolicy:
+    """Kind-specific English projection with speaking kept as an optional dimension."""
+
+    supported_assessment_kinds = frozenset(
+        {
+            AssessmentKind.PRACTICE_CHECK,
+            AssessmentKind.LISTENING_CHECK,
+            AssessmentKind.ORAL_CHECK,
+        }
+    )
+
+    def __init__(self, key: str, knowledge_type: str, required_dimensions: tuple[str, ...]):
+        self.key = key
+        self.supported_knowledge_types = frozenset({knowledge_type})
+        self.required_dimensions = required_dimensions
+
+    def recompute(
+        self,
+        learning_records: list[LearningRecord],
+        assessment_items: list[AssessmentItem],
+        *,
+        knowledge_type: str | None = None,
+    ) -> MasteryProjection:
+        del knowledge_type
+        ordered_learning = sorted(
+            learning_records, key=lambda record: (_utc(record.learned_at), str(record.id))
+        )
+        ordered_items = sorted(
+            assessment_items, key=lambda item: (_utc(item.assessed_at), str(item.id))
+        )
+        by_dimension = {
+            dimension: [item for item in ordered_items if item.skill_dimension == dimension]
+            for dimension in ENGLISH_DIMENSIONS
+        }
+        dimensions = {
+            dimension: english_dimension_state(items)
+            for dimension, items in by_dimension.items()
+            if items
+        }
+        required_dimensions = self.required_dimensions
+        if self.key == ENGLISH_PHONICS_POLICY_KEY and any(
+            item.skill_dimension in {"blending", "decoding"} for item in ordered_items
+        ):
+            required_dimensions = ("decoding",)
+        required_states = [
+            dimensions.get(dimension, "unlearned") for dimension in required_dimensions
+        ]
+        state_code = "introduced" if ordered_learning else "unlearned"
+        if ordered_items:
+            state_code = "practicing"
+        if required_states and all(state in {"proficient", "stable"} for state in required_states):
+            state_code = "proficient"
+        if required_states and all(state == "stable" for state in required_states):
+            state_code = "stable"
+        legacy_level = {
+            "unlearned": MasteryLevel.UNLEARNED,
+            "introduced": MasteryLevel.INTRODUCED,
+            "practicing": MasteryLevel.RECOGNIZING,
+            "proficient": MasteryLevel.PROFICIENT,
+            "stable": MasteryLevel.STABLE,
+        }[state_code]
+        counts = {outcome.value: 0 for outcome in AssessmentOutcome}
+        response_times: list[int] = []
+        consecutive_correct = 0
+        consecutive_incorrect = 0
+        for item in ordered_items:
+            counts[item.outcome] += 1
+            if item.response_time_ms is not None:
+                response_times.append(item.response_time_ms)
+            if item.outcome == AssessmentOutcome.CORRECT and not item.hint_used:
+                consecutive_correct += 1
+                consecutive_incorrect = 0
+            elif item.outcome == AssessmentOutcome.INCORRECT:
+                consecutive_incorrect += 1
+                consecutive_correct = 0
+            else:
+                consecutive_correct = 0
+                consecutive_incorrect = 0
+        rank = {
+            "unlearned": 0.0,
+            "practicing": 0.35,
+            "proficient": 0.75,
+            "stable": 1.0,
+        }
+        score = (
+            round(sum(rank[state] for state in required_states) / len(required_states), 4)
+            if required_states
+            else 0.0
+        )
+        return MasteryProjection(
+            mastery_level=legacy_level,
+            mastery_score=score,
+            first_introduced_at=(ordered_learning[0].learned_at if ordered_learning else None),
+            last_learning_at=(ordered_learning[-1].learned_at if ordered_learning else None),
+            last_assessed_at=(ordered_items[-1].assessed_at if ordered_items else None),
+            correct_count=counts[AssessmentOutcome.CORRECT],
+            hinted_correct_count=counts[AssessmentOutcome.HINTED_CORRECT],
+            uncertain_count=counts[AssessmentOutcome.UNCERTAIN],
+            incorrect_count=counts[AssessmentOutcome.INCORRECT],
+            consecutive_correct=consecutive_correct,
+            consecutive_incorrect=consecutive_incorrect,
+            average_response_time_ms=(
+                round(sum(response_times) / len(response_times), 2) if response_times else None
+            ),
+            state_code=state_code,
+            dimensions_json={
+                **dimensions,
+                "required": list(required_dimensions),
+                "speaking_is_required": False,
+            },
+        )
+
+
 class MathMasteryPolicy:
     """Math-specific projection requiring independent, varied, cross-day evidence."""
 
@@ -468,6 +627,34 @@ mastery_policies = MasteryPolicyRegistry()
 mastery_policies.register(ChineseCharacterMasteryPolicy())
 mastery_policies.register(PinyinMasteryPolicy())
 mastery_policies.register(MathMasteryPolicy())
+mastery_policies.register(
+    EnglishMasteryPolicy(
+        ENGLISH_WORD_POLICY_KEY,
+        KnowledgeType.ENGLISH_WORD,
+        ("listening", "meaning"),
+    )
+)
+mastery_policies.register(
+    EnglishMasteryPolicy(
+        ENGLISH_LETTER_POLICY_KEY,
+        KnowledgeType.ENGLISH_LETTER,
+        ("letter_name", "case_matching"),
+    )
+)
+mastery_policies.register(
+    EnglishMasteryPolicy(
+        ENGLISH_PHONICS_POLICY_KEY,
+        KnowledgeType.ENGLISH_PHONICS,
+        ("sound_recognition",),
+    )
+)
+mastery_policies.register(
+    EnglishMasteryPolicy(
+        ENGLISH_PHRASE_POLICY_KEY,
+        KnowledgeType.ENGLISH_PHRASE,
+        ("listening", "meaning"),
+    )
+)
 
 
 def mastery_policy_for_type(knowledge_type: str) -> MasteryPolicy | None:

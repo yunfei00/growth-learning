@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">月亮</title>
+  <rect width="240" height="240" rx="42" fill="#eef1ff"/>
+  <path d="M163 184c-64 18-115-29-104-89 7-38 37-66 75-70-26 20-37 52-28 82 9 31 31 55 57 77Z" fill="#f6da70" stroke="#776427" stroke-width="8" stroke-linejoin="round"/>
+  <circle cx="170" cy="55" r="7" fill="#7f8bc7"/><circle cx="191" cy="89" r="5" fill="#7f8bc7"/><circle cx="169" cy="115" r="4" fill="#7f8bc7"/>
+</svg>
