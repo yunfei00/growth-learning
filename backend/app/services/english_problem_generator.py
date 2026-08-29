@@ -164,7 +164,6 @@ async def generate_english_problem(
         prompt = {
             "instruction": target.child_hint_zh,
             "audio": _audio(target),
-            "visual": _visual(target),
             "hide_target_text": True,
         }
         options = []
@@ -185,7 +184,6 @@ async def generate_english_problem(
             "instruction": "把声音慢慢连起来，是哪个单词？",
             "segments": list(target.metadata_json.get("segments", list(target.text))),
             "audio": _audio(target),
-            "visual": _visual(target),
             "hide_target_text": True,
         }
         options = [

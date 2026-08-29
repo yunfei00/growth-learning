@@ -31,6 +31,7 @@ from app.services.english_catalog import (
     ENGLISH_COURSE_KEY,
     ENGLISH_GENERATOR_VERSION,
     ENGLISH_SEEDS,
+    STATIC_VISUAL_WORDS,
     import_english_foundation,
     stable_english_point_id,
 )
@@ -196,13 +197,18 @@ async def test_audio_visual_and_generators_are_safe_and_reproducible(
                     assert audio.speech_text != item.text
             else:
                 assert audio.strategy in {"curated", "tts"}
-        cat = await session.scalar(
-            select(EnglishItem)
-            .join(KnowledgePoint)
-            .where(KnowledgePoint.canonical_key == "english:word:cat")
-        )
-        assert cat is not None
-        assert english_visual_provider.resolve(cat).image_url == "/english/visuals/cat.svg"
+        assert frozenset({"cat", "dog", "apple", "ball", "sun", "moon"}) == STATIC_VISUAL_WORDS
+        for word in sorted(STATIC_VISUAL_WORDS):
+            item = await session.scalar(
+                select(EnglishItem)
+                .join(KnowledgePoint)
+                .where(KnowledgePoint.canonical_key == f"english:word:{word}")
+            )
+            assert item is not None
+            visual = english_visual_provider.resolve(item)
+            assert visual.visual_type == "static_image"
+            assert visual.image_url == f"/english/visuals/{word}.svg"
+            assert visual.visual_key
 
         templates = list(
             await session.scalars(
@@ -231,6 +237,10 @@ async def test_audio_visual_and_generators_are_safe_and_reproducible(
             assert all(option["assessment_alt"].startswith("选项") for option in first.options)
             if first.prompt.get("hide_target_text"):
                 assert "text" not in first.prompt
+            if template.practice_kind == "visual_choose_audio":
+                assert first.prompt.get("visual") is not None
+            else:
+                assert "visual" not in first.prompt
 
 
 def test_four_english_mastery_policies_require_independent_cross_day_evidence() -> None:

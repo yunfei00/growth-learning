@@ -1592,6 +1592,11 @@ main {
   padding-block: 28px 56px;
 }
 
+.english-detail-page.child-mode {
+  gap: 12px;
+  padding-block: 12px 24px;
+}
+
 .english-overview-header,
 .english-detail-topline,
 .english-today-card > header,
@@ -1721,9 +1726,10 @@ main {
 
 .english-visual {
   align-items: center;
+  aspect-ratio: 1;
   display: inline-flex;
   flex: 0 0 auto;
-  height: 190px;
+  height: auto;
   justify-content: center;
   overflow: hidden;
   width: 190px;
@@ -1812,17 +1818,35 @@ main {
   padding: 14px 18px;
 }
 
-.english-problem-screen { display: grid; gap: 22px; }
-.english-main-task { align-items: center; display: flex; flex-direction: column; gap: 14px; min-height: 250px; text-align: center; }
+.english-problem-screen {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+}
+
+.english-detail-page.child-mode.has-problem .english-problem-screen {
+  min-height: calc(100dvh - 64px - 112px);
+  padding: 18px 22px;
+}
+
+.english-problem-screen > header h1 {
+  font-size: clamp(1.45rem, 3vw, 2.1rem);
+  margin: 0;
+}
+
+.english-problem-screen > header .eyebrow { margin-bottom: 4px; }
+.english-problem-feedback { padding: 8px 14px; }
+.english-main-task { align-items: center; display: flex; flex-direction: column; gap: 10px; min-height: 0; text-align: center; }
 .english-main-task h2 { color: #36584e; font-size: clamp(1.4rem, 4vw, 2.25rem); margin: 0; }
 .english-prompt-text,
-.english-prompt-segments { color: #315d50; font-size: clamp(4rem, 14vw, 9rem); line-height: 1; }
-.english-prompt-segments { font-size: clamp(2.5rem, 9vw, 6rem); }
-.english-big-audio { border-radius: 50%; font-size: 3.2rem; height: 92px; padding: 0; width: 92px; }
+.english-prompt-segments { color: #315d50; font-size: clamp(3rem, 8vw, 6rem); line-height: 1; }
+.english-prompt-segments { font-size: clamp(2.25rem, 6vw, 4.5rem); }
+.english-big-audio { border-radius: 50%; font-size: 2.75rem; height: 78px; padding: 0; width: 78px; }
+.english-main-task > .english-visual { width: clamp(104px, 14dvh, 144px); }
 
 .english-answer-grid {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -1838,16 +1862,75 @@ main {
   font: inherit;
   gap: 8px;
   justify-content: center;
-  min-height: 150px;
-  padding: 16px;
+  min-height: clamp(164px, 20dvh, 198px);
+  padding: 10px;
 }
 
+.english-answer-grid .english-visual { width: clamp(104px, 14dvh, 144px); }
 .english-answer-grid > button { cursor: pointer; }
 .english-answer-grid > button:hover { border-color: #3c8e72; }
 .english-answer-grid > button > strong { font-size: clamp(2rem, 7vw, 4.5rem); }
 .english-audio-option button { background: transparent; border: 0; color: #315d50; cursor: pointer; font: inherit; font-weight: 900; min-height: 54px; }
 .english-audio-option button:first-child { font-size: 2.4rem; }
 .english-audio-option small { display: block; font-size: 0.75rem; }
+
+.english-problem-tools {
+  justify-content: center;
+  margin-top: 0;
+}
+
+.english-problem-tools .primary { margin-left: auto; }
+
+.english-detail-page.child-mode.has-intro .english-item-intro {
+  display: grid;
+  gap: 12px 18px;
+  grid-template-areas:
+    "stage example"
+    "actions example"
+    "navigation navigation";
+  grid-template-columns: minmax(0, 1.5fr) minmax(250px, 0.5fr);
+  padding: 18px 22px;
+}
+
+.english-detail-page.child-mode.has-intro .english-item-stage {
+  gap: 18px;
+  grid-area: stage;
+  min-height: 0;
+}
+
+.english-detail-page.child-mode.has-intro .english-start-actions {
+  grid-area: actions;
+  margin-top: 0;
+}
+
+.english-detail-page.child-mode.has-intro .english-example-card {
+  align-content: center;
+  grid-area: example;
+  margin-top: 0;
+  padding: 16px;
+}
+
+.english-detail-page.child-mode.has-intro .english-sequence-nav {
+  grid-area: navigation;
+  margin-top: 0;
+}
+
+@media (min-width: 901px) and (max-height: 820px) {
+  .english-detail-page.child-mode.has-problem .english-problem-screen {
+    gap: 10px;
+    padding: 14px 18px;
+  }
+
+  .english-main-task { gap: 7px; }
+  .english-main-task h2 { font-size: clamp(1.25rem, 3vw, 1.8rem); }
+  .english-big-audio { font-size: 2.5rem; height: 72px; width: 72px; }
+  .english-answer-grid > button,
+  .english-audio-option { min-height: 148px; }
+  .english-answer-grid .english-visual,
+  .english-main-task > .english-visual { width: 108px; }
+  .english-start-actions button,
+  .english-problem-tools button { min-height: 56px; padding-block: 9px; }
+}
 
 .english-history-section article { align-items: start; border-top: 1px solid #e2ddd1; display: grid; gap: 12px; grid-template-columns: 0.7fr 1.3fr; padding-top: 16px; }
 .english-history-section article > div { display: grid; gap: 4px; }
@@ -1879,6 +1962,10 @@ main {
   .english-item-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .english-kind-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-english-workspace { grid-template-columns: 1fr; }
+  .english-detail-page.child-mode.has-intro .english-item-intro {
+    grid-template-areas: "stage" "actions" "example" "navigation";
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 600px) {

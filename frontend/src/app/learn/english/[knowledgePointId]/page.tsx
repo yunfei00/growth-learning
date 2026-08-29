@@ -112,7 +112,13 @@ function EnglishDetailContent() {
           responseTimeMs: Math.max(0, Math.round(answeredAt - startedAt.current)),
         },
       );
-      setMessage(result.feedback);
+      setMessage(
+        childMode
+          ? result.outcome === "incorrect"
+            ? "再听一次试试看"
+            : "对啦！"
+          : result.feedback,
+      );
       const mayRetry = session.mode === "practice" && result.outcome === "incorrect";
       setAnswered(!mayRetry);
       setAudioReplays(0);
@@ -162,10 +168,10 @@ function EnglishDetailContent() {
   if (!item) return <main className="center-state section-shell">{error || "正在准备声音和图片…"}</main>;
   const problem = session?.problems[index];
 
-  return <main className="english-detail-page section-shell">
+  return <main className={`english-detail-page section-shell ${childMode ? "child-mode" : "parent-mode"} ${problem ? "has-problem" : "has-intro"}`}>
     <div className="english-detail-topline"><button onClick={() => router.back()} type="button">← 返回英语声音乐园</button><span>{item.position} / {item.total}</span></div>
     {error ? <p className="form-message form-error" role="alert">{error}</p> : null}
-    {message ? <p className="english-feedback" role="status">{message}</p> : null}
+    {message && !problem ? <p className="english-feedback" role="status">{message}</p> : null}
     {!problem ? <section className="english-item-intro">
       <div className="english-item-stage"><EnglishVisualCard label={item.meaning_zh} visual={item.visual} /><div><p className="eyebrow">{item.category_label}</p><h1>{item.text}</h1><p className="english-meaning">{item.meaning_zh}</p>{item.kind === "letter" ? <p className="english-letter-pair">{String(item.metadata.uppercase ?? item.text)} · {String(item.metadata.lowercase ?? item.text.toLowerCase())}</p> : null}{item.kind === "phonics" && Array.isArray(item.metadata.segments) ? <p className="english-segments">{item.metadata.segments.map(String).join(" · ")}</p> : null}<span className={`english-state state-${item.state_code}`}>{STATE_LABELS[item.state_code]}</span></div></div>
       <div className="english-start-actions"><button className="listen" disabled={!item.audio.available} onClick={() => play(item.audio)} type="button">🔊 听一听</button><button disabled={working} onClick={() => void begin("practice")} type="button">开始声音练习</button>{!childMode && ["word", "phrase"].includes(item.kind) ? <><button className="secondary" disabled={working} onClick={() => void begin("assessment", "listening")} type="button">听力检查</button><button className="secondary" disabled={working} onClick={() => void begin("assessment", "meaning")} type="button">理解检查</button></> : null}{!childMode && item.kind === "letter" ? <><button className="secondary" disabled={working} onClick={() => void begin("assessment", "letter_name")} type="button">字母名称检查</button><button className="secondary" disabled={working} onClick={() => void begin("assessment", "case_matching")} type="button">大小写配对检查</button></> : null}{!childMode && item.kind === "phonics" ? <button className="secondary" disabled={working} onClick={() => void begin("assessment", item.category === "cvc" ? "decoding" : "sound_recognition")} type="button">{item.category === "cvc" ? "拼读检查" : "辨音检查"}</button> : null}</div>
@@ -175,8 +181,9 @@ function EnglishDetailContent() {
       <nav aria-label="英语前后导航" className="english-sequence-nav">{item.previous ? <Link href={`/learn/english/${item.previous.knowledge_point_id}`}><span>← 上一个</span><strong>{item.previous.text}</strong></Link> : <span />}{item.next ? <Link href={`/learn/english/${item.next.knowledge_point_id}`}><span>下一个 →</span><strong>{item.next.text}</strong></Link> : <span>已到最后</span>}</nav>
     </section> : <section className="english-problem-screen">
       <header><div><p className="eyebrow">English · {item.category_label}</p><h1>第 {index + 1} / {session?.problems.length} 题</h1></div><span>{session?.mode === "assessment" ? "独立检查" : "声音练习"}</span></header>
+      {message ? <p className="english-feedback english-problem-feedback" role="status">{message}</p> : null}
       <div className="english-main-task">{problem.prompt.visual ? <EnglishVisualCard label="题目图片" visual={problem.prompt.visual} /> : null}{problem.prompt.text ? <strong className="english-prompt-text">{problem.prompt.text}</strong> : null}{problem.prompt.segments ? <strong className="english-prompt-segments">{problem.prompt.segments.join(" · ")}</strong> : null}<h2>{String(problem.prompt.instruction ?? "听一听，选一个答案")}</h2>{problem.prompt.audio ? <button aria-label="播放题目声音" className="english-big-audio" onClick={() => play(problem.prompt.audio)} type="button">🔊</button> : null}</div>
-      <div className="english-answer-grid">{problem.options.map((option) => option.audio ? <article className="english-audio-option" key={String(option.value)}><button aria-label={`播放${option.assessment_alt}`} disabled={working || answered} onClick={() => play(option.audio)} type="button">🔊<small>{option.assessment_alt}</small></button><button disabled={working || answered} onClick={() => void answer(option.value, performance.now())} type="button">选这个声音</button></article> : <button aria-label={option.assessment_alt} disabled={working || answered} key={String(option.value)} onClick={() => void answer(option.value, performance.now())} type="button">{option.visual ? <EnglishVisualCard label={option.assessment_alt} visual={option.visual} /> : null}{option.text ? <strong>{option.text}</strong> : null}<small>{option.assessment_alt}</small></button>)}</div>
+      <div className="english-answer-grid">{problem.options.map((option) => option.audio ? <article className="english-audio-option" key={String(option.value)}><button aria-label={`播放${option.assessment_alt}`} disabled={working || answered} onClick={() => play(option.audio)} type="button">🔊{!childMode ? <small>{option.assessment_alt}</small> : null}</button><button disabled={working || answered} onClick={() => void answer(option.value, performance.now())} type="button">选这个声音</button></article> : <button aria-label={option.assessment_alt} disabled={working || answered} key={String(option.value)} onClick={() => void answer(option.value, performance.now())} type="button">{option.visual ? <EnglishVisualCard label={option.assessment_alt} visual={option.visual} /> : null}{option.text ? <strong>{option.text}</strong> : null}{!childMode ? <small>{option.assessment_alt}</small> : null}</button>)}</div>
       <div className="english-problem-tools">{problem.prompt.audio ? <button onClick={() => play(problem.prompt.audio)} type="button">🔊 再听一次</button> : null}{session?.mode === "practice" ? <button onClick={() => { setHintUsed(true); setMessage(item.meaning_zh); }} type="button">给我中文提示</button> : null}{answered ? <button className="primary" onClick={next} type="button">{index + 1 === session?.problems.length ? "完成" : "下一题 →"}</button> : null}</div>
     </section>}
   </main>;

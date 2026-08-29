@@ -1,6 +1,10 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 
 import type { EnglishVisual } from "@/lib/api/client";
+import { resolveStaticEnglishVisual } from "@/lib/english-visual-display";
 
 export function EnglishVisualCard({
   visual,
@@ -11,10 +15,35 @@ export function EnglishVisualCard({
   label: string;
   compact?: boolean;
 }) {
-  if (visual.visual_type === "static_image" && visual.image_url) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+
+  if (visual.visual_type === "static_image") {
+    const display = resolveStaticEnglishVisual(
+      visual,
+      Boolean(visual.image_url && failedImageUrl === visual.image_url),
+    );
+    if (display.kind === "fallback") {
+      return (
+        <span
+          aria-label={label}
+          className={`english-visual symbol visual-fallback${compact ? " compact" : ""}`}
+          data-visual-fallback="true"
+          role="img"
+        >
+          {display.symbol}
+        </span>
+      );
+    }
     return (
       <span className={`english-visual static${compact ? " compact" : ""}`}>
-        <Image alt={label} height={compact ? 96 : 220} src={visual.image_url} unoptimized width={compact ? 96 : 220} />
+        <Image
+          alt={label}
+          height={compact ? 96 : 220}
+          onError={() => setFailedImageUrl(visual.image_url)}
+          src={display.src}
+          unoptimized
+          width={compact ? 96 : 220}
+        />
       </span>
     );
   }
@@ -36,7 +65,7 @@ export function EnglishVisualCard({
     );
   }
   return (
-    <span aria-label={label} className={`english-visual symbol${compact ? " compact" : ""}`}>
+    <span aria-label={label} className={`english-visual symbol${compact ? " compact" : ""}`} role="img">
       {visual.visual_key ?? "🔊"}
     </span>
   );

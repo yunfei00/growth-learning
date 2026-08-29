@@ -27,6 +27,8 @@ test("one primary English question is rendered with sound replay separate from h
   assert.match(detail, /给我中文提示/);
   assert.match(detail, /setHintUsed\(true\)/);
   assert.match(detail, /再听一次/);
+  assert.match(detail, /english-problem-feedback/);
+  assert.match(detail, /!childMode \? <small>\{option\.assessment_alt\}<\/small> : null/);
 });
 
 test("English playback fixes an en-US voice without using browser language defaults", () => {
@@ -51,8 +53,16 @@ test("Today and admin understand English as a first-class subject", () => {
 });
 
 test("English controls and cards remain child-sized on phones", () => {
-  assert.match(styles, /\.english-answer-grid > button,[\s\S]*min-height: 150px/);
+  assert.match(styles, /\.english-answer-grid > button,[\s\S]*min-height: clamp\(164px, 20dvh, 198px\)/);
   assert.match(styles, /@media \(max-width: 600px\)[\s\S]*\.english-answer-grid/);
   assert.match(styles, /grid-template-columns: 1fr/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test("desktop English exercises use a compact viewport-aware layout", () => {
+  assert.doesNotMatch(styles, /\.english-main-task[^}]*min-height:\s*250px/);
+  assert.match(styles, /\.english-main-task[^}]*min-height:\s*0/);
+  assert.match(styles, /\.english-detail-page\.child-mode\.has-problem/);
+  assert.match(styles, /min-height:\s*calc\(100dvh/);
+  assert.match(styles, /@media \(min-width: 901px\) and \(max-height: 820px\)/);
 });
