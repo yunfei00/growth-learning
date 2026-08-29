@@ -6972,6 +6972,11 @@ body:has(.child-mode-header) .site-footer {
 }
 
 /* Keep direct Math scenes authoritative over the legacy Phase 18 renderers. */
+.math-main-task > .math-spatial-scene {
+  height: clamp(240px, 34dvh, 300px);
+  max-width: 640px;
+  width: min(94%, 640px);
+}
 .math-spatial-scene > button.math-spatial-object {
   align-items: center;
   background: #fff;

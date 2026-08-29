@@ -102,4 +102,5 @@ test("math controls remain large and responsive at phone width", () => {
   assert.match(styles, /height: calc\(100dvh - 144px\)/);
   assert.match(styles, /math-problem-feedback:not\(\.has-message\)/);
   assert.match(styles, /math-compare-divider/);
+  assert.match(styles, /height: clamp\(240px, 34dvh, 300px\)/);
 });
