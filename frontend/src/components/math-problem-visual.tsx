@@ -107,6 +107,7 @@ export function MathProblemVisual({ payload, ...selectable }: { payload: Payload
   if (visual.empty_meaning === true) return <div aria-label="一个也没有，用数字0表示" className="math-zero-meaning" role="img"><EmptyContainer /><strong>0</strong></div>;
   if (typeof visual.count === "number") return <Dots count={visual.count} layout={String(visual.layout ?? "cluster")} representation={representation} />;
   if (typeof visual.numeral === "number") return <div className="math-big-numeral">{visual.numeral}</div>;
+  if (payload.kind === "classification_choice" && visual.prompt_token) return <div aria-label="要配对的图形" className="math-classification-prompt"><MathVisualToken token={visual.prompt_token} /></div>;
   if (payload.kind === "pattern_choice" && Array.isArray(visual.sequence)) return <div className="math-pattern-sequence">{visual.sequence.map((token, index) => <MathVisualToken key={`${String((token as Record<string, unknown>).key)}-${index}`} token={token} />)}<span>?</span></div>;
   if (Array.isArray(visual.sequence)) return <div aria-label="数字序列" className="math-number-sequence">{visual.sequence.map((value, index) => <span className={value === null ? "missing" : ""} key={index}>{value === null ? "?" : String(value)}</span>)}</div>;
   if (typeof visual.left_count === "number" && typeof visual.right_count === "number") {

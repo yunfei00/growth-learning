@@ -76,6 +76,8 @@ test("compare, spatial, shape, classification and measurement answers use their 
   assert.match(visual, /math-measurement-object/);
   assert.match(visual, /MathVisualToken/);
   assert.match(visual, /token\.color/);
+  assert.match(visual, /visual\.prompt_token/);
+  assert.match(visual, /math-classification-prompt/);
   assert.match(detail, /!directVisualAnswer/);
   assert.match(detail, /!childMode \? <small>\{option\.label\}<\/small> : null/);
 });

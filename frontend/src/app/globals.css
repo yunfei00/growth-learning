@@ -2257,6 +2257,17 @@ button.math-compare-side { cursor: pointer; }
   min-height: 12px;
 }
 
+.math-classification-prompt {
+  align-items: center;
+  background: #fffdf7;
+  border: 3px dashed #9eaa8c;
+  border-radius: 24px;
+  display: flex;
+  justify-content: center;
+  min-height: 140px;
+  padding: .7rem 2rem;
+}
+
 .math-auto-start { min-height: 380px; }
 .math-journey-complete {
   align-content: center;

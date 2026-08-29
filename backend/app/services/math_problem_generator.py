@@ -382,11 +382,13 @@ def _classification(
     rng: random.Random, template: MathProblemTemplate
 ) -> tuple[dict[str, object], object]:
     code = str(template.config_json["skill_code"]).split(":", 1)[-1]
+    prompt_token: dict[str, str] | None = None
     if code == "match-same":
         options = ["circle", "triangle", "square"]
         rng.shuffle(options)
         answer: object = options.index("circle")
         instruction = "哪个和上面的圆形一样？"
+        prompt_token = _shape_token("circle", key="prompt-circle", label="要配对的蓝色圆形")
     elif code == "find-different":
         options = ["square", "square", "circle"]
         rng.shuffle(options)
@@ -416,7 +418,7 @@ def _classification(
             "kind": "classification_choice",
             "instruction": instruction,
             "representation_type": template.representation_type,
-            "visual": {},
+            "visual": {"prompt_token": prompt_token} if prompt_token else {},
             "options": [
                 {
                     "value": index,

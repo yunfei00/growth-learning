@@ -366,6 +366,20 @@ async def test_child_visual_contracts_zero_policy_and_spatial_tokens(
                         token_fields <= token.keys() for token in visual_tokens
                     )
 
+        matching_pair = next(
+            item
+            for item in templates
+            if item.config_json.get("skill_code") == "classification:match-same"
+        )
+        matching_problem = math_problem_generators.generate(matching_pair, 53)
+        prompt_token = matching_problem.render_payload["visual"]["prompt_token"]
+        assert token_fields <= prompt_token.keys()
+        correct_option = matching_problem.render_payload["options"][
+            int(matching_problem.expected_answer)
+        ]
+        assert correct_option["token"]["shape"] == prompt_token["shape"]
+        assert correct_option["token"]["color"] == prompt_token["color"]
+
 
 def test_math_policy_is_independent_varied_and_cross_day() -> None:
     policy = mastery_policy_for_type("math_skill")
