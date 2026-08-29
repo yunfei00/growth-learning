@@ -57,7 +57,9 @@ def _quantity_choice(
     rng: random.Random, template: MathProblemTemplate
 ) -> tuple[dict[str, object], object]:
     config = template.config_json
-    minimum = int(config.get("minimum", 0))
+    # Zero belongs to its explicit concept skill. Ordinary quantity tasks must
+    # always render at least one concrete object instead of an empty answer area.
+    minimum = max(1, int(config.get("minimum", 1)))
     maximum = int(config.get("maximum", 5))
     count = rng.randint(minimum, maximum)
     options = _nearby_options(rng, count, low=0, high=max(5, maximum))
@@ -98,10 +100,10 @@ def _numeral_recognition(
 def _numeral_quantity_match(
     rng: random.Random, template: MathProblemTemplate
 ) -> tuple[dict[str, object], object]:
-    minimum = int(template.config_json.get("minimum", 0))
+    minimum = max(1, int(template.config_json.get("minimum", 1)))
     maximum = int(template.config_json.get("maximum", 5))
     target = rng.randint(minimum, maximum)
-    counts = _nearby_options(rng, target, low=0, high=max(5, maximum))
+    counts = _nearby_options(rng, target, low=1, high=max(5, maximum))
     return (
         {
             "kind": "quantity_group_choice",
@@ -125,7 +127,7 @@ def _numeral_quantity_match(
 def _compare_quantity(
     rng: random.Random, template: MathProblemTemplate
 ) -> tuple[dict[str, object], object]:
-    minimum = int(template.config_json.get("minimum", 0))
+    minimum = max(1, int(template.config_json.get("minimum", 1)))
     maximum = int(template.config_json.get("maximum", 5))
     equal = template.config_json.get("relation") == "equal"
     left = rng.randint(minimum, maximum)
@@ -133,11 +135,37 @@ def _compare_quantity(
     while not equal and right == left:
         right = rng.randint(minimum, maximum)
     expected = "equal" if left == right else ("left" if left > right else "right")
-    options = [
-        {"value": "left", "label": "左边"},
-        {"value": "right", "label": "右边"},
-        {"value": "equal", "label": "一样多"},
-    ]
+    options = (
+        [
+            {
+                "value": "equal",
+                "label": "一样多",
+                "token": {
+                    "key": "equal",
+                    "shape": "check",
+                    "color": "green",
+                    "size": "large",
+                    "label": "一样多",
+                },
+            },
+            {
+                "value": "not_equal",
+                "label": "不一样",
+                "token": {
+                    "key": "not-equal",
+                    "shape": "not_equal",
+                    "color": "orange",
+                    "size": "large",
+                    "label": "不一样",
+                },
+            },
+        ]
+        if equal
+        else [
+            {"value": "left", "label": "左边", "side": "left", "count": left},
+            {"value": "right", "label": "右边", "side": "right", "count": right},
+        ]
+    )
     rng.shuffle(options)
     return (
         {
@@ -189,7 +217,7 @@ def _composition(
     rng: random.Random, template: MathProblemTemplate
 ) -> tuple[dict[str, object], object]:
     total = int(template.config_json["total"])
-    known = rng.randint(0, total)
+    known = rng.randint(1, total - 1)
     missing = total - known
     return _numeric_payload(
         f"{known} 和几合起来是 {total}？",
@@ -205,8 +233,8 @@ def _composition(
 
 def _joining(rng: random.Random, template: MathProblemTemplate) -> tuple[dict[str, object], object]:
     maximum = int(template.config_json.get("maximum", 5))
-    left = rng.randint(0, maximum)
-    right = rng.randint(0, maximum - left)
+    left = rng.randint(1, maximum - 1)
+    right = rng.randint(1, maximum - left)
     answer = left + right
     return _numeric_payload(
         "两组合起来，一共有几个？",
@@ -224,8 +252,8 @@ def _taking_away(
     rng: random.Random, template: MathProblemTemplate
 ) -> tuple[dict[str, object], object]:
     maximum = int(template.config_json.get("maximum", 5))
-    start = rng.randint(0, maximum)
-    removed = rng.randint(0, start)
+    start = rng.randint(2, maximum)
+    removed = rng.randint(1, start - 1)
     answer = start - removed
     return _numeric_payload(
         "拿走一些以后，还剩几个？",
@@ -241,9 +269,27 @@ def _taking_away(
 
 
 PATTERN_TOKENS = (
-    {"key": "blue-circle", "color": "blue", "shape": "circle", "label": "蓝色圆形"},
-    {"key": "red-triangle", "color": "red", "shape": "triangle", "label": "红色三角形"},
-    {"key": "green-square", "color": "green", "shape": "square", "label": "绿色正方形"},
+    {
+        "key": "blue-circle",
+        "color": "blue",
+        "shape": "circle",
+        "size": "medium",
+        "label": "蓝色圆形",
+    },
+    {
+        "key": "red-triangle",
+        "color": "red",
+        "shape": "triangle",
+        "size": "medium",
+        "label": "红色三角形",
+    },
+    {
+        "key": "green-square",
+        "color": "green",
+        "shape": "square",
+        "size": "medium",
+        "label": "绿色正方形",
+    },
 )
 
 
@@ -277,6 +323,32 @@ SHAPE_LABELS = {
     "sphere": "球体",
     "cube": "正方体",
 }
+SHAPE_COLORS = {
+    "circle": "blue",
+    "triangle": "red",
+    "square": "green",
+    "rectangle": "orange",
+    "sphere": "purple",
+    "cube": "teal",
+}
+
+
+def _shape_token(shape: str, *, key: str | None = None, label: str | None = None) -> dict[str, str]:
+    size = "medium"
+    base_shape = shape
+    if shape.startswith("small-"):
+        size = "small"
+        base_shape = shape.removeprefix("small-")
+    elif shape.startswith("large-"):
+        size = "large"
+        base_shape = shape.removeprefix("large-")
+    return {
+        "key": key or shape,
+        "shape": base_shape,
+        "color": SHAPE_COLORS.get(base_shape, "blue"),
+        "size": size,
+        "label": label or SHAPE_LABELS.get(base_shape, base_shape),
+    }
 
 
 def _shape_choice(
@@ -294,7 +366,12 @@ def _shape_choice(
             "representation_type": "shape",
             "visual": {},
             "options": [
-                {"value": shape, "label": SHAPE_LABELS[shape], "shape": shape} for shape in choices
+                {
+                    "value": shape,
+                    "label": SHAPE_LABELS[shape],
+                    "token": _shape_token(shape),
+                }
+                for shape in choices
             ],
         },
         target,
@@ -341,7 +418,11 @@ def _classification(
             "representation_type": template.representation_type,
             "visual": {},
             "options": [
-                {"value": index, "label": labels[value], "shape": value}
+                {
+                    "value": index,
+                    "label": labels[value],
+                    "token": _shape_token(value, label=labels[value]),
+                }
                 for index, value in enumerate(options)
             ],
         },
@@ -361,17 +442,30 @@ def _spatial_choice(
     }
     label = relation_labels[relation]
     answer = rng.choice(("a", "b"))
-    options = [
-        {"value": "a", "label": "蓝色圆形"},
-        {"value": "b", "label": "黄色正方形"},
+    tokens = [
+        {
+            "key": "a",
+            "shape": "circle",
+            "color": "blue",
+            "size": "large",
+            "label": "蓝色圆形",
+        },
+        {
+            "key": "b",
+            "shape": "square",
+            "color": "yellow",
+            "size": "large",
+            "label": "黄色正方形",
+        },
     ]
+    options = [{"value": token["key"], "label": token["label"], "token": token} for token in tokens]
     rng.shuffle(options)
     return (
         {
             "kind": "spatial_choice",
             "instruction": f"哪个在{label}？",
             "representation_type": "spatial_scene",
-            "visual": {"relation": relation, "answer_object": answer},
+            "visual": {"relation": relation, "answer_object": answer, "objects": tokens},
             "options": options,
         },
         answer,
@@ -395,8 +489,33 @@ def _measurement_compare(
             "kind": "measurement_compare",
             "instruction": f"哪一个{label}？",
             "representation_type": template.representation_type,
-            "visual": {"comparison": comparison, "left_value": left, "right_value": right},
-            "options": [{"value": "left", "label": "左边"}, {"value": "right", "label": "右边"}],
+            "visual": {
+                "comparison": comparison,
+                "left_value": left,
+                "right_value": right,
+                "objects": [
+                    {
+                        "key": "left",
+                        "shape": "line" if comparison == "long-short" else "bar",
+                        "color": "blue",
+                        "size": "large",
+                        "label": "左侧对象",
+                        "value": left,
+                    },
+                    {
+                        "key": "right",
+                        "shape": "line" if comparison == "long-short" else "bar",
+                        "color": "orange",
+                        "size": "large",
+                        "label": "右侧对象",
+                        "value": right,
+                    },
+                ],
+            },
+            "options": [
+                {"value": "left", "label": "左侧对象"},
+                {"value": "right", "label": "右侧对象"},
+            ],
         },
         desired,
     )

@@ -732,6 +732,7 @@ async def answer_math_attempt(
         attempt_count=attempt.attempt_count,
         hint_used=attempt.hint_used,
         feedback=feedback,
+        correct_answer=attempt.expected_answer,
         session_completed=completed,
         mastery_state=mastery_state,
     )

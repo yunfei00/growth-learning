@@ -155,6 +155,7 @@ class MathAttemptAnswerResponse(BaseModel):
     attempt_count: int
     hint_used: bool
     feedback: str
+    correct_answer: Any
     session_completed: bool
     mastery_state: MathStateValue | None = None
 

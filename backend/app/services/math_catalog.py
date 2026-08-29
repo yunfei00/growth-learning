@@ -33,6 +33,7 @@ MATH_GENERATOR_VERSION = "math-generator-v1"
 MATH_COURSE_KEY = "system-math-foundation-v1"
 MATH_NAMESPACE = uuid.UUID("19f8de86-6292-54bd-84f7-29865a189612")
 MATH_TEMPLATE_NAMESPACE = uuid.UUID("f2cf51f7-e0db-52a4-bf1a-160325842daa")
+DISABLED_MATH_CANONICAL_KEYS = {"math:spatial:front-behind"}
 
 
 @dataclass(frozen=True)
@@ -461,7 +462,18 @@ SPATIAL = tuple(
         ("spatial_scene", "objects"),
         "spatial_choice_v1",
         difficulty=2 if code == "left-right" else 1,
-        settings={"relation": code},
+        settings={
+            "relation": code,
+            **(
+                {
+                    "disabled_reason": (
+                        "二维界面暂时无法为低龄儿童稳定表达前后关系，待有可靠视觉素材后再启用。"
+                    )
+                }
+                if code == "front-behind"
+                else {}
+            ),
+        },
     )
     for code, title, instruction, tip in (
         ("up-down", "认识上和下", "哪个在上面？", "用身体和真实位置一起体验上、下。"),
@@ -655,6 +667,7 @@ async def import_math_foundation(session: AsyncSession) -> MathImportResult:
     point_ids: dict[str, uuid.UUID] = {}
     for order_index, seed in enumerate(MATH_SKILL_SEEDS):
         try:
+            enabled = seed.canonical_key not in DISABLED_MATH_CANONICAL_KEYS
             point = await session.scalar(
                 select(KnowledgePoint).where(KnowledgePoint.canonical_key == seed.canonical_key)
             )
@@ -664,7 +677,7 @@ async def import_math_foundation(session: AsyncSession) -> MathImportResult:
                     id=stable_math_point_id(seed.canonical_key),
                     subject=Subject.MATH,
                     type=KnowledgeType.MATH_SKILL,
-                    status=KnowledgeStatus.ACTIVE,
+                    status=(KnowledgeStatus.ACTIVE if enabled else KnowledgeStatus.ARCHIVED),
                     title=seed.title,
                     canonical_key=seed.canonical_key,
                     source_type="project_curated",
@@ -680,7 +693,7 @@ async def import_math_foundation(session: AsyncSession) -> MathImportResult:
             point_values = {
                 "subject": Subject.MATH,
                 "type": KnowledgeType.MATH_SKILL,
-                "status": KnowledgeStatus.ACTIVE,
+                "status": KnowledgeStatus.ACTIVE if enabled else KnowledgeStatus.ARCHIVED,
                 "title": seed.title,
                 "source_type": "project_curated",
                 "source_reference": MATH_CATALOG_VERSION,
@@ -735,7 +748,7 @@ async def import_math_foundation(session: AsyncSession) -> MathImportResult:
                     "skill_code": f"{seed.domain}:{seed.skill_code}",
                     "domain": seed.domain,
                 }
-                template.status = KnowledgeStatus.ACTIVE
+                template.status = KnowledgeStatus.ACTIVE if enabled else KnowledgeStatus.ARCHIVED
                 template.order_index = template_order
         except Exception as error:
             result.errors.append(f"{seed.canonical_key}: {type(error).__name__}: {error}")

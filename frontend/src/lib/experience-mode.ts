@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 export const CHILD_MODE_KEY = "growth-learning:experience-mode";
 
-export function useChildExperienceMode(): boolean {
+export function useResolvedChildExperienceMode(): boolean | null {
   const [childMode, setChildMode] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -14,5 +14,9 @@ export function useChildExperienceMode(): boolean {
     return () => window.clearTimeout(timer);
   }, []);
 
-  return childMode !== false;
+  return childMode;
+}
+
+export function useChildExperienceMode(): boolean {
+  return useResolvedChildExperienceMode() !== false;
 }

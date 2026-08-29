@@ -413,6 +413,7 @@ export type MathAttemptResult = {
   attempt_count: number;
   hint_used: boolean;
   feedback: string;
+  correct_answer: unknown;
   session_completed: boolean;
   mastery_state: MathState | null;
 };

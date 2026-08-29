@@ -124,7 +124,7 @@ async def test_catalog_has_stable_skill_ids_templates_relations_and_course(
         assert first.errors == []
         assert first.catalog_size == 68
         assert first.created == 68
-        assert first.template_count == 153
+        assert first.template_count == 151
         assert first.templates_created == 153
         assert first.relations_created == 13
         assert first.course_created is True
@@ -150,6 +150,20 @@ async def test_catalog_has_stable_skill_ids_templates_relations_and_course(
         assert len({point.canonical_key for point, _skill in rows}) == 68
         assert all(point.subject == "math" and point.type == "math_skill" for point, _ in rows)
         assert all(point.id == stable_math_point_id(point.canonical_key) for point, _ in rows)
+        front_behind = next(
+            point for point, _skill in rows if point.canonical_key == "math:spatial:front-behind"
+        )
+        assert front_behind.status == "archived"
+        front_templates = list(
+            await session.scalars(
+                select(MathProblemTemplate).where(
+                    MathProblemTemplate.knowledge_point_id == front_behind.id
+                )
+            )
+        )
+        assert front_templates and all(
+            template.status == "archived" for template in front_templates
+        )
         original_order = [point.canonical_key for point, _skill in rows]
         original_ids = {point.canonical_key: point.id for point, _skill in rows}
 
@@ -169,7 +183,7 @@ async def test_catalog_has_stable_skill_ids_templates_relations_and_course(
         release = await session.scalar(select(MathCatalogRelease))
         assert release is not None
         assert release.catalog_version == MATH_CATALOG_VERSION
-        assert release.item_count == 68 and release.template_count == 153
+        assert release.item_count == 68 and release.template_count == 151
         course = await session.scalar(select(Course).where(Course.system_key == MATH_COURSE_KEY))
         assert course is not None and course.subject == "math"
         units = list(
@@ -247,6 +261,112 @@ async def test_generator_is_reproducible_valid_and_not_position_hardcoded(
         assert zero.render_payload["visual"]["empty_meaning"] is True
 
 
+async def test_child_visual_contracts_zero_policy_and_spatial_tokens(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        await import_math_foundation(session)
+        templates = list(await session.scalars(select(MathProblemTemplate)))
+
+        comparisons = [
+            item
+            for item in templates
+            if item.config_json["generator_key"] == "compare_quantity_v1"
+            and item.config_json.get("relation") != "equal"
+        ]
+        assert comparisons
+        for seed in range(100):
+            generated = math_problem_generators.generate(comparisons[seed % len(comparisons)], seed)
+            visual = generated.render_payload["visual"]
+            assert int(visual["left_count"]) >= 1
+            assert int(visual["right_count"]) >= 1
+            assert visual["left_count"] != visual["right_count"]
+            assert {option["value"] for option in generated.render_payload["options"]} == {
+                "left",
+                "right",
+            }
+
+        for template in templates:
+            generator_key = template.config_json["generator_key"]
+            generated = math_problem_generators.generate(template, 29)
+            visual = generated.render_payload["visual"]
+            if generator_key in {"quantity_choice_v1", "numeral_quantity_match_v1"}:
+                if "count" in visual:
+                    assert int(visual["count"]) >= 1
+                if generator_key == "numeral_quantity_match_v1":
+                    assert all(
+                        int(option["count"]) >= 1 for option in generated.render_payload["options"]
+                    )
+            if generator_key == "composition_v1":
+                assert all(int(value) >= 1 for value in visual["groups"])
+            if generator_key == "joining_v1":
+                assert int(visual["first_count"]) >= 1
+                assert int(visual["second_count"]) >= 1
+            if generator_key == "taking_away_v1":
+                assert int(visual["start_count"]) >= 2
+                assert 1 <= int(visual["removed_count"]) < int(visual["start_count"])
+                assert int(visual["remaining_count"]) >= 1
+
+        zero_template = next(
+            item
+            for item in templates
+            if item.config_json["skill_code"] == "number_symbol:recognize-0"
+        )
+        zero = math_problem_generators.generate(zero_template, 8)
+        assert zero.render_payload["visual"] == {
+            "numeral": 0,
+            "empty_meaning": True,
+            "aria_label": "盘子里一个也没有，用0表示",
+        }
+
+        for relation in ("up-down", "left-right", "inside-outside"):
+            spatial = next(
+                item for item in templates if item.config_json.get("relation") == relation
+            )
+            generated = math_problem_generators.generate(spatial, 31)
+            objects = generated.render_payload["visual"]["objects"]
+            options = generated.render_payload["options"]
+            assert {value["key"] for value in objects} == {"a", "b"}
+            assert {value["shape"] for value in objects} == {"circle", "square"}
+            assert all(
+                {"key", "shape", "color", "size", "label"} <= value.keys() for value in objects
+            )
+            assert {option["token"]["key"] for option in options} == {
+                value["key"] for value in objects
+            }
+            assert all(
+                option["token"]
+                == next(value for value in objects if value["key"] == option["token"]["key"])
+                for option in options
+            )
+
+        token_fields = {"key", "shape", "color", "size", "label"}
+        for generator_key in (
+            "pattern_v1",
+            "shape_choice_v1",
+            "classification_v1",
+            "measurement_compare_v1",
+        ):
+            matching = [
+                item for item in templates if item.config_json["generator_key"] == generator_key
+            ]
+            assert matching
+            for template in matching:
+                generated = math_problem_generators.generate(template, 47)
+                payload = generated.render_payload
+                option_tokens = [
+                    option["token"] for option in payload["options"] if "token" in option
+                ]
+                assert all(token_fields <= token.keys() for token in option_tokens)
+                if generator_key in {"pattern_v1", "measurement_compare_v1"}:
+                    visual_tokens = payload["visual"].get("sequence") or payload["visual"].get(
+                        "objects"
+                    )
+                    assert visual_tokens and all(
+                        token_fields <= token.keys() for token in visual_tokens
+                    )
+
+
 def test_math_policy_is_independent_varied_and_cross_day() -> None:
     policy = mastery_policy_for_type("math_skill")
     assert isinstance(policy, MathMasteryPolicy)
@@ -309,7 +429,7 @@ async def test_practice_and_assessment_preserve_distinct_evidence(
         _, child = await create_family_child(parent)
         child_id = child["id"]
         listing = await parent.get(f"/api/v1/children/{child_id}/math/skills?page_size=100")
-        assert listing.status_code == 200 and listing.json()["total"] == 68
+        assert listing.status_code == 200 and listing.json()["total"] == 67
         skill_id = next(
             item["knowledge_point_id"]
             for item in listing.json()["items"]
@@ -601,7 +721,7 @@ async def test_admin_math_can_filter_archive_restore_and_import(
         assert archived.json()["status"] == "archived"
         assert archived.json()["parent_tip"] == "管理后台维护提示"
         public = await admin.get("/api/v1/math/skills?page_size=100")
-        assert public.status_code == 200 and public.json()["total"] == 67
+        assert public.status_code == 200 and public.json()["total"] == 66
         restored = await admin.patch(
             f"/api/v1/admin/math/{item['knowledge_point_id']}", json={"status": "active"}
         )
@@ -610,4 +730,4 @@ async def test_admin_math_can_filter_archive_restore_and_import(
         assert imported.status_code == 200, imported.text
         assert imported.json()["created"] == 0
         assert imported.json()["catalog_size"] == 68
-        assert imported.json()["template_count"] == 153
+        assert imported.json()["template_count"] == 151
