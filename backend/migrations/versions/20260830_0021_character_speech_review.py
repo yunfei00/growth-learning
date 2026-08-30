@@ -18,24 +18,22 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "chinese_characters",
-        sa.Column("accepted_readings", sa.JSON(), server_default=sa.text("'[]'::json"), nullable=False),
+        sa.Column(
+            "accepted_readings", sa.JSON(), server_default=sa.text("'[]'::json"), nullable=False
+        ),
     )
     # These are deliberately curated context readings, not every dictionary reading.
     op.execute(
-        "UPDATE chinese_characters SET accepted_readings='[\"hang2\"]'::json "
-        "WHERE character='行'"
+        "UPDATE chinese_characters SET accepted_readings='[\"hang2\"]'::json WHERE character='行'"
     )
     op.execute(
-        "UPDATE chinese_characters SET accepted_readings='[\"zhang3\"]'::json "
-        "WHERE character='长'"
+        "UPDATE chinese_characters SET accepted_readings='[\"zhang3\"]'::json WHERE character='长'"
     )
     op.execute(
-        "UPDATE chinese_characters SET accepted_readings='[\"yue4\"]'::json "
-        "WHERE character='乐'"
+        "UPDATE chinese_characters SET accepted_readings='[\"yue4\"]'::json WHERE character='乐'"
     )
     op.execute(
-        "UPDATE chinese_characters SET accepted_readings='[\"chong2\"]'::json "
-        "WHERE character='重'"
+        "UPDATE chinese_characters SET accepted_readings='[\"chong2\"]'::json WHERE character='重'"
     )
 
     op.add_column(
@@ -67,10 +65,17 @@ def upgrade() -> None:
         sa.Column("attempt_index", sa.Integer(), nullable=False),
         sa.Column("provider", sa.String(80), nullable=False),
         sa.Column("transcript", sa.Text()),
-        sa.Column("alternatives_json", sa.JSON(), server_default=sa.text("'[]'::json"), nullable=False),
+        sa.Column(
+            "alternatives_json", sa.JSON(), server_default=sa.text("'[]'::json"), nullable=False
+        ),
         sa.Column("confidence", sa.Float()),
         sa.Column("confidence_available", sa.Boolean(), server_default=sa.false(), nullable=False),
-        sa.Column("normalized_readings_json", sa.JSON(), server_default=sa.text("'[]'::json"), nullable=False),
+        sa.Column(
+            "normalized_readings_json",
+            sa.JSON(),
+            server_default=sa.text("'[]'::json"),
+            nullable=False,
+        ),
         sa.Column("decision", sa.String(32), nullable=False),
         sa.Column("syllable_match", sa.Boolean()),
         sa.Column("tone_match", sa.Boolean()),
@@ -78,11 +83,16 @@ def upgrade() -> None:
         sa.Column("explicit_unknown", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("hint_used", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("duration_ms", sa.Integer()),
-        sa.Column("provider_metadata", sa.JSON(), server_default=sa.text("'{}'::json"), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "provider_metadata", sa.JSON(), server_default=sa.text("'{}'::json"), nullable=False
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint("attempt_index >= 1", name="ck_character_speech_attempts_index"),
         sa.CheckConstraint(
-            "decision IN ('match', 'partial_match', 'uncertain', 'no_match', 'no_speech', 'recognition_error')",
+            "decision IN ('match', 'partial_match', 'uncertain', 'no_match', "
+            "'no_speech', 'recognition_error')",
             name="ck_character_speech_attempts_decision",
         ),
         sa.CheckConstraint(
@@ -128,7 +138,12 @@ def upgrade() -> None:
         sa.Column("override_outcome", sa.String(24), nullable=False),
         sa.Column("overridden_by_user_id", sa.Uuid(), nullable=False),
         sa.Column("override_reason", sa.String(500), nullable=False),
-        sa.Column("overridden_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "overridden_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.CheckConstraint(
             "original_outcome IN ('correct', 'hinted_correct', 'uncertain', 'incorrect')",
             name="ck_assessment_overrides_original",
@@ -141,9 +156,7 @@ def upgrade() -> None:
             ["assessment_item_id"], ["assessment_items.id"], ondelete="RESTRICT"
         ),
         sa.ForeignKeyConstraint(["child_id"], ["children.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(
-            ["overridden_by_user_id"], ["users.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["overridden_by_user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
     )
     for column in ("assessment_item_id", "child_id", "overridden_by_user_id"):
@@ -151,13 +164,25 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_assessment_overrides_overridden_by_user_id"), table_name="assessment_overrides")
+    op.drop_index(
+        op.f("ix_assessment_overrides_overridden_by_user_id"), table_name="assessment_overrides"
+    )
     op.drop_index(op.f("ix_assessment_overrides_child_id"), table_name="assessment_overrides")
-    op.drop_index(op.f("ix_assessment_overrides_assessment_item_id"), table_name="assessment_overrides")
+    op.drop_index(
+        op.f("ix_assessment_overrides_assessment_item_id"), table_name="assessment_overrides"
+    )
     op.drop_table("assessment_overrides")
-    op.drop_index(op.f("ix_character_speech_attempts_knowledge_point_id"), table_name="character_speech_attempts")
-    op.drop_index(op.f("ix_character_speech_attempts_assessment_session_id"), table_name="character_speech_attempts")
-    op.drop_index(op.f("ix_character_speech_attempts_child_id"), table_name="character_speech_attempts")
+    op.drop_index(
+        op.f("ix_character_speech_attempts_knowledge_point_id"),
+        table_name="character_speech_attempts",
+    )
+    op.drop_index(
+        op.f("ix_character_speech_attempts_assessment_session_id"),
+        table_name="character_speech_attempts",
+    )
+    op.drop_index(
+        op.f("ix_character_speech_attempts_child_id"), table_name="character_speech_attempts"
+    )
     op.drop_table("character_speech_attempts")
     op.drop_column("assessment_session_targets", "hint_requested_at")
     op.drop_constraint(
