@@ -13,6 +13,7 @@ from app.models import (
     AssessmentItem,
     AssessmentOutcome,
     AssessmentSession,
+    CharacterSpeechAttempt,
     ChildKnowledgeState,
     FamilyMember,
     FamilyRole,
@@ -69,6 +70,49 @@ async def seed_character(
             ),
         )
         return str(point.id)
+
+
+async def test_free_speech_practice_never_creates_assessment_or_mastery(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    test_app: FastAPI,
+) -> None:
+    test_app.state.settings.character_speech_review_enabled = True
+    await register_and_login(client, "speech-practice@example.com")
+    _, child = await create_family_and_child(client, "口头练习")
+    point_id = await seed_character(session_factory, "东", "dōng")
+
+    response = await client.post(
+        f"/api/v1/children/{child['id']}/characters/{point_id}/speech-practice/evaluate",
+        json={
+            "transcript": "冬",
+            "alternatives": [{"transcript": "东", "confidence": 0.91}],
+            "confidence": 0.91,
+            "confidence_available": True,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "decision": "match",
+        "normalized_readings": ["dong1"],
+        "syllable_match": True,
+        "tone_match": True,
+        "tone_evaluation": "matched",
+        "explicit_unknown": False,
+        "assessment_item_created": False,
+        "mastery_modified": False,
+    }
+
+    rejected_audio = await client.post(
+        f"/api/v1/children/{child['id']}/characters/{point_id}/speech-practice/evaluate",
+        json={"transcript": "东", "raw_audio": "must-not-be-accepted"},
+    )
+    assert rejected_audio.status_code == 422
+
+    async with session_factory() as session:
+        assert await session.scalar(select(func.count()).select_from(AssessmentItem)) == 0
+        assert await session.scalar(select(func.count()).select_from(CharacterSpeechAttempt)) == 0
+        assert await session.scalar(select(func.count()).select_from(ChildKnowledgeState)) == 0
 
 
 async def test_learning_and_assessment_create_raw_evidence_and_mastery(

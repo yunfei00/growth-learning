@@ -5,6 +5,7 @@ import {
   initialSpeechReviewMachine,
   reduceSpeechReviewMachine,
 } from "../src/lib/review-speech-machine.ts";
+import { speechPracticeFeedback } from "../src/lib/speech-practice.ts";
 
 test("speech review retries silence twice then records uncertain", () => {
   let state = reduceSpeechReviewMachine(initialSpeechReviewMachine, { type: "START" });
@@ -37,4 +38,19 @@ test("explicit unknown is a negative outcome while ordinary ASR mismatch is retr
     decision: "no_match",
   });
   assert.equal(mismatch.state, "retry_prompt");
+});
+
+test("speech review exposes a distinct recognition state", () => {
+  const listening = reduceSpeechReviewMachine(initialSpeechReviewMachine, { type: "LISTEN" });
+  const recognizing = reduceSpeechReviewMachine(listening, { type: "RECOGNIZE" });
+  assert.equal(recognizing.state, "recognizing");
+});
+
+test("free speech practice gives feedback without defining an assessment outcome", () => {
+  assert.deepEqual(speechPracticeFeedback("match"), {
+    kind: "correct",
+    message: "读对啦！",
+  });
+  assert.equal(speechPracticeFeedback("no_match").kind, "uncertain");
+  assert.equal(speechPracticeFeedback("no_speech").kind, "uncertain");
 });

@@ -394,6 +394,28 @@ class SpeechAttemptResponse(BaseModel):
     created_at: datetime
 
 
+class SpeechPracticeEvaluate(BaseModel):
+    """Privacy-minimal transcript payload for non-assessment oral practice."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    transcript: str | None = Field(default=None, max_length=120)
+    alternatives: list[SpeechAlternative] = Field(default_factory=list, max_length=5)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    confidence_available: bool = False
+
+
+class SpeechPracticeResponse(BaseModel):
+    decision: SpeechReviewDecisionValue
+    normalized_readings: list[str]
+    syllable_match: bool | None
+    tone_match: bool | None
+    tone_evaluation: Literal["matched", "mismatched", "unavailable"]
+    explicit_unknown: bool
+    assessment_item_created: Literal[False] = False
+    mastery_modified: Literal[False] = False
+
+
 class AssessmentOverrideCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

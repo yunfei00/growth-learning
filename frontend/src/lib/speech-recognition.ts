@@ -13,6 +13,7 @@ export type SpeechRecognitionResult = {
 
 export type SpeechRecognitionErrorCode =
   | "not_supported"
+  | "insecure_context"
   | "not_allowed"
   | "no_speech"
   | "network"
@@ -21,6 +22,7 @@ export type SpeechRecognitionErrorCode =
 
 export type SpeechRecognitionProvider = {
   supported: boolean;
+  unavailableReason: "not_supported" | "insecure_context" | null;
   start: (options?: { lang?: string; timeoutMs?: number }) => Promise<SpeechRecognitionResult>;
   stop: () => void;
   abort: () => void;
@@ -55,7 +57,10 @@ function errorCode(value: string | undefined): SpeechRecognitionErrorCode {
 export function isSpeechRecognitionSupported(): boolean {
   if (typeof window === "undefined") return false;
   const browserWindow = window as BrowserWindow;
-  return Boolean(browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition);
+  return Boolean(
+    window.isSecureContext
+      && (browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition),
+  );
 }
 
 export function createBrowserSpeechRecognitionProvider(): SpeechRecognitionProvider {
@@ -63,6 +68,15 @@ export function createBrowserSpeechRecognitionProvider(): SpeechRecognitionProvi
   let timer: number | null = null;
   let rejectCurrent: ((reason: unknown) => void) | null = null;
   const supported = isSpeechRecognitionSupported();
+  const browserWindow = typeof window === "undefined" ? null : window as BrowserWindow;
+  const hasRecognitionApi = Boolean(
+    browserWindow?.SpeechRecognition ?? browserWindow?.webkitSpeechRecognition,
+  );
+  const unavailableReason = supported
+    ? null
+    : hasRecognitionApi && typeof window !== "undefined" && !window.isSecureContext
+      ? "insecure_context" as const
+      : "not_supported" as const;
 
   const clear = () => {
     if (timer !== null) window.clearTimeout(timer);
@@ -82,9 +96,10 @@ export function createBrowserSpeechRecognitionProvider(): SpeechRecognitionProvi
 
   return {
     supported,
+    unavailableReason,
     start: ({ lang = "zh-CN", timeoutMs = 5000 } = {}) => {
       if (!supported || typeof window === "undefined") {
-        return Promise.reject({ code: "not_supported" as const });
+        return Promise.reject({ code: unavailableReason });
       }
       abort();
       const browserWindow = window as BrowserWindow;

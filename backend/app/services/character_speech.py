@@ -34,6 +34,8 @@ from app.schemas.learning import (
     AssessmentOverrideResponse,
     SpeechAttemptCreate,
     SpeechAttemptResponse,
+    SpeechPracticeEvaluate,
+    SpeechPracticeResponse,
 )
 
 _UNKNOWN_PHRASES = {
@@ -215,6 +217,42 @@ def speech_attempt_response(attempt: CharacterSpeechAttempt) -> SpeechAttemptRes
         hint_used=attempt.hint_used,
         duration_ms=attempt.duration_ms,
         created_at=attempt.created_at,
+    )
+
+
+async def evaluate_free_speech_practice(
+    session: AsyncSession,
+    knowledge_point_id: uuid.UUID,
+    payload: SpeechPracticeEvaluate,
+) -> SpeechPracticeResponse:
+    """Evaluate one oral-practice transcript without creating learning evidence.
+
+    This intentionally performs no writes. Free practice is not an assessment,
+    so it cannot create an AssessmentItem or change mastery/review state.
+    """
+
+    character = await session.scalar(
+        select(ChineseCharacter).where(
+            ChineseCharacter.knowledge_point_id == knowledge_point_id,
+            ChineseCharacter.is_enabled.is_(True),
+        )
+    )
+    if character is None:
+        raise LookupError("Character not found")
+    evaluation = evaluate_character_speech(
+        character,
+        payload.transcript,
+        [item.transcript for item in payload.alternatives],
+        confidence=payload.confidence,
+        confidence_available=payload.confidence_available,
+    )
+    return SpeechPracticeResponse(
+        decision=evaluation.decision,
+        normalized_readings=list(evaluation.normalized_readings),
+        syllable_match=evaluation.syllable_match,
+        tone_match=evaluation.tone_match,
+        tone_evaluation=evaluation.tone_evaluation,
+        explicit_unknown=evaluation.explicit_unknown,
     )
 
 

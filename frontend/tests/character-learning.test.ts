@@ -6,6 +6,10 @@ import {
   parseCharacterLearningContext,
   resolveCharacterReturnAction,
 } from "../src/lib/character-navigation.ts";
+import {
+  getCompletedReviewDetailAction,
+  getDailyReviewEntry,
+} from "../src/lib/character-review-entry.ts";
 import { activateChineseSpeech, speakChinese } from "../src/lib/speech.ts";
 
 test("character entries preserve return targets for every supported source", () => {
@@ -66,4 +70,19 @@ test("speech activation never navigates and speaks exactly once", () => {
 
 test("unsupported speech synthesis is a no-op", () => {
   assert.equal(speakChinese("东", null, null), false);
+});
+
+test("speech daily review has an explicit entry and completed history never restarts it", () => {
+  const speech = getDailyReviewEntry(
+    { review_count: 10, review_completed_count: 4 },
+    { character_review_mode: "speech_auto", speech_review_feature_enabled: true },
+  );
+  assert.equal(speech.title, "🎙️ 儿童朗读复习");
+  assert.equal(speech.buttonLabel, "开始朗读复习");
+  assert.equal(getCompletedReviewDetailAction({ review_count: 10, review_completed_count: 4 }).href,
+    "/learn/characters?view=session");
+  assert.deepEqual(
+    getCompletedReviewDetailAction({ review_count: 10, review_completed_count: 10 }),
+    { href: null, label: "今日复习已完成" },
+  );
 });

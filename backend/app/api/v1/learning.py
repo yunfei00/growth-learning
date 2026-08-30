@@ -35,11 +35,14 @@ from app.schemas.learning import (
     ReviewBacklogResponse,
     SpeechAttemptCreate,
     SpeechAttemptResponse,
+    SpeechPracticeEvaluate,
+    SpeechPracticeResponse,
 )
 from app.services.ai_learning_assistant import LearningAssistantError, generate_character_assistance
 from app.services.authorization import get_authorized_child
 from app.services.character_catalog import get_character
 from app.services.character_speech import (
+    evaluate_free_speech_practice,
     mark_review_hint,
     override_assessment_item,
     persist_speech_attempt,
@@ -447,6 +450,29 @@ async def get_character_state(
     if detail is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
     return detail
+
+
+@router.post(
+    "/{child_id}/characters/{knowledge_point_id}/speech-practice/evaluate",
+    response_model=SpeechPracticeResponse,
+)
+async def evaluate_character_speech_practice(
+    child_id: uuid.UUID,
+    knowledge_point_id: uuid.UUID,
+    payload: SpeechPracticeEvaluate,
+    request: Request,
+    current_user: CurrentUser,
+    session: DbSession,
+) -> SpeechPracticeResponse:
+    await get_authorized_child(session, current_user, child_id)
+    if not request.app.state.settings.character_speech_review_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Speech practice disabled"
+        )
+    try:
+        return await evaluate_free_speech_practice(session, knowledge_point_id, payload)
+    except LookupError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
 
 
 @router.post(

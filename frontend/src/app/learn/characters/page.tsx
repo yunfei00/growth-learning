@@ -36,6 +36,7 @@ import {
   submitPlannedAssessment,
   updateLearningSettings,
 } from "@/lib/api/client";
+import { getDailyReviewEntry } from "@/lib/character-review-entry";
 
 type View = "today" | "overview" | "new" | "quick" | "session" | "records" | "assessments" | "settings";
 type HistoryPeriod = "all" | "today" | "week" | "month";
@@ -235,6 +236,17 @@ function CharacterLearningContent() {
     setRecommendations([]);
     setLearningHistory(null);
     resetFeedback();
+  };
+
+  const openSpeechSettings = () => {
+    showView("settings", { focus: "speech-review" });
+    window.setTimeout(() => {
+      document.getElementById("speech-review-setting")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      document.getElementById("character-review-mode")?.focus();
+    }, 50);
   };
 
   const startNewLearning = async () => {
@@ -450,9 +462,18 @@ function CharacterLearningContent() {
       if (task === "new" || requestedView === "new") {
         initialTaskHandled.current = true;
         void startNewLearning();
-      } else if (task === "review") {
+      } else if (task === "review" || requestedView === "session") {
         initialTaskHandled.current = true;
-        void beginPlannedSession("daily_review");
+        if (plan.review_count > plan.review_completed_count) {
+          void beginPlannedSession("daily_review");
+        } else {
+          showView("today");
+          setMessage(
+            plan.review_count > 0
+              ? "今日复习已完成；查看记录不会重新创建测评。"
+              : "今天没有待复习的汉字。",
+          );
+        }
       } else if (requestedView === "records") {
         initialTaskHandled.current = true;
         const periodValue = query.get("period");
@@ -485,15 +506,20 @@ function CharacterLearningContent() {
     setIsLoading(true);
     resetFeedback();
     try {
-      setSettings(await updateLearningSettings(childId, {
+      const nextSettings = await updateLearningSettings(childId, {
         max_new_characters_per_day: settings.max_new_characters_per_day,
         daily_review_capacity: settings.daily_review_capacity,
         weekly_assessment_enabled: settings.weekly_assessment_enabled,
         monthly_assessment_enabled: settings.monthly_assessment_enabled,
         timezone: settings.timezone,
         character_review_mode: settings.character_review_mode,
-      }));
-      setMessage("学习设置已保存；已有今日计划保持不变，明天按新设置生成。 ");
+      });
+      setSettings(nextSettings);
+      setMessage(
+        nextSettings.character_review_mode === "speech_auto"
+          ? "已开启儿童朗读复习。下一次每日复习将使用麦克风。"
+          : "已切换为家长陪伴复习。",
+      );
     } catch (requestError) {
       setError(messageFrom(requestError, "学习设置保存失败"));
     } finally {
@@ -535,6 +561,7 @@ function CharacterLearningContent() {
   const reviewTaskCompleted = Boolean(
     plan && plan.review_count > 0 && plan.review_completed_count >= plan.review_count,
   );
+  const reviewEntry = plan ? getDailyReviewEntry(plan, settings) : null;
 
   return (
     <section className="character-learning-page section-shell">
@@ -561,7 +588,16 @@ function CharacterLearningContent() {
             <>
               <div className="today-task-grid">
                 <article className={newTaskCompleted ? "task-completed" : ""}><span>新字</span><strong>{plan.recommended_new_count}</strong><small>{newTaskCompleted ? "已完成 ✓" : `已完成 ${plan.new_completed_count}`}</small><button onClick={() => void startNewLearning()} disabled={plan.recommended_new_count === 0} type="button">{newTaskCompleted ? "再次打开" : "学习今日新字"}</button></article>
-                <article className={reviewTaskCompleted ? "task-completed" : ""}><span>复习</span><strong>{plan.review_count}</strong><small>{reviewTaskCompleted ? "已完成 ✓" : `待复习总数 ${plan.due_count}`}</small><button onClick={() => void beginPlannedSession("daily_review")} disabled={plan.review_count === 0} type="button">{reviewTaskCompleted ? "查看已完成复习" : "开始 / 继续复习"}</button></article>
+                <article className={`${reviewTaskCompleted ? "task-completed" : ""} ${reviewEntry?.speechEnabled ? "speech-review-entry" : ""}`}>
+                  <span>{reviewEntry?.title ?? "每日复习"}</span>
+                  <strong>{plan.review_count}</strong>
+                  <small>{reviewTaskCompleted ? "已完成 ✓" : `待复习总数 ${plan.due_count}`}</small>
+                  {!reviewEntry?.speechEnabled ? <p className="daily-review-mode">当前：家长陪伴复习</p> : <p className="daily-review-mode">进入后开启麦克风，直接读出大字</p>}
+                  <button onClick={() => void beginPlannedSession("daily_review")} disabled={!reviewEntry?.hasTask} type="button">{reviewEntry?.buttonLabel ?? "开始 / 继续复习"}</button>
+                  {!reviewEntry?.speechEnabled && settings?.speech_review_feature_enabled && family.current_role === "admin" ? (
+                    <button className="review-mode-link" onClick={openSpeechSettings} type="button">开启儿童朗读复习</button>
+                  ) : null}
+                </article>
                 <article><span>阅读</span><strong>1 篇</strong><small>{plan.reading.title ?? (plan.reading.status === "needs_story" ? "需要生成今天的故事" : "故事已准备")}</small><Link className="task-link-button" href={plan.reading.story_version_id ? `/read/${plan.reading.story_version_id}` : "/read"}>{plan.reading.status === "completed" ? "查看已完成故事" : plan.reading.status === "in_progress" ? "继续阅读" : plan.reading.status === "pending" ? "开始阅读" : "生成今天的故事"}</Link></article>
               </div>
               <div className="plan-explanation"><strong>安排说明</strong><p>{plan.recommendation_reason}</p>{plan.due_count > plan.review_count ? <p>剩余项目不会丢失，按当前容量预计约 {plan.estimated_backlog_days} 天逐步完成。</p> : null}</div>
@@ -596,7 +632,7 @@ function CharacterLearningContent() {
       {view === "session" && session ? (
         <section className="learning-workspace assessment-workspace" id={`assessment-session-${session.id}`}>
           <header><div><p className="eyebrow">{SOURCE_LABELS[session.source]}</p><h2>{session.status === "completed" ? "完成啦 🎉" : `${session.completed_items + 1} / ${session.total_items}`}</h2></div><span>{session.sampling_method} · {session.sampling_version}</span></header>
-          {session.status === "completed" ? <div className="session-result"><h3>{SOURCE_LABELS[session.source]}完成</h3><div className="result-count-grid">{(Object.keys(OUTCOME_LABELS) as AssessmentOutcome[]).map((outcome) => <article key={outcome}><span>{OUTCOME_LABELS[outcome]}</span><strong>{resultCounts?.[outcome] ?? 0}</strong></article>)}</div><div className="completed-review-characters">{session.targets.map((target) => <CharacterLink context={{ source: "review", returnTo: `/learn/characters?view=assessments#assessment-session-${session.id}`, sequence: "assessment_session", contextId: session.id }} knowledgePointId={target.knowledge_point_id} key={target.knowledge_point_id} speakText={target.character}><strong>{target.character}</strong><span>{target.pinyin}</span><small>再次查看、朗读或练习</small></CharacterLink>)}</div><p>没有分数或排名；再次打开汉字不会重复提交结果或修改掌握度。</p><button className="button button-primary" onClick={() => showView("today")} type="button">回到今日任务</button></div> : currentPlannedTarget ? (settings?.character_review_mode === "speech_auto" && settings.speech_review_feature_enabled && !speechFallback ? <CharacterSpeechReview childId={childId} disabled={isLoading} onFallback={() => setSpeechFallback(true)} onOutcome={(outcome, attemptIds) => recordPlannedOutcome(outcome, attemptIds)} onSessionUpdate={setSession} session={session} target={currentPlannedTarget} /> : <div className="recognition-card"><strong className="recognition-glyph">{currentPlannedTarget.character}</strong>{answerVisible ? <div className="recognition-answer"><p>{currentPlannedTarget.pinyin}</p><small>看到提示后，请选择“提示后认识”</small></div> : <p className="answer-hidden">拼音和答案默认隐藏</p>}<div className="outcome-grid"><button onClick={() => void recordPlannedOutcome("correct")} disabled={isLoading} type="button">认识</button><button onClick={() => { setAnswerVisible(true); }} className="hint-button" disabled={isLoading} type="button">查看提示</button><button onClick={() => void recordPlannedOutcome("hinted_correct")} disabled={!answerVisible || isLoading} type="button">提示后认识</button><button onClick={() => void recordPlannedOutcome("uncertain")} disabled={isLoading} type="button">不确定</button><button onClick={() => void recordPlannedOutcome("incorrect")} disabled={isLoading} type="button">不认识</button></div></div>) : null}
+          {session.status === "completed" ? <div className="session-result"><h3>{SOURCE_LABELS[session.source]}完成</h3><div className="result-count-grid">{(Object.keys(OUTCOME_LABELS) as AssessmentOutcome[]).map((outcome) => <article key={outcome}><span>{OUTCOME_LABELS[outcome]}</span><strong>{resultCounts?.[outcome] ?? 0}</strong></article>)}</div><div className="completed-review-characters">{session.targets.map((target) => <CharacterLink context={{ source: "review", returnTo: `/learn/characters?view=assessments&assessmentId=${session.id}#assessment-session-${session.id}`, sequence: "assessment_session", contextId: session.id }} knowledgePointId={target.knowledge_point_id} key={target.knowledge_point_id} speakText={target.character}><strong>{target.character}</strong><span>{target.pinyin}</span><small>查看这个字</small></CharacterLink>)}</div><p>没有分数或排名；再次打开汉字不会重复提交结果或修改掌握度。</p><button className="button button-primary" onClick={() => showView("today")} type="button">回到今日任务</button></div> : currentPlannedTarget ? (settings?.character_review_mode === "speech_auto" && settings.speech_review_feature_enabled && !speechFallback ? <CharacterSpeechReview childId={childId} disabled={isLoading} onFallback={() => setSpeechFallback(true)} onOutcome={(outcome, attemptIds) => recordPlannedOutcome(outcome, attemptIds)} onSessionUpdate={setSession} session={session} target={currentPlannedTarget} /> : <div className="recognition-card"><strong className="recognition-glyph">{currentPlannedTarget.character}</strong>{answerVisible ? <div className="recognition-answer"><p>{currentPlannedTarget.pinyin}</p><small>看到提示后，请选择“提示后认识”</small></div> : <p className="answer-hidden">拼音和答案默认隐藏</p>}<div className="outcome-grid"><button onClick={() => void recordPlannedOutcome("correct")} disabled={isLoading} type="button">认识</button><button onClick={() => { setAnswerVisible(true); }} className="hint-button" disabled={isLoading} type="button">查看提示</button><button onClick={() => void recordPlannedOutcome("hinted_correct")} disabled={!answerVisible || isLoading} type="button">提示后认识</button><button onClick={() => void recordPlannedOutcome("uncertain")} disabled={isLoading} type="button">不确定</button><button onClick={() => void recordPlannedOutcome("incorrect")} disabled={isLoading} type="button">不认识</button></div></div>) : null}
         </section>
       ) : null}
 
@@ -698,11 +734,11 @@ function CharacterLearningContent() {
       ) : null}
 
       {view === "assessments" ? (
-        <section className="learning-workspace"><header><div><p className="eyebrow">真实测评证据</p><h2>测试历史</h2></div><span>每日复习 · 周度小挑战 · 月度识字检测</span></header>{isLoading ? <div className="center-state compact"><span className="loading-spinner" /></div> : history.length ? <div className="assessment-history-list">{history.map((item) => <button key={item.id} onClick={() => void openSessionDetail(item.id)} type="button"><div><strong>{SOURCE_LABELS[item.source]}</strong><span>{formatTime(item.started_at)}</span></div><div><span>{item.item_count} 项</span><span>认识 {item.correct}</span><span>提示 {item.hinted_correct}</span><span>不确定 {item.uncertain}</span><span>不认识 {item.incorrect}</span></div></button>)}</div> : <div className="empty-learning-state"><h3>还没有测试记录</h3><p>完成每日复习、周度或月度检测后会显示在这里。</p></div>}{session ? <div className="history-session-detail"><h3>{SOURCE_LABELS[session.source]} · {formatTime(session.started_at)}</h3><div className="target-chip-list">{session.targets.map((target) => <span key={target.knowledge_point_id}><strong>{target.character}</strong>{target.outcome ? OUTCOME_LABELS[target.outcome] : "未完成"}<small>{target.sampling_class}</small></span>)}</div></div> : null}</section>
+        <section className="learning-workspace"><header><div><p className="eyebrow">真实测评证据</p><h2>测试历史</h2></div><span>每日复习 · 周度小挑战 · 月度识字检测</span></header>{isLoading ? <div className="center-state compact"><span className="loading-spinner" /></div> : history.length ? <div className="assessment-history-list">{history.map((item) => <button key={item.id} onClick={() => void openSessionDetail(item.id)} type="button"><div><strong>{SOURCE_LABELS[item.source]}</strong><span>{formatTime(item.started_at)}</span></div><div><span>{item.item_count} 项</span><span>认识 {item.correct}</span><span>提示 {item.hinted_correct}</span><span>不确定 {item.uncertain}</span><span>不认识 {item.incorrect}</span></div></button>)}</div> : <div className="empty-learning-state"><h3>还没有测试记录</h3><p>完成每日复习、周度或月度检测后会显示在这里。</p></div>}{session ? <div className="history-session-detail" id={`assessment-session-${session.id}`}><h3>{SOURCE_LABELS[session.source]} · {formatTime(session.started_at)}</h3><div className="target-chip-list">{session.targets.map((target) => target.outcome ? <CharacterLink context={{ source: "review", returnTo: `/learn/characters?view=assessments&assessmentId=${session.id}#assessment-session-${session.id}`, sequence: "assessment_session", contextId: session.id }} key={target.knowledge_point_id} knowledgePointId={target.knowledge_point_id} speakText={target.character}><strong>{target.character}</strong><span>{OUTCOME_LABELS[target.outcome]}</span><small>查看这个字</small></CharacterLink> : <span key={target.knowledge_point_id}><strong>{target.character}</strong>未完成<small>{target.sampling_class}</small></span>)}</div></div> : null}</section>
       ) : null}
 
       {view === "settings" ? (
-        <section className="learning-workspace"><header><div><p className="eyebrow">家长管理</p><h2>学习设置</h2></div><span>只有家庭管理员可以修改</span></header>{settings ? <div className="learning-settings-form"><label>每日最多新字<input type="number" min="0" max="20" value={settings.max_new_characters_per_day} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, max_new_characters_per_day: Number(event.target.value) })} /></label><label>每日复习容量<input type="number" min="1" max="100" value={settings.daily_review_capacity} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, daily_review_capacity: Number(event.target.value) })} /></label><label className="toggle-setting"><input type="checkbox" checked={settings.weekly_assessment_enabled} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, weekly_assessment_enabled: event.target.checked })} />开启周度小挑战</label><label className="toggle-setting"><input type="checkbox" checked={settings.monthly_assessment_enabled} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, monthly_assessment_enabled: event.target.checked })} />开启月度识字检测</label><label>时区<input value={settings.timezone} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, timezone: event.target.value })} /></label><label>每日复习方式<select value={settings.character_review_mode} disabled={family.current_role !== "admin" || !settings.speech_review_feature_enabled} onChange={(event) => setSettings({ ...settings, character_review_mode: event.target.value as LearningSettings["character_review_mode"] })}><option value="parent_manual">普通复习（家长判断）</option><option value="speech_auto">儿童朗读复习（自动听读）</option></select></label>{!settings.speech_review_feature_enabled ? <p className="role-note">自动听读功能正在逐步开放，当前可继续使用普通复习模式。</p> : null}{family.current_role === "admin" ? <button className="button button-primary" onClick={() => void saveSettings()} disabled={isLoading} type="button">保存设置</button> : <p className="role-note">陪伴者可以学习和测评，但不能修改家庭学习设置。</p>}</div> : <div className="center-state compact"><span className="loading-spinner" /></div>}</section>
+        <section className="learning-workspace"><header><div><p className="eyebrow">家长管理</p><h2>学习设置</h2></div><span>只有家庭管理员可以修改</span></header>{settings ? <div className="learning-settings-form"><label>每日最多新字<input type="number" min="0" max="20" value={settings.max_new_characters_per_day} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, max_new_characters_per_day: Number(event.target.value) })} /></label><label>每日复习容量<input type="number" min="1" max="100" value={settings.daily_review_capacity} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, daily_review_capacity: Number(event.target.value) })} /></label><label className="toggle-setting"><input type="checkbox" checked={settings.weekly_assessment_enabled} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, weekly_assessment_enabled: event.target.checked })} />开启周度小挑战</label><label className="toggle-setting"><input type="checkbox" checked={settings.monthly_assessment_enabled} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, monthly_assessment_enabled: event.target.checked })} />开启月度识字检测</label><label>时区<input value={settings.timezone} disabled={family.current_role !== "admin"} onChange={(event) => setSettings({ ...settings, timezone: event.target.value })} /></label><label id="speech-review-setting">每日复习方式<select id="character-review-mode" value={settings.character_review_mode} disabled={family.current_role !== "admin" || !settings.speech_review_feature_enabled} onChange={(event) => setSettings({ ...settings, character_review_mode: event.target.value as LearningSettings["character_review_mode"] })}><option value="parent_manual">普通复习（家长判断）</option><option value="speech_auto">儿童朗读复习（自动听读）</option></select><small>语音自动复习是实验功能，需要浏览器麦克风权限和 HTTPS 安全地址。</small></label>{!settings.speech_review_feature_enabled ? <p className="role-note">自动听读功能正在逐步开放，当前可继续使用普通复习模式。</p> : null}{family.current_role === "admin" ? <button className="button button-primary" onClick={() => void saveSettings()} disabled={isLoading} type="button">保存设置</button> : <p className="role-note">陪伴者可以学习和测评，但不能修改家庭学习设置。</p>}</div> : <div className="center-state compact"><span className="loading-spinner" /></div>}</section>
       ) : null}
     </section>
   );

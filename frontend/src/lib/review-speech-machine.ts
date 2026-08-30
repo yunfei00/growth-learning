@@ -20,6 +20,7 @@ export type SpeechReviewEvent =
   | { type: "START" }
   | { type: "READY" }
   | { type: "LISTEN" }
+  | { type: "RECOGNIZE" }
   | { type: "RESULT"; decision: "match" | "partial_match" | "uncertain" | "no_match" }
   | { type: "NO_SPEECH" }
   | { type: "ERROR" }
@@ -45,6 +46,7 @@ export function reduceSpeechReviewMachine(
     case "START": return { ...machine, state: "requesting_permission" };
     case "READY": return { ...machine, state: "ready" };
     case "LISTEN": return { ...machine, state: "listening" };
+    case "RECOGNIZE": return { ...machine, state: "recognizing" };
     case "RESULT":
       if (event.decision === "match") return { ...machine, state: "feedback_correct" };
       return machine.attemptIndex < 2

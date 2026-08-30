@@ -4331,6 +4331,20 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .inline-speech-button { margin-top: 14px; padding: 6px 0; }
 .parent-learning-tip p:last-child { font-size: clamp(1.05rem, 2vw, 1.35rem); line-height: 1.7; }
 .character-detail-actions { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 9px; }
+.completed-review-detail-notice {
+  margin: 12px 0 18px;
+  padding: 18px 20px;
+  border: 1px solid #d7c27f;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  background: #fff8df;
+}
+.completed-review-detail-notice strong { color: var(--forest-dark); font-size: 1.08rem; }
+.completed-review-detail-notice p { margin: 5px 0 0; color: var(--ink-soft); }
+.completed-review-detail-notice .button { flex: 0 0 auto; }
 .character-practice,
 .ai-boundary-note { margin-top: 18px; padding: 18px 20px; border: 1px solid #e5d39b; border-radius: 15px; background: #fff8df; }
 .character-practice p { font-size: 1.15rem; line-height: 1.7; }
@@ -5375,6 +5389,26 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
   cursor: not-allowed;
 }
 
+.today-task-grid .speech-review-entry {
+  border-color: #2f7156;
+  box-shadow: inset 0 5px #2f7156;
+  background: linear-gradient(145deg, #eff8f2, #fffdf8);
+}
+
+.today-task-grid .daily-review-mode {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.today-task-grid article .review-mode-link {
+  margin-top: 8px;
+  border: 1px solid var(--forest);
+  color: var(--forest-dark);
+  background: transparent;
+}
+
 .period-action-grid {
   margin-top: 18px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5489,11 +5523,26 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
   font-size: 0.75rem;
 }
 
+.target-chip-list > a {
+  min-width: 110px;
+  padding: 11px;
+  border: 1px solid rgba(37, 93, 74, 0.15);
+  border-radius: 10px;
+  display: grid;
+  gap: 3px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.target-chip-list > a:hover { border-color: var(--forest); }
+
 .target-chip-list strong {
   color: var(--forest-dark);
   font-family: "Noto Serif SC", SimSun, serif;
   font-size: 1.7rem;
 }
+
+.target-chip-list > a small { color: var(--forest); font-weight: 800; }
 
 .target-chip-list small {
   color: var(--ink-soft);
@@ -5532,6 +5581,12 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
   background: #fff;
 }
 
+.learning-settings-form label > small {
+  color: var(--ink-soft);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 /* Speech-assisted child review: one calm, high-contrast screen. */
 .speech-review-consent,
 .speech-review-fallback,
@@ -5556,13 +5611,62 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .speech-review-glyph { font-family: "Noto Serif SC", SimSun, serif; font-size: clamp(10rem, 30vw, 17rem); line-height: .95; }
 .speech-review-actions { width: min(100%, 560px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .speech-review-actions button { min-height: 52px; border: 1px solid rgba(255,255,255,.35); border-radius: 14px; color: #173d31; background: #fff; font: inherit; font-weight: 850; cursor: pointer; }
+.speech-review-actions button span { display: block; font-size: 1.45rem; }
+.speech-review-actions button small { display: block; margin-top: 2px; font-size: .72rem; }
 .speech-review-actions .speech-hint-button { color: #fff; background: rgba(255,255,255,.12); }
 .speech-review-actions button:disabled { opacity: .5; cursor: wait; }
 .speech-review-retry { margin: 0; color: #ffeab2; font-weight: 800; }
 
+.character-speech-practice {
+  min-height: min(620px, calc(100vh - 130px));
+  margin-top: 18px;
+  padding: clamp(24px, 5vw, 48px);
+  border-radius: 24px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 16px;
+  color: #fff;
+  text-align: center;
+  background: linear-gradient(150deg, #174437, #2f7156);
+}
+
+.speech-practice-topline {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.speech-practice-topline > button {
+  border: 0;
+  color: #d8eee1;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.speech-practice-glyph {
+  font-family: "Noto Serif SC", SimSun, serif;
+  font-size: clamp(10rem, 30vw, 17rem);
+  line-height: .9;
+}
+
+.speech-practice-message {
+  min-height: 30px;
+  margin: 0;
+  font-size: clamp(1.08rem, 3vw, 1.45rem);
+  font-weight: 800;
+}
+
+.speech-practice-message.feedback { color: #fff0a8; }
+.character-speech-practice > small { color: #cfe4d7; line-height: 1.55; }
+
 @media (max-width: 600px) {
   .speech-review-actions { grid-template-columns: 1fr; }
   .speech-review-glyph { font-size: clamp(9rem, 42vw, 13rem); }
+  .completed-review-detail-notice { align-items: stretch; flex-direction: column; }
+  .speech-practice-glyph { font-size: clamp(9rem, 42vw, 13rem); }
 }
 
 .learning-settings-form .toggle-setting {

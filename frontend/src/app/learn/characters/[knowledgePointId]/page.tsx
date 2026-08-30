@@ -5,16 +5,22 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
+import { CharacterSpeechPractice } from "@/components/character-speech-practice";
 import { ProtectedPage } from "@/components/protected-page";
 import {
   ApiClientError,
   type CharacterAIAssistance,
   type CharacterMasteryDetail,
   type CharacterNavigation,
+  type DailyPlan,
+  type LearningSettings,
   generateCharacterAIAssistance,
   getCharacterMasteryDetail,
   getCharacterNavigation,
+  getLearningSettings,
+  getTodayPlan,
 } from "@/lib/api/client";
+import { getCompletedReviewDetailAction } from "@/lib/character-review-entry";
 import {
   buildCharacterLearningHref,
   characterReturnLabel,
@@ -38,8 +44,11 @@ function CharacterDetailContent() {
   const { activeChild } = useActiveChild();
   const [detail, setDetail] = useState<CharacterMasteryDetail | null>(null);
   const [navigation, setNavigation] = useState<CharacterNavigation | null>(null);
+  const [todayPlan, setTodayPlan] = useState<DailyPlan | null>(null);
+  const [settings, setSettings] = useState<LearningSettings | null>(null);
   const [ai, setAI] = useState<CharacterAIAssistance | null>(null);
   const [practiceOpen, setPracticeOpen] = useState(false);
+  const [speechPracticeOpen, setSpeechPracticeOpen] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const serializedQuery = searchParams.toString();
@@ -52,14 +61,20 @@ function CharacterDetailContent() {
     if (!activeChild) return;
     setDetail(null);
     setNavigation(null);
+    setTodayPlan(null);
+    setSettings(null);
     setAI(null);
     setPracticeOpen(false);
+    setSpeechPracticeOpen(false);
     try {
-      const detailValue = await getCharacterMasteryDetail(
-        activeChild.id,
-        params.knowledgePointId,
-      );
+      const [detailValue, todayPlanValue, settingsValue] = await Promise.all([
+        getCharacterMasteryDetail(activeChild.id, params.knowledgePointId),
+        getTodayPlan(activeChild.id).catch(() => null),
+        getLearningSettings(activeChild.id).catch(() => null),
+      ]);
       setDetail(detailValue);
+      setTodayPlan(todayPlanValue);
+      setSettings(settingsValue);
       setError("");
       try {
         setNavigation(
@@ -119,6 +134,8 @@ function CharacterDetailContent() {
       ? `第 ${navigation.group} 组 · ${navigation.position} / ${navigation.total}`
       : `${navigation.position} / ${navigation.total}`
     : "单字学习";
+  const isCompletedReviewRecord = context.source === "review";
+  const reviewAction = getCompletedReviewDetailAction(todayPlan);
 
   return (
     <main className="character-detail-page section-shell">
@@ -129,6 +146,23 @@ function CharacterDetailContent() {
         <span>{sequenceLabel}</span>
       </div>
       {error ? <p className="form-message form-error">{error}</p> : null}
+      {isCompletedReviewRecord ? (
+        <aside className="completed-review-detail-notice">
+          <div>
+            <strong>这是已经完成的复习记录</strong>
+            <p>再次查看这个字不会修改今天的复习结果。</p>
+          </div>
+          {reviewAction.href ? (
+            <Link className="button button-primary" href={reviewAction.href}>
+              {reviewAction.label}
+            </Link>
+          ) : (
+            <button className="button button-secondary" disabled type="button">
+              {reviewAction.label}
+            </button>
+          )}
+        </aside>
+      ) : null}
       <section className="character-learning-stage">
         <aside className="character-focus-panel">
           <p className="character-focus-pinyin">{character.pinyin}</p>
@@ -235,6 +269,14 @@ function CharacterDetailContent() {
         </button>
         <button
           className="button button-secondary"
+          disabled={!settings?.speech_review_feature_enabled}
+          onClick={() => setSpeechPracticeOpen((value) => !value)}
+          type="button"
+        >
+          {settings?.speech_review_feature_enabled ? "🎙️ 口头练一练" : "🎙️ 口头练习暂未开放"}
+        </button>
+        <button
+          className="button button-secondary"
           disabled={working}
           onClick={() => void askAI()}
           type="button"
@@ -250,6 +292,14 @@ function CharacterDetailContent() {
           </p>
           <small>这次自由练习不会重复计算今日完成数，也不会创建测评或修改掌握度。</small>
         </aside>
+      ) : null}
+      {speechPracticeOpen && activeChild ? (
+        <CharacterSpeechPractice
+          character={character.character}
+          childId={activeChild.id}
+          knowledgePointId={params.knowledgePointId}
+          onClose={() => setSpeechPracticeOpen(false)}
+        />
       ) : null}
       {ai ? (
         <p className="ai-boundary-note">

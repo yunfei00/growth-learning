@@ -58,6 +58,9 @@ export function CharacterSpeechReview({
   const [attempts, setAttempts] = useState<SpeechAttempt[]>([]);
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
+  const [unavailableReason, setUnavailableReason] = useState<
+    SpeechRecognitionProvider["unavailableReason"]
+  >(null);
 
   const dispatch = useCallback((event: Parameters<typeof reduceSpeechReviewMachine>[1]) => {
     setMachine((value) => reduceSpeechReviewMachine(value, event));
@@ -113,6 +116,7 @@ export function CharacterSpeechReview({
     const provider = providerRef.current ?? createBrowserSpeechRecognitionProvider();
     providerRef.current = provider;
     if (!provider.supported) {
+      setUnavailableReason(provider.unavailableReason);
       dispatch({ type: "UNSUPPORTED" });
       return;
     }
@@ -121,6 +125,7 @@ export function CharacterSpeechReview({
     const startedAt = performance.now();
     try {
       const result = await provider.start({ timeoutMs: 5000 });
+      dispatch({ type: "RECOGNIZE" });
       const saved = await saveAttempt({
         knowledge_point_id: target.knowledge_point_id,
         attempt_index: machine.attemptIndex + 1,
@@ -227,21 +232,27 @@ export function CharacterSpeechReview({
   };
 
   if (machine.state === "unsupported") {
-    return <div className="speech-review-fallback"><h3>这个设备暂时不能自动听读音</h3><p>可以继续使用普通复习模式，掌握度不会被设备能力影响。</p><button className="button button-secondary" onClick={onFallback} type="button">使用普通复习模式</button></div>;
+    const insecure = unavailableReason === "insecure_context";
+    return <div className="speech-review-fallback"><h3>{insecure ? "当前地址需要 HTTPS 才能使用麦克风" : "这个设备暂时不能自动听读音"}</h3><p>{insecure ? "当前页面使用 HTTP，浏览器不会稳定开放语音权限。请部署 HTTPS 后重试。" : "可以继续使用普通复习模式，掌握度不会被设备能力影响。"}</p><button className="button button-secondary" onClick={onFallback} type="button">使用普通复习模式</button></div>;
   }
   if (!started) {
     return <div className="speech-review-consent"><span aria-hidden="true">🎙️</span><h3>今天我来听你读字 😊</h3><p>点击后只会把短暂的识别文字用于本次复习，不保存录音。</p><button className="button button-primary" disabled={disabled} onClick={start} type="button">开启麦克风</button></div>;
   }
   const listening = machine.state === "listening" || machine.state === "recognizing";
+  const statusText = machine.state === "listening"
+    ? "🎙️ 正在听…"
+    : machine.state === "recognizing"
+      ? "正在听你读…"
+      : feedback || "请读出这个字";
   return (
     <div className="speech-review-card">
-      <div className="speech-review-status" aria-live="polite">{listening ? "正在听…" : feedback || "请读出这个字"}</div>
+      <div className="speech-review-status" aria-live="polite">{statusText}</div>
       <strong className="speech-review-glyph">{target.character}</strong>
       <p className="speech-review-privacy">拼音和答案先隐藏，读完后会给你温柔提示。</p>
       <div className="speech-review-actions">
-        <button aria-label="播放提示" className="speech-hint-button" disabled={busy || listening} onClick={() => void requestHint()} type="button">🔊 提示</button>
+        <button aria-label="播放提示" className="speech-hint-button" disabled={busy || listening} onClick={() => void requestHint()} type="button"><span aria-hidden="true">🔊</span><small>提示</small></button>
         <button className="speech-retry-button" disabled={busy || listening} onClick={retry} type="button">再读一次</button>
-        <button className="speech-unknown-button" disabled={busy || listening} onClick={() => void explicitUnknown()} type="button">我不知道</button>
+        <button aria-label="不知道" className="speech-unknown-button" disabled={busy || listening} onClick={() => void explicitUnknown()} type="button"><span aria-hidden="true">🤷</span><small>不知道</small></button>
       </div>
       {machine.state === "retry_prompt" ? <p className="speech-review-retry">再试一次吧（最多两次重试）</p> : null}
     </div>

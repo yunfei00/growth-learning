@@ -1000,6 +1000,17 @@ export type SpeechAttempt = {
   created_at: string;
 };
 
+export type SpeechPracticeEvaluation = {
+  decision: SpeechReviewDecision;
+  normalized_readings: string[];
+  syllable_match: boolean | null;
+  tone_match: boolean | null;
+  tone_evaluation: "matched" | "mismatched" | "unavailable";
+  explicit_unknown: boolean;
+  assessment_item_created: false;
+  mastery_modified: false;
+};
+
 export type AssessmentOverride = {
   id: string;
   original_outcome: AssessmentOutcome;
@@ -2543,6 +2554,22 @@ export function createCharacterSpeechAttempt(
 ): Promise<SpeechAttempt> {
   return request<SpeechAttempt>(
     `/api/v1/children/${childId}/planned-assessments/${sessionId}/speech-attempts`,
+    { method: "POST", body: jsonBody(payload) },
+  );
+}
+
+export function evaluateCharacterSpeechPractice(
+  childId: string,
+  knowledgePointId: string,
+  payload: {
+    transcript?: string | null;
+    alternatives?: SpeechAlternative[];
+    confidence?: number | null;
+    confidence_available?: boolean;
+  },
+): Promise<SpeechPracticeEvaluation> {
+  return request<SpeechPracticeEvaluation>(
+    `/api/v1/children/${childId}/characters/${knowledgePointId}/speech-practice/evaluate`,
     { method: "POST", body: jsonBody(payload) },
   );
 }
