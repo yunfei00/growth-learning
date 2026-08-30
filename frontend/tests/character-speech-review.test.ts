@@ -6,6 +6,7 @@ import {
   reduceSpeechReviewMachine,
 } from "../src/lib/review-speech-machine.ts";
 import { speechPracticeFeedback } from "../src/lib/speech-practice.ts";
+import { resolveSpeechRecognitionAvailability } from "../src/lib/speech-recognition.ts";
 
 test("speech review retries silence twice then records uncertain", () => {
   let state = reduceSpeechReviewMachine(initialSpeechReviewMachine, { type: "START" });
@@ -53,4 +54,19 @@ test("free speech practice gives feedback without defining an assessment outcome
   });
   assert.equal(speechPracticeFeedback("no_match").kind, "uncertain");
   assert.equal(speechPracticeFeedback("no_speech").kind, "uncertain");
+});
+
+test("insecure origins are reported accurately even when Chrome hides the speech API", () => {
+  assert.deepEqual(
+    resolveSpeechRecognitionAvailability({ secureContext: false, hasRecognitionApi: false }),
+    { supported: false, unavailableReason: "insecure_context" },
+  );
+  assert.deepEqual(
+    resolveSpeechRecognitionAvailability({ secureContext: true, hasRecognitionApi: false }),
+    { supported: false, unavailableReason: "not_supported" },
+  );
+  assert.deepEqual(
+    resolveSpeechRecognitionAvailability({ secureContext: true, hasRecognitionApi: true }),
+    { supported: true, unavailableReason: null },
+  );
 });

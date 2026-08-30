@@ -21,7 +21,7 @@ import {
   reduceSpeechReviewMachine,
   type SpeechReviewMachine,
 } from "@/lib/review-speech-machine";
-import { speakChinese } from "@/lib/speech";
+import { speakChineseAndWait } from "@/lib/speech";
 
 const DECISION_LABELS: Record<SpeechReviewDecision, string> = {
   match: "听到了，很棒！",
@@ -58,6 +58,7 @@ export function CharacterSpeechReview({
   const [attempts, setAttempts] = useState<SpeechAttempt[]>([]);
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [unavailableReason, setUnavailableReason] = useState<
     SpeechRecognitionProvider["unavailableReason"]
   >(null);
@@ -94,6 +95,11 @@ export function CharacterSpeechReview({
   }, [childId, session.id]);
 
   const handleRecognitionError = useCallback(async (code: SpeechRecognitionErrorCode) => {
+    if (code === "not_allowed") {
+      setPermissionDenied(true);
+      setFeedback("麦克风权限没有开启");
+      return;
+    }
     const decision: SpeechReviewDecision = code === "no_speech" ? "no_speech" : "recognition_error";
     const result = await saveAttempt({
       knowledge_point_id: target.knowledge_point_id,
@@ -112,7 +118,7 @@ export function CharacterSpeechReview({
     }
   }, [attempts, dispatch, machine.attemptIndex, machine.hintUsed, onOutcome, saveAttempt, target.knowledge_point_id]);
 
-  const listen = useCallback(async () => {
+  const listen = useCallback(async (hintUsedOverride?: boolean) => {
     const provider = providerRef.current ?? createBrowserSpeechRecognitionProvider();
     providerRef.current = provider;
     if (!provider.supported) {
@@ -121,7 +127,9 @@ export function CharacterSpeechReview({
       return;
     }
     dispatch({ type: "LISTEN" });
+    setPermissionDenied(false);
     setFeedback("");
+    const hintUsed = hintUsedOverride ?? machine.hintUsed;
     const startedAt = performance.now();
     try {
       const result = await provider.start({ timeoutMs: 5000 });
@@ -136,7 +144,7 @@ export function CharacterSpeechReview({
         confidence_available: result.confidence_available,
         duration_ms: Math.round(performance.now() - startedAt),
         decision: "uncertain",
-        hint_used: machine.hintUsed,
+        hint_used: hintUsed,
         provider_metadata: { language: result.language },
       });
       const decision = saved.decision;
@@ -144,7 +152,7 @@ export function CharacterSpeechReview({
         dispatch({ type: "RESULT", decision: "match" });
         setFeedback(DECISION_LABELS[decision]);
         await playCorrectFeedback();
-        await onOutcome(machine.hintUsed ? "hinted_correct" : "correct", [...attempts.map((item) => item.id), saved.id]);
+        await onOutcome(hintUsed ? "hinted_correct" : "correct", [...attempts.map((item) => item.id), saved.id]);
       } else if (machine.attemptIndex >= 2) {
         setFeedback("没关系，我们先记作不确定。还可以继续学习。");
         await onOutcome("uncertain", [...attempts.map((item) => item.id), saved.id]);
@@ -177,6 +185,7 @@ export function CharacterSpeechReview({
     const provider = providerRef.current ?? createBrowserSpeechRecognitionProvider();
     providerRef.current = provider;
     if (!provider.supported) {
+      setUnavailableReason(provider.unavailableReason);
       dispatch({ type: "UNSUPPORTED" });
       return;
     }
@@ -195,14 +204,14 @@ export function CharacterSpeechReview({
     dispatch({ type: "HINT" });
     try {
       providerRef.current?.abort();
-      speakChinese(target.character);
-      const updated = await markPlannedAssessmentHint(childId, session.id, target.knowledge_point_id);
+      const [updated] = await Promise.all([
+        markPlannedAssessmentHint(childId, session.id, target.knowledge_point_id),
+        speakChineseAndWait(target.character),
+      ]);
       onSessionUpdate(updated);
       setFeedback("跟着读一遍吧");
-      window.setTimeout(() => {
-        dispatch({ type: "RETRY" });
-        void listen();
-      }, 1300);
+      dispatch({ type: "RETRY" });
+      void listen(true);
     } finally {
       setBusy(false);
     }
@@ -231,9 +240,19 @@ export function CharacterSpeechReview({
     }
   };
 
+  const retryPermission = () => {
+    setPermissionDenied(false);
+    dispatch({ type: "READY" });
+    void listen();
+  };
+
+  if (permissionDenied) {
+    return <div className="speech-review-fallback"><h3>麦克风权限没有开启</h3><p>请在浏览器地址栏旁开启麦克风权限，然后重新尝试；也可以继续由家长陪伴复习。</p><div className="speech-review-fallback-actions"><button className="button button-primary" onClick={retryPermission} type="button">重新尝试</button><button className="button button-secondary" onClick={onFallback} type="button">使用普通复习模式</button></div></div>;
+  }
+
   if (machine.state === "unsupported") {
     const insecure = unavailableReason === "insecure_context";
-    return <div className="speech-review-fallback"><h3>{insecure ? "当前地址需要 HTTPS 才能使用麦克风" : "这个设备暂时不能自动听读音"}</h3><p>{insecure ? "当前页面使用 HTTP，浏览器不会稳定开放语音权限。请部署 HTTPS 后重试。" : "可以继续使用普通复习模式，掌握度不会被设备能力影响。"}</p><button className="button button-secondary" onClick={onFallback} type="button">使用普通复习模式</button></div>;
+    return <div className="speech-review-fallback"><h3>{insecure ? "当前网站连接不安全，暂时不能使用语音复习。" : "这个设备暂时不能自动听读音"}</h3><p>{insecure ? "请使用 HTTPS 安全地址访问。" : "可以继续使用普通复习模式，掌握度不会被设备能力影响。"}</p><button className="button button-secondary" onClick={onFallback} type="button">使用普通复习模式</button></div>;
   }
   if (!started) {
     return <div className="speech-review-consent"><span aria-hidden="true">🎙️</span><h3>今天我来听你读字 😊</h3><p>点击后只会把短暂的识别文字用于本次复习，不保存录音。</p><button className="button button-primary" disabled={disabled} onClick={start} type="button">开启麦克风</button></div>;

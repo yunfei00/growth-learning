@@ -5591,12 +5591,13 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .speech-review-consent,
 .speech-review-fallback,
 .speech-review-card {
-  margin-top: 28px;
-  padding: clamp(24px, 5vw, 52px);
+  min-height: min(520px, calc(100dvh - 230px));
+  margin-top: 16px;
+  padding: clamp(18px, 3vw, 34px);
   border-radius: 26px;
   display: grid;
   justify-items: center;
-  gap: 14px;
+  gap: 10px;
   text-align: center;
   background: linear-gradient(150deg, #174437, #2f7156);
   color: #fff;
@@ -5608,8 +5609,9 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .speech-review-fallback p,
 .speech-review-privacy { max-width: 34rem; margin: 0; color: #cfe4d7; line-height: 1.7; }
 .speech-review-status { min-height: 28px; font-size: clamp(1.1rem, 3vw, 1.5rem); font-weight: 800; }
-.speech-review-glyph { font-family: "Noto Serif SC", SimSun, serif; font-size: clamp(10rem, 30vw, 17rem); line-height: .95; }
+.speech-review-glyph { font-family: "Noto Serif SC", SimSun, serif; font-size: clamp(8rem, 24vh, 15rem); line-height: .9; }
 .speech-review-actions { width: min(100%, 560px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.speech-review-fallback-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .speech-review-actions button { min-height: 52px; border: 1px solid rgba(255,255,255,.35); border-radius: 14px; color: #173d31; background: #fff; font: inherit; font-weight: 850; cursor: pointer; }
 .speech-review-actions button span { display: block; font-size: 1.45rem; }
 .speech-review-actions button small { display: block; margin-top: 2px; font-size: .72rem; }
@@ -5663,8 +5665,7 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .character-speech-practice > small { color: #cfe4d7; line-height: 1.55; }
 
 @media (max-width: 600px) {
-  .speech-review-actions { grid-template-columns: 1fr; }
-  .speech-review-glyph { font-size: clamp(9rem, 42vw, 13rem); }
+  .speech-review-glyph { font-size: clamp(8rem, 36vw, 12rem); }
   .completed-review-detail-notice { align-items: stretch; flex-direction: column; }
   .speech-practice-glyph { font-size: clamp(9rem, 42vw, 13rem); }
 }

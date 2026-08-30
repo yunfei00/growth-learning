@@ -10,7 +10,7 @@ import {
   getCompletedReviewDetailAction,
   getDailyReviewEntry,
 } from "../src/lib/character-review-entry.ts";
-import { activateChineseSpeech, speakChinese } from "../src/lib/speech.ts";
+import { activateChineseSpeech, speakChinese, speakChineseAndWait } from "../src/lib/speech.ts";
 
 test("character entries preserve return targets for every supported source", () => {
   const cases = [
@@ -70,6 +70,23 @@ test("speech activation never navigates and speaks exactly once", () => {
 
 test("unsupported speech synthesis is a no-op", () => {
   assert.equal(speakChinese("东", null, null), false);
+});
+
+test("speech review can wait for its own TTS before restarting recognition", async () => {
+  const utterances: Array<{ lang: string; rate: number }> = [];
+  const spoken = speakChineseAndWait(
+    "月",
+    {
+      cancel: () => undefined,
+      speak: (value) => {
+        utterances.push(value);
+      },
+    },
+    () => ({ lang: "", rate: 1 }),
+  );
+  assert.equal(await spoken, true);
+  assert.equal(utterances[0]?.lang, "zh-CN");
+  assert.equal(utterances[0]?.rate, 0.75);
 });
 
 test("speech daily review has an explicit entry and completed history never restarts it", () => {

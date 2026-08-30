@@ -28,6 +28,22 @@ export type SpeechRecognitionProvider = {
   abort: () => void;
 };
 
+export function resolveSpeechRecognitionAvailability({
+  secureContext,
+  hasRecognitionApi,
+}: {
+  secureContext: boolean;
+  hasRecognitionApi: boolean;
+}): Pick<SpeechRecognitionProvider, "supported" | "unavailableReason"> {
+  if (!secureContext) {
+    return { supported: false, unavailableReason: "insecure_context" };
+  }
+  if (!hasRecognitionApi) {
+    return { supported: false, unavailableReason: "not_supported" };
+  }
+  return { supported: true, unavailableReason: null };
+}
+
 type BrowserRecognition = {
   lang: string;
   continuous: boolean;
@@ -67,16 +83,15 @@ export function createBrowserSpeechRecognitionProvider(): SpeechRecognitionProvi
   let recognition: BrowserRecognition | null = null;
   let timer: number | null = null;
   let rejectCurrent: ((reason: unknown) => void) | null = null;
-  const supported = isSpeechRecognitionSupported();
   const browserWindow = typeof window === "undefined" ? null : window as BrowserWindow;
   const hasRecognitionApi = Boolean(
     browserWindow?.SpeechRecognition ?? browserWindow?.webkitSpeechRecognition,
   );
-  const unavailableReason = supported
-    ? null
-    : hasRecognitionApi && typeof window !== "undefined" && !window.isSecureContext
-      ? "insecure_context" as const
-      : "not_supported" as const;
+  const availability = resolveSpeechRecognitionAvailability({
+    secureContext: typeof window !== "undefined" && window.isSecureContext,
+    hasRecognitionApi,
+  });
+  const { supported, unavailableReason } = availability;
 
   const clear = () => {
     if (timer !== null) window.clearTimeout(timer);
