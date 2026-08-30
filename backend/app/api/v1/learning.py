@@ -13,6 +13,8 @@ from app.models import ChildKnowledgeState
 from app.schemas.learning import (
     AssessmentBatchSubmit,
     AssessmentHistoryEntry,
+    AssessmentOverrideCreate,
+    AssessmentOverrideResponse,
     AssessmentSessionCreate,
     CharacterAIAssistanceResponse,
     CharacterLearningHistoryPage,
@@ -31,10 +33,17 @@ from app.schemas.learning import (
     PlannedAssessmentResponse,
     PriorityUpdate,
     ReviewBacklogResponse,
+    SpeechAttemptCreate,
+    SpeechAttemptResponse,
 )
 from app.services.ai_learning_assistant import LearningAssistantError, generate_character_assistance
 from app.services.authorization import get_authorized_child
 from app.services.character_catalog import get_character
+from app.services.character_speech import (
+    mark_review_hint,
+    override_assessment_item,
+    persist_speech_attempt,
+)
 from app.services.child_character_learning import (
     UnsupportedAssessmentFlowError,
     create_assessment_session,
@@ -73,12 +82,15 @@ LearningAIProvider = Annotated[AIProvider, Depends(get_learning_ai_provider)]
 
 @router.get("/{child_id}/learning-settings", response_model=LearningSettingsResponse)
 async def get_learning_settings(
-    child_id: uuid.UUID, current_user: CurrentUser, session: DbSession
+    child_id: uuid.UUID, current_user: CurrentUser, session: DbSession, request: Request
 ) -> LearningSettingsResponse:
     await get_authorized_child(session, current_user, child_id)
     settings = await ensure_learning_settings(session, child_id)
     await session.commit()
-    return settings_response(settings)
+    return settings_response(
+        settings,
+        speech_review_feature_enabled=request.app.state.settings.character_speech_review_enabled,
+    )
 
 
 @router.patch("/{child_id}/learning-settings", response_model=LearningSettingsResponse)
@@ -87,9 +99,15 @@ async def patch_learning_settings(
     payload: LearningSettingsUpdate,
     current_user: CurrentUser,
     session: DbSession,
+    request: Request,
 ) -> LearningSettingsResponse:
     await get_authorized_child(session, current_user, child_id, admin_required=True)
-    return await update_learning_settings(session, child_id, payload)
+    return await update_learning_settings(
+        session,
+        child_id,
+        payload,
+        speech_review_feature_enabled=request.app.state.settings.character_speech_review_enabled,
+    )
 
 
 @router.get("/{child_id}/today", response_model=DailyPlanResponse)
@@ -336,6 +354,85 @@ async def get_character_sequence_navigation(
             detail="Character is not part of this navigation sequence",
         )
     return result
+
+
+@router.post(
+    "/{child_id}/planned-assessments/{assessment_session_id}/targets/{knowledge_point_id}/hint",
+    response_model=PlannedAssessmentResponse,
+)
+async def request_assessment_hint(
+    child_id: uuid.UUID,
+    assessment_session_id: uuid.UUID,
+    knowledge_point_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: DbSession,
+) -> PlannedAssessmentResponse:
+    await get_authorized_child(session, current_user, child_id)
+    try:
+        await mark_review_hint(session, child_id, assessment_session_id, knowledge_point_id)
+        result = await get_planned_assessment(session, child_id, assessment_session_id)
+        if result is None:
+            raise LookupError("Assessment session not found")
+        return result
+    except LookupError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from error
+
+
+@router.post(
+    "/{child_id}/planned-assessments/{assessment_session_id}/speech-attempts",
+    response_model=SpeechAttemptResponse,
+)
+async def submit_speech_attempt(
+    child_id: uuid.UUID,
+    assessment_session_id: uuid.UUID,
+    payload: SpeechAttemptCreate,
+    current_user: CurrentUser,
+    session: DbSession,
+) -> SpeechAttemptResponse:
+    await get_authorized_child(session, current_user, child_id)
+    try:
+        return await persist_speech_attempt(
+            session, child_id, assessment_session_id, current_user.id, payload
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from error
+
+
+@router.post(
+    "/{child_id}/assessment-items/{assessment_item_id}/override",
+    response_model=AssessmentOverrideResponse,
+)
+async def override_assessment(
+    child_id: uuid.UUID,
+    assessment_item_id: uuid.UUID,
+    payload: AssessmentOverrideCreate,
+    current_user: CurrentUser,
+    session: DbSession,
+) -> AssessmentOverrideResponse:
+    await get_authorized_child(session, current_user, child_id, admin_required=True)
+    try:
+        return await override_assessment_item(
+            session,
+            child_id,
+            assessment_item_id,
+            current_user.id,
+            payload.outcome,
+            payload.reason,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
+        ) from error
 
 
 @router.get("/{child_id}/characters/{knowledge_point_id}", response_model=CharacterMasteryDetail)

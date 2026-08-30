@@ -50,6 +50,11 @@ class AssessmentSource(StrEnum):
     MONTHLY_ASSESSMENT = "monthly_assessment"
 
 
+class CharacterReviewMode(StrEnum):
+    PARENT_MANUAL = "parent_manual"
+    SPEECH_AUTO = "speech_auto"
+
+
 class ChildLearningSettings(TimestampMixin, Base):
     """Family-admin configuration for one child's deterministic workload."""
 
@@ -63,6 +68,10 @@ class ChildLearningSettings(TimestampMixin, Base):
         CheckConstraint(
             "daily_review_capacity >= 1 AND daily_review_capacity <= 100",
             name="ck_child_learning_settings_review_capacity",
+        ),
+        CheckConstraint(
+            "character_review_mode IN ('parent_manual', 'speech_auto')",
+            name="ck_child_learning_settings_character_review_mode",
         ),
     )
 
@@ -81,6 +90,12 @@ class ChildLearningSettings(TimestampMixin, Base):
     )
     monthly_assessment_enabled: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true", nullable=False
+    )
+    character_review_mode: Mapped[str] = mapped_column(
+        String(24),
+        default=CharacterReviewMode.PARENT_MANUAL,
+        server_default=CharacterReviewMode.PARENT_MANUAL,
+        nullable=False,
     )
     timezone: Mapped[str] = mapped_column(
         String(64), default="Asia/Shanghai", server_default="Asia/Shanghai", nullable=False
@@ -298,6 +313,7 @@ class AssessmentSessionTarget(TimestampMixin, Base):
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     sampling_class: Mapped[str] = mapped_column(String(40), nullable=False)
+    hint_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class LiteracyEstimate(TimestampMixin, Base):

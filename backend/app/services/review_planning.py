@@ -14,11 +14,13 @@ from app.models import (
     AssessmentItem,
     AssessmentKind,
     AssessmentOutcome,
+    AssessmentOverride,
     AssessmentSession,
     AssessmentSessionPlan,
     AssessmentSessionTarget,
     AssessmentSource,
     CatalogRelease,
+    CharacterSpeechAttempt,
     ChildCourseEnrollment,
     ChildKnowledgeState,
     ChildLearningSettings,
@@ -44,6 +46,7 @@ from app.models import (
 from app.schemas.learning import (
     AssessmentBatchSubmit,
     AssessmentHistoryEntry,
+    AssessmentOverrideResponse,
     AssessmentTargetResponse,
     DailyPlanItemResponse,
     DailyPlanResponse,
@@ -54,6 +57,7 @@ from app.schemas.learning import (
     ReviewBacklogResponse,
     ReviewScheduleResponse,
 )
+from app.services.character_speech import speech_attempt_response
 from app.services.daily_reading import daily_reading_response, ensure_daily_reading_task
 from app.services.mastery import mastery_policy_for_type, recompute_child_knowledge_state
 
@@ -234,13 +238,17 @@ async def ensure_learning_settings(
     return settings
 
 
-def settings_response(settings: ChildLearningSettings) -> LearningSettingsResponse:
+def settings_response(
+    settings: ChildLearningSettings, *, speech_review_feature_enabled: bool = False
+) -> LearningSettingsResponse:
     return LearningSettingsResponse(
         max_new_characters_per_day=settings.max_new_characters_per_day,
         daily_review_capacity=settings.daily_review_capacity,
         weekly_assessment_enabled=settings.weekly_assessment_enabled,
         monthly_assessment_enabled=settings.monthly_assessment_enabled,
         timezone=settings.timezone,
+        character_review_mode=settings.character_review_mode,
+        speech_review_feature_enabled=speech_review_feature_enabled,
     )
 
 
@@ -248,12 +256,14 @@ async def update_learning_settings(
     session: AsyncSession,
     child_id: uuid.UUID,
     payload: LearningSettingsUpdate,
+    *,
+    speech_review_feature_enabled: bool = False,
 ) -> LearningSettingsResponse:
     settings = await ensure_learning_settings(session, child_id)
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(settings, field, value)
     await session.commit()
-    return settings_response(settings)
+    return settings_response(settings, speech_review_feature_enabled=speech_review_feature_enabled)
 
 
 async def _enabled_catalog_size(session: AsyncSession) -> int:
@@ -896,6 +906,38 @@ async def _session_response(
             )
         ).all()
     )
+    attempts = list(
+        (
+            await session.scalars(
+                select(CharacterSpeechAttempt)
+                .where(CharacterSpeechAttempt.assessment_session_id == assessment.id)
+                .order_by(
+                    CharacterSpeechAttempt.knowledge_point_id,
+                    CharacterSpeechAttempt.attempt_index,
+                )
+            )
+        ).all()
+    )
+    attempts_by_point: dict[uuid.UUID, list[CharacterSpeechAttempt]] = {}
+    for attempt in attempts:
+        attempts_by_point.setdefault(attempt.knowledge_point_id, []).append(attempt)
+    item_ids = [item.id for _, _, item in rows if item is not None]
+    overrides = (
+        list(
+            (
+                await session.scalars(
+                    select(AssessmentOverride)
+                    .where(AssessmentOverride.assessment_item_id.in_(item_ids))
+                    .order_by(AssessmentOverride.overridden_at.desc())
+                )
+            ).all()
+        )
+        if item_ids
+        else []
+    )
+    override_by_item: dict[uuid.UUID, AssessmentOverride] = {}
+    for override in overrides:
+        override_by_item.setdefault(override.assessment_item_id, override)
     return PlannedAssessmentResponse(
         id=assessment.id,
         child_id=assessment.child_id,
@@ -917,7 +959,30 @@ async def _session_response(
                 position=target.position,
                 sampling_class=target.sampling_class,
                 outcome=item.outcome if item else None,
+                assessment_item_id=item.id if item else None,
                 response_time_ms=item.response_time_ms if item else None,
+                hint_requested_at=target.hint_requested_at,
+                evaluation_method=(
+                    (item.evidence_metadata or {}).get("evaluation_method", "parent_manual")
+                    if item
+                    else "parent_manual"
+                ),
+                speech_attempts=[
+                    speech_attempt_response(attempt)
+                    for attempt in attempts_by_point.get(target.knowledge_point_id, [])
+                ],
+                override=(
+                    AssessmentOverrideResponse(
+                        id=override_by_item[item.id].id,
+                        original_outcome=override_by_item[item.id].original_outcome,
+                        override_outcome=override_by_item[item.id].override_outcome,
+                        overridden_by_user_id=override_by_item[item.id].overridden_by_user_id,
+                        override_reason=override_by_item[item.id].override_reason,
+                        overridden_at=override_by_item[item.id].overridden_at,
+                    )
+                    if item and item.id in override_by_item
+                    else None
+                ),
             )
             for target, character, item in rows
         ],
@@ -1172,6 +1237,36 @@ async def submit_planned_assessment(
     if existing_ids:
         raise RuntimeError("One or more submitted characters already have preserved evidence")
     for item in payload.items:
+        target = await session.scalar(
+            select(AssessmentSessionTarget).where(
+                AssessmentSessionTarget.assessment_session_id == assessment.id,
+                AssessmentSessionTarget.knowledge_point_id == item.knowledge_point_id,
+            )
+        )
+        if target is None:
+            raise ValueError("Submission target is outside the persisted session sample")
+        hint_used = item.hint_used or target.hint_requested_at is not None
+        evidence_metadata = {
+            **item.evidence_metadata,
+            "evaluation_method": item.evaluation_method,
+        }
+        if item.speech_attempt_ids:
+            valid_attempt_ids = set(
+                (
+                    await session.scalars(
+                        select(CharacterSpeechAttempt.id).where(
+                            CharacterSpeechAttempt.id.in_(item.speech_attempt_ids),
+                            CharacterSpeechAttempt.assessment_session_id == assessment.id,
+                            CharacterSpeechAttempt.knowledge_point_id == item.knowledge_point_id,
+                        )
+                    )
+                ).all()
+            )
+            if valid_attempt_ids != set(item.speech_attempt_ids):
+                raise ValueError("Speech evidence does not belong to this review target")
+            evidence_metadata["speech_attempt_ids"] = [
+                str(value) for value in item.speech_attempt_ids
+            ]
         session.add(
             AssessmentItem(
                 session_id=assessment.id,
@@ -1180,7 +1275,9 @@ async def submit_planned_assessment(
                 evaluator_user_id=evaluator_user_id,
                 outcome=item.outcome,
                 response_time_ms=item.response_time_ms,
-                hint_used=item.hint_used,
+                hint_used=hint_used,
+                skill_dimension=item.skill_dimension,
+                evidence_metadata=evidence_metadata,
                 assessed_at=now,
             )
         )

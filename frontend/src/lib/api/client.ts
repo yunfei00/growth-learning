@@ -905,6 +905,8 @@ export type LearningSettings = {
   weekly_assessment_enabled: boolean;
   monthly_assessment_enabled: boolean;
   timezone: string;
+  character_review_mode: "parent_manual" | "speech_auto";
+  speech_review_feature_enabled: boolean;
 };
 
 export type DailyPlanItem = {
@@ -966,7 +968,45 @@ export type AssessmentTarget = {
   position: number;
   sampling_class: string;
   outcome: AssessmentOutcome | null;
+  assessment_item_id: string | null;
   response_time_ms: number | null;
+  hint_requested_at: string | null;
+  evaluation_method: "parent_manual" | "speech_assisted";
+  speech_attempts: SpeechAttempt[];
+  override: AssessmentOverride | null;
+};
+
+export type SpeechReviewDecision =
+  | "match" | "partial_match" | "uncertain" | "no_match" | "no_speech" | "recognition_error";
+
+export type SpeechAlternative = { transcript: string; confidence: number | null };
+
+export type SpeechAttempt = {
+  id: string;
+  attempt_index: number;
+  provider: string;
+  transcript: string | null;
+  alternatives: SpeechAlternative[];
+  confidence: number | null;
+  confidence_available: boolean;
+  normalized_readings: string[];
+  decision: SpeechReviewDecision;
+  syllable_match: boolean | null;
+  tone_match: boolean | null;
+  tone_evaluation: "matched" | "mismatched" | "unavailable";
+  explicit_unknown: boolean;
+  hint_used: boolean;
+  duration_ms: number | null;
+  created_at: string;
+};
+
+export type AssessmentOverride = {
+  id: string;
+  original_outcome: AssessmentOutcome;
+  override_outcome: AssessmentOutcome;
+  overridden_by_user_id: string;
+  override_reason: string;
+  overridden_at: string;
 };
 
 export type PlannedAssessment = {
@@ -2456,12 +2496,64 @@ export function submitPlannedAssessment(
       outcome: AssessmentOutcome;
       response_time_ms: number;
       hint_used?: boolean;
+      evaluation_method?: "parent_manual" | "speech_assisted";
+      speech_attempt_ids?: string[];
     }>;
     complete?: boolean;
   },
 ): Promise<PlannedAssessment> {
   return request<PlannedAssessment>(
     `/api/v1/children/${childId}/planned-assessments/${sessionId}/items`,
+    { method: "POST", body: jsonBody(payload) },
+  );
+}
+
+export function markPlannedAssessmentHint(
+  childId: string,
+  sessionId: string,
+  knowledgePointId: string,
+): Promise<PlannedAssessment> {
+  return request<PlannedAssessment>(
+    `/api/v1/children/${childId}/planned-assessments/${sessionId}/targets/${knowledgePointId}/hint`,
+    { method: "POST" },
+  );
+}
+
+export function createCharacterSpeechAttempt(
+  childId: string,
+  sessionId: string,
+  payload: {
+    knowledge_point_id: string;
+    attempt_index: number;
+    provider: string;
+    transcript?: string | null;
+    alternatives?: SpeechAlternative[];
+    confidence?: number | null;
+    confidence_available?: boolean;
+    duration_ms?: number | null;
+    decision: SpeechReviewDecision;
+    normalized_readings?: string[];
+    syllable_match?: boolean | null;
+    tone_match?: boolean | null;
+    tone_evaluation?: "matched" | "mismatched" | "unavailable";
+    explicit_unknown?: boolean;
+    hint_used?: boolean;
+    provider_metadata?: Record<string, unknown>;
+  },
+): Promise<SpeechAttempt> {
+  return request<SpeechAttempt>(
+    `/api/v1/children/${childId}/planned-assessments/${sessionId}/speech-attempts`,
+    { method: "POST", body: jsonBody(payload) },
+  );
+}
+
+export function overrideAssessmentItem(
+  childId: string,
+  assessmentItemId: string,
+  payload: { outcome: AssessmentOutcome; reason: string },
+): Promise<AssessmentOverride> {
+  return request<AssessmentOverride>(
+    `/api/v1/children/${childId}/assessment-items/${assessmentItemId}/override`,
     { method: "POST", body: jsonBody(payload) },
   );
 }

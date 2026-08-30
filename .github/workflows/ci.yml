@@ -162,6 +162,7 @@ jobs:
                   "english_exercise_attempts", "english_daily_plans",
                   "english_daily_plan_items",
                   "curriculum_releases", "course_lessons", "course_platform_events",
+                  "character_speech_attempts", "assessment_overrides",
               }
               missing = required - tables
               if missing:

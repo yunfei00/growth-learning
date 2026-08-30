@@ -1,5 +1,7 @@
 """Child character learning, assessment, and mastery API schemas."""
 
+from __future__ import annotations
+
 import uuid
 from datetime import date, datetime
 from typing import Literal
@@ -20,6 +22,11 @@ ActivityTypeValue = Literal[
     "applied",
 ]
 AssessmentOutcomeValue = Literal["correct", "hinted_correct", "uncertain", "incorrect"]
+AssessmentEvaluationMethodValue = Literal["parent_manual", "speech_assisted"]
+SpeechReviewDecisionValue = Literal[
+    "match", "partial_match", "uncertain", "no_match", "no_speech", "recognition_error"
+]
+CharacterReviewModeValue = Literal["parent_manual", "speech_auto"]
 AssessmentKindValue = Literal[
     "recognition",
     "practice_check",
@@ -45,7 +52,7 @@ class LearningSessionCreate(BaseModel):
     items: list[LearningRecordInput] = Field(min_length=1, max_length=50)
 
     @model_validator(mode="after")
-    def unique_items(self) -> "LearningSessionCreate":
+    def unique_items(self) -> LearningSessionCreate:
         ids = [item.knowledge_point_id for item in self.items]
         if len(ids) != len(set(ids)):
             raise ValueError("A knowledge point can appear only once per session")
@@ -60,10 +67,12 @@ class AssessmentItemInput(BaseModel):
     response_time_ms: int | None = Field(default=None, ge=0, le=3_600_000)
     hint_used: bool = False
     skill_dimension: str | None = Field(default=None, min_length=1, max_length=60)
-    evidence_metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    evidence_metadata: dict[str, object] = Field(default_factory=dict)
+    evaluation_method: AssessmentEvaluationMethodValue = "parent_manual"
+    speech_attempt_ids: list[uuid.UUID] = Field(default_factory=list, max_length=5)
 
     @model_validator(mode="after")
-    def align_hint_outcome(self) -> "AssessmentItemInput":
+    def align_hint_outcome(self) -> AssessmentItemInput:
         if self.outcome == "hinted_correct":
             self.hint_used = True
         return self
@@ -78,7 +87,7 @@ class AssessmentSessionCreate(BaseModel):
     items: list[AssessmentItemInput] = Field(min_length=1, max_length=50)
 
     @model_validator(mode="after")
-    def unique_items(self) -> "AssessmentSessionCreate":
+    def unique_items(self) -> AssessmentSessionCreate:
         ids = [item.knowledge_point_id for item in self.items]
         if len(ids) != len(set(ids)):
             raise ValueError("A knowledge point can appear only once per session")
@@ -239,6 +248,8 @@ class LearningSettingsResponse(BaseModel):
     weekly_assessment_enabled: bool
     monthly_assessment_enabled: bool
     timezone: str
+    character_review_mode: CharacterReviewModeValue
+    speech_review_feature_enabled: bool = False
 
 
 class LearningSettingsUpdate(BaseModel):
@@ -249,9 +260,10 @@ class LearningSettingsUpdate(BaseModel):
     weekly_assessment_enabled: bool | None = None
     monthly_assessment_enabled: bool | None = None
     timezone: str | None = Field(default=None, min_length=1, max_length=64)
+    character_review_mode: CharacterReviewModeValue | None = None
 
     @model_validator(mode="after")
-    def valid_timezone(self) -> "LearningSettingsUpdate":
+    def valid_timezone(self) -> LearningSettingsUpdate:
         if self.timezone is not None:
             try:
                 ZoneInfo(self.timezone)
@@ -327,7 +339,75 @@ class AssessmentTargetResponse(BaseModel):
     position: int
     sampling_class: str
     outcome: AssessmentOutcomeValue | None = None
+    assessment_item_id: uuid.UUID | None = None
     response_time_ms: int | None = None
+    hint_requested_at: datetime | None = None
+    evaluation_method: AssessmentEvaluationMethodValue = "parent_manual"
+    speech_attempts: list[SpeechAttemptResponse] = Field(default_factory=list)
+    override: AssessmentOverrideResponse | None = None
+
+
+class SpeechAlternative(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    transcript: str = Field(min_length=1, max_length=120)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+
+
+class SpeechAttemptCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    knowledge_point_id: uuid.UUID
+    attempt_index: int = Field(ge=1, le=3)
+    provider: str = Field(min_length=1, max_length=80)
+    transcript: str | None = Field(default=None, max_length=120)
+    alternatives: list[SpeechAlternative] = Field(default_factory=list, max_length=5)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    confidence_available: bool = False
+    duration_ms: int | None = Field(default=None, ge=0, le=60_000)
+    decision: SpeechReviewDecisionValue
+    normalized_readings: list[str] = Field(default_factory=list, max_length=20)
+    syllable_match: bool | None = None
+    tone_match: bool | None = None
+    tone_evaluation: Literal["matched", "mismatched", "unavailable"] = "unavailable"
+    explicit_unknown: bool = False
+    hint_used: bool = False
+    provider_metadata: dict[str, object] = Field(default_factory=dict)
+
+
+class SpeechAttemptResponse(BaseModel):
+    id: uuid.UUID
+    attempt_index: int
+    provider: str
+    transcript: str | None
+    alternatives: list[SpeechAlternative]
+    confidence: float | None
+    confidence_available: bool
+    normalized_readings: list[str]
+    decision: SpeechReviewDecisionValue
+    syllable_match: bool | None
+    tone_match: bool | None
+    tone_evaluation: Literal["matched", "mismatched", "unavailable"]
+    explicit_unknown: bool
+    hint_used: bool
+    duration_ms: int | None
+    created_at: datetime
+
+
+class AssessmentOverrideCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: AssessmentOutcomeValue
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class AssessmentOverrideResponse(BaseModel):
+    id: uuid.UUID
+    original_outcome: AssessmentOutcomeValue
+    override_outcome: AssessmentOutcomeValue
+    overridden_by_user_id: uuid.UUID
+    override_reason: str
+    overridden_at: datetime
 
 
 class PlannedAssessmentResponse(BaseModel):
@@ -353,7 +433,7 @@ class AssessmentBatchSubmit(BaseModel):
     complete: bool = False
 
     @model_validator(mode="after")
-    def unique_items(self) -> "AssessmentBatchSubmit":
+    def unique_items(self) -> AssessmentBatchSubmit:
         ids = [item.knowledge_point_id for item in self.items]
         if len(ids) != len(set(ids)):
             raise ValueError("A knowledge point can appear only once per submission")

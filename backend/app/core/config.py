@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     ai_model: str = ""
     ai_timeout_seconds: float = 60.0
     ai_story_max_attempts: int = 3
+    character_speech_review_enabled: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:
