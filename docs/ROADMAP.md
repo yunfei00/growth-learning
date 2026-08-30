@@ -261,6 +261,22 @@ lint/typecheck/build、CI、生产导入与真实登录态 smoke 全绿；Issue 
 - 性能与稳定性
 - 安全和备份
 
+长期课程平台推进顺序（不自动转换成 Phase 编号）：
+
+1. Curriculum Platform V1
+2. Grade 1 Semester 1 V1
+3. Closed Family Beta
+4. Grade 1 Semester 2
+5. Grade 2
+6. Grade 3
+7. Product Architecture Review
+8. Grade 4～6
+9. Grade 7～9
+
+Curriculum Platform V1 只建立 `foundation / primary / junior_middle`、Grade 1～9、Semester、
+不可歧义的 Curriculum Release、Lesson、发布审核、JSON 搬运和内容中心。它不复制商业教材，也不
+预填 9×学科×学期空课程；第一份一年级上数学只保持 Draft，用于验证结构。
+
 ## V2 Backlog
 
 - 更完整的可访问性、性能预算、外部安全评估与可观测性

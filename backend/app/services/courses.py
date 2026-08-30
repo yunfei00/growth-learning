@@ -16,9 +16,13 @@ from app.models import (
     ChineseCharacter,
     Course,
     CourseActivityProgress,
+    CourseLesson,
+    CoursePlatformEvent,
     CourseSourceType,
     CourseStatus,
     CourseUnit,
+    CurriculumRelease,
+    CurriculumReleaseStatus,
     DailyLearningPlan,
     DailyPlanItem,
     DailyPlanItemKind,
@@ -41,6 +45,7 @@ from app.schemas.course import (
     CourseActivityCompletionResponse,
     CourseActivityResponse,
     CourseCreate,
+    CourseLessonResponse,
     CoursePointResponse,
     CourseResponse,
     CourseUnitResponse,
@@ -122,13 +127,38 @@ async def visible_courses(
     child_id: uuid.UUID,
     family_id: uuid.UUID,
     subject: str | None = None,
+    grade_level: int | None = None,
+    semester: str | None = None,
+    education_stage: str | None = None,
 ) -> list[Course]:
+    enrolled_course_ids = select(ChildCourseEnrollment.course_id).where(
+        ChildCourseEnrollment.child_id == child_id
+    )
     teacher_ids = select(TeacherChildRelation.teacher_id).where(
         TeacherChildRelation.child_id == child_id,
         TeacherChildRelation.status == TeacherRelationStatus.ACTIVE,
     )
     query = select(Course).where(
-        Course.status != CourseStatus.ARCHIVED,
+        or_(
+            Course.status == CourseStatus.ENABLED,
+            Course.id.in_(enrolled_course_ids),
+        ),
+        or_(
+            Course.curriculum_release_id.is_(None),
+            Course.curriculum_release_id.in_(
+                select(CurriculumRelease.id).where(
+                    CurriculumRelease.status == CurriculumReleaseStatus.PUBLISHED
+                )
+            ),
+            and_(
+                Course.id.in_(enrolled_course_ids),
+                Course.curriculum_release_id.in_(
+                    select(CurriculumRelease.id).where(
+                        CurriculumRelease.status == CurriculumReleaseStatus.ARCHIVED
+                    )
+                ),
+            ),
+        ),
         or_(
             Course.source_type == CourseSourceType.SYSTEM,
             and_(
@@ -148,6 +178,12 @@ async def visible_courses(
     )
     if subject is not None:
         query = query.where(Course.subject == subject)
+    if grade_level is not None:
+        query = query.where(Course.grade_level == grade_level)
+    if semester is not None:
+        query = query.where(Course.semester == semester)
+    if education_stage is not None:
+        query = query.where(Course.education_stage == education_stage)
     return list(
         (
             await session.scalars(
@@ -160,6 +196,17 @@ async def visible_courses(
 async def _course_is_visible(
     session: AsyncSession, course: Course, child_id: uuid.UUID, family_id: uuid.UUID
 ) -> bool:
+    existing_enrollment = await _course_enrollment(session, child_id, course.id)
+    if course.status != CourseStatus.ENABLED and existing_enrollment is None:
+        return False
+    if course.curriculum_release_id is not None:
+        release_status = await session.scalar(
+            select(CurriculumRelease.status).where(
+                CurriculumRelease.id == course.curriculum_release_id
+            )
+        )
+        if release_status != CurriculumReleaseStatus.PUBLISHED and existing_enrollment is None:
+            return False
     if course.source_type == CourseSourceType.SYSTEM:
         return True
     if course.source_type in (
@@ -224,6 +271,9 @@ async def create_course(
         created_by_user_id=actor_user_id,
         recommended_age_min=payload.recommended_age_min,
         recommended_age_max=payload.recommended_age_max,
+        education_stage=payload.education_stage,
+        grade_level=payload.grade_level,
+        semester=payload.semester,
         status=CourseStatus.ENABLED,
         version=1,
         reference_metadata=payload.reference_metadata,
@@ -259,6 +309,8 @@ async def create_course(
                         knowledge_point_id=point_payload.knowledge_point_id,
                         role=point_payload.role,
                         order_index=point_order,
+                        reference_code=point_payload.reference_code,
+                        curriculum_metadata=point_payload.curriculum_metadata,
                     )
                 )
     await session.commit()
@@ -315,6 +367,15 @@ async def course_response(
             )
         }
     for unit in units:
+        lessons = list(
+            (
+                await session.scalars(
+                    select(CourseLesson)
+                    .where(CourseLesson.course_unit_id == unit.id)
+                    .order_by(CourseLesson.order_index)
+                )
+            ).all()
+        )
         activities = list(
             (
                 await session.scalars(
@@ -360,6 +421,7 @@ async def course_response(
                 state = all_point_states.get(point.id) if policy is not None else None
                 point_responses.append(
                     CoursePointResponse(
+                        mapping_id=mapping.id,
                         knowledge_point_id=point.id,
                         title=point.title,
                         subject=point.subject,
@@ -368,6 +430,8 @@ async def course_response(
                         pinyin=character.pinyin if character is not None else None,
                         role=mapping.role,
                         order_index=mapping.order_index,
+                        reference_code=mapping.reference_code,
+                        curriculum_metadata=mapping.curriculum_metadata,
                         mastery_level=(
                             state.mastery_level
                             if state is not None
@@ -387,6 +451,7 @@ async def course_response(
                     instructions=activity.instructions,
                     order_index=activity.order_index,
                     status=activity.status,
+                    lesson_id=activity.lesson_id,
                     progress_status=progress_status,
                     points=point_responses,
                 )
@@ -406,6 +471,32 @@ async def course_response(
         )
         introduced = sum(level != MasteryLevel.UNLEARNED for level in levels)
         stable = sum(level == MasteryLevel.STABLE for level in levels)
+        lesson_responses = [
+            CourseLessonResponse(
+                id=lesson.id,
+                title=lesson.title,
+                description=lesson.description,
+                order_index=lesson.order_index,
+                estimated_minutes=lesson.estimated_minutes,
+                status=lesson.status,
+                metadata_json=lesson.metadata_json,
+                activity_count=len(
+                    [activity for activity in activity_responses if activity.lesson_id == lesson.id]
+                ),
+                completed_activities=len(
+                    [
+                        activity
+                        for activity in activity_responses
+                        if activity.lesson_id == lesson.id
+                        and activity.progress_status == "completed"
+                    ]
+                ),
+                activities=[
+                    activity for activity in activity_responses if activity.lesson_id == lesson.id
+                ],
+            )
+            for lesson in lessons
+        ]
         unit_responses.append(
             CourseUnitResponse(
                 id=unit.id,
@@ -419,6 +510,7 @@ async def course_response(
                 stable_count=stable,
                 unlearned_count=len(levels) - introduced,
                 projection_unavailable_count=unavailable_count,
+                lessons=lesson_responses,
                 activities=activity_responses,
             )
         )
@@ -440,6 +532,32 @@ async def course_response(
     )
     introduced_count = sum(level != MasteryLevel.UNLEARNED for level in course_levels)
     stable_count = sum(level == MasteryLevel.STABLE for level in course_levels)
+    release = (
+        await session.get(CurriculumRelease, course.curriculum_release_id)
+        if course.curriculum_release_id is not None
+        else None
+    )
+    stage_labels = {
+        "foundation": "幼儿 / 启蒙",
+        "primary": "小学",
+        "junior_middle": "初中",
+    }
+    semester_labels = {
+        "full_year": "全年",
+        "semester_1": "上学期",
+        "semester_2": "下学期",
+    }
+    grade_labels = {
+        1: "一年级",
+        2: "二年级",
+        3: "三年级",
+        4: "四年级",
+        5: "五年级",
+        6: "六年级",
+        7: "七年级",
+        8: "八年级",
+        9: "九年级",
+    }
     return CourseResponse(
         id=course.id,
         subject=course.subject,
@@ -448,6 +566,16 @@ async def course_response(
         source_type=course.source_type,
         status=course.status,
         version=course.version,
+        education_stage=course.education_stage,
+        education_stage_label=stage_labels[course.education_stage],
+        grade_level=course.grade_level,
+        grade_level_label=grade_labels.get(course.grade_level, "启蒙"),
+        semester=course.semester,
+        semester_label=semester_labels[course.semester],
+        curriculum_key=course.curriculum_key,
+        curriculum_version=course.curriculum_version,
+        curriculum_release_id=course.curriculum_release_id,
+        curriculum_release_status=release.status if release else None,
         recommended_age_min=course.recommended_age_min,
         recommended_age_max=course.recommended_age_max,
         reference_metadata=course.reference_metadata,
@@ -487,12 +615,24 @@ async def enroll_child(
             child_id=child_id,
             course_id=course.id,
             course_version=course.version,
+            curriculum_release_id=course.curriculum_release_id,
             status=status,
             path_order=path_order,
             started_at=now if status == EnrollmentStatus.ACTIVE else None,
             settings={},
         )
         session.add(enrollment)
+        await session.flush()
+        if status == EnrollmentStatus.ACTIVE:
+            session.add(
+                CoursePlatformEvent(
+                    child_id=child_id,
+                    enrollment_id=enrollment.id,
+                    event_type="course_started",
+                    occurred_at=now,
+                    metadata_json={"course_id": str(course.id)},
+                )
+            )
     else:
         enrollment.status = status
         enrollment.path_order = path_order
@@ -533,6 +673,8 @@ async def enrollment_response(
         course_id=course.id,
         course_title=course.title,
         course_version=enrollment.course_version,
+        curriculum_release_id=enrollment.curriculum_release_id,
+        curriculum_version=course.curriculum_version,
         status=enrollment.status,
         path_order=enrollment.path_order,
         started_at=enrollment.started_at,
@@ -563,6 +705,7 @@ async def copy_course_path(
                     child_id=target_child_id,
                     course_id=item.course_id,
                     course_version=item.course_version,
+                    curriculum_release_id=item.curriculum_release_id,
                     status=EnrollmentStatus.PLANNED,
                     path_order=item.path_order,
                     settings=dict(item.settings),
@@ -711,6 +854,15 @@ async def complete_character_activity(
     progress.learning_session_id = learning_session.id
     progress.started_at = progress.started_at or now
     progress.completed_at = now
+    session.add(
+        CoursePlatformEvent(
+            child_id=child_id,
+            enrollment_id=enrollment.id,
+            event_type="activity_completed",
+            occurred_at=now,
+            metadata_json={"activity_id": str(activity.id)},
+        )
+    )
     await session.flush()
     for point_id in point_ids:
         await recompute_child_knowledge_state(session, child_id, point_id)

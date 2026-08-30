@@ -10,6 +10,8 @@ class CourseKnowledgePointInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     knowledge_point_id: uuid.UUID
     role: str = Field(default="primary", pattern="^(primary|review|optional|prerequisite)$")
+    reference_code: str | None = Field(default=None, max_length=160)
+    curriculum_metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class CourseActivityInput(BaseModel):
@@ -43,6 +45,11 @@ class CourseCreate(BaseModel):
     recommended_age_min: int | None = Field(default=None, ge=0, le=18)
     recommended_age_max: int | None = Field(default=None, ge=0, le=18)
     reference_metadata: dict[str, str] = Field(default_factory=dict)
+    education_stage: str = Field(
+        default="foundation", pattern="^(foundation|primary|junior_middle)$"
+    )
+    grade_level: int | None = Field(default=None, ge=1, le=9)
+    semester: str = Field(default="full_year", pattern="^(full_year|semester_1|semester_2)$")
     units: list[CourseUnitInput] = Field(min_length=1, max_length=50)
 
     @model_validator(mode="after")
@@ -53,10 +60,17 @@ class CourseCreate(BaseModel):
             and self.recommended_age_min > self.recommended_age_max
         ):
             raise ValueError("recommended_age_min cannot exceed recommended_age_max")
+        if self.education_stage == "foundation" and self.grade_level is not None:
+            raise ValueError("foundation courses cannot have a grade level")
+        if self.education_stage == "primary" and self.grade_level not in range(1, 7):
+            raise ValueError("primary courses require grade level 1 through 6")
+        if self.education_stage == "junior_middle" and self.grade_level not in range(7, 10):
+            raise ValueError("junior_middle courses require grade level 7 through 9")
         return self
 
 
 class CoursePointResponse(BaseModel):
+    mapping_id: uuid.UUID
     knowledge_point_id: uuid.UUID
     title: str
     subject: str
@@ -68,6 +82,8 @@ class CoursePointResponse(BaseModel):
     mastery_level: str | None
     mastery_policy_key: str | None
     projection_status: str
+    reference_code: str | None = None
+    curriculum_metadata: dict = Field(default_factory=dict)
 
 
 class CourseActivityResponse(BaseModel):
@@ -77,8 +93,22 @@ class CourseActivityResponse(BaseModel):
     instructions: str | None
     order_index: int
     status: str
+    lesson_id: uuid.UUID | None = None
     progress_status: str
     points: list[CoursePointResponse]
+
+
+class CourseLessonResponse(BaseModel):
+    id: uuid.UUID
+    title: str
+    description: str | None
+    order_index: int
+    estimated_minutes: int | None
+    status: str
+    metadata_json: dict
+    activity_count: int
+    completed_activities: int
+    activities: list[CourseActivityResponse]
 
 
 class CourseUnitResponse(BaseModel):
@@ -93,6 +123,7 @@ class CourseUnitResponse(BaseModel):
     stable_count: int
     unlearned_count: int
     projection_unavailable_count: int
+    lessons: list[CourseLessonResponse] = Field(default_factory=list)
     activities: list[CourseActivityResponse]
 
 
@@ -104,6 +135,16 @@ class CourseResponse(BaseModel):
     source_type: str
     status: str
     version: int
+    education_stage: str
+    education_stage_label: str
+    grade_level: int | None
+    grade_level_label: str
+    semester: str
+    semester_label: str
+    curriculum_key: str | None
+    curriculum_version: str | None
+    curriculum_release_id: uuid.UUID | None
+    curriculum_release_status: str | None
     recommended_age_min: int | None
     recommended_age_max: int | None
     reference_metadata: dict
@@ -148,6 +189,8 @@ class EnrollmentResponse(BaseModel):
     course_id: uuid.UUID
     course_title: str
     course_version: int
+    curriculum_release_id: uuid.UUID | None
+    curriculum_version: str | None
     status: str
     path_order: int
     started_at: datetime | None

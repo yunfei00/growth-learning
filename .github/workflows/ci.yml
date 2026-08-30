@@ -161,6 +161,7 @@ jobs:
                   "english_catalog_releases", "english_items", "english_practice_items",
                   "english_exercise_attempts", "english_daily_plans",
                   "english_daily_plan_items",
+                  "curriculum_releases", "course_lessons", "course_platform_events",
               }
               missing = required - tables
               if missing:
@@ -366,6 +367,79 @@ jobs:
                   "legacy_assessment": 1,
               }
               print("Phase 19 English catalog is idempotent and prior evidence is preserved")
+
+          asyncio.run(main())
+          PY
+
+      - name: Verify Curriculum Platform migration preserves legacy course history
+        run: |
+          python -m alembic downgrade 20260829_0019
+          python - <<'PY'
+          import asyncio
+          import json
+          import uuid
+          from sqlalchemy import text
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from app.core.config import get_settings
+
+          IDS = {
+              "course": uuid.UUID("00000000-0000-0000-0000-000000000300"),
+              "unit": uuid.UUID("00000000-0000-0000-0000-000000000301"),
+              "activity": uuid.UUID("00000000-0000-0000-0000-000000000302"),
+              "mapping": uuid.UUID("00000000-0000-0000-0000-000000000303"),
+              "enrollment": uuid.UUID("00000000-0000-0000-0000-000000000304"),
+              "progress": uuid.UUID("00000000-0000-0000-0000-000000000305"),
+              "user": uuid.UUID("00000000-0000-0000-0000-000000000001"),
+              "child": uuid.UUID("00000000-0000-0000-0000-000000000101"),
+              "point": uuid.UUID("00000000-0000-0000-0000-000000000102"),
+          }
+
+          async def main():
+              engine = create_async_engine(get_settings().database_url)
+              async with engine.begin() as connection:
+                  await connection.execute(text("INSERT INTO courses (id, subject, title, source_type, created_by_user_id, status, version, system_key, reference_metadata) VALUES (:id, 'chinese', 'Legacy Foundation Course', 'system', :user, 'enabled', 1, 'legacy-curriculum-fixture', CAST(:metadata AS json))"), {"id": IDS["course"], "user": IDS["user"], "metadata": json.dumps({})})
+                  await connection.execute(text("INSERT INTO course_units (id, course_id, title, order_index, status) VALUES (:id, :course, 'Legacy Unit', 0, 'enabled')"), {"id": IDS["unit"], "course": IDS["course"]})
+                  await connection.execute(text("INSERT INTO learning_activities (id, course_unit_id, activity_type, title, order_index, status, content_metadata) VALUES (:id, :unit, 'knowledge_learning', 'Legacy Activity', 0, 'enabled', CAST(:metadata AS json))"), {"id": IDS["activity"], "unit": IDS["unit"], "metadata": json.dumps({})})
+                  await connection.execute(text("INSERT INTO activity_knowledge_points (id, activity_id, knowledge_point_id, role, order_index) VALUES (:id, :activity, :point, 'primary', 0)"), {"id": IDS["mapping"], "activity": IDS["activity"], "point": IDS["point"]})
+                  await connection.execute(text("INSERT INTO child_course_enrollments (id, child_id, course_id, course_version, status, path_order, current_unit_id, settings) VALUES (:id, :child, :course, 1, 'active', 0, :unit, CAST(:settings AS json))"), {"id": IDS["enrollment"], "child": IDS["child"], "course": IDS["course"], "unit": IDS["unit"], "settings": json.dumps({})})
+                  await connection.execute(text("INSERT INTO course_activity_progress (id, enrollment_id, activity_id, status) VALUES (:id, :enrollment, :activity, 'completed')"), {"id": IDS["progress"], "enrollment": IDS["enrollment"], "activity": IDS["activity"]})
+              await engine.dispose()
+
+          asyncio.run(main())
+          PY
+          python -m alembic upgrade head
+          python - <<'PY'
+          import asyncio
+          import uuid
+          from sqlalchemy import inspect, text
+          from sqlalchemy.ext.asyncio import create_async_engine
+          from app.core.config import get_settings
+
+          COURSE_ID = uuid.UUID("00000000-0000-0000-0000-000000000300")
+          CHILD_ID = uuid.UUID("00000000-0000-0000-0000-000000000101")
+          ENROLLMENT_ID = uuid.UUID("00000000-0000-0000-0000-000000000304")
+          PROGRESS_ID = uuid.UUID("00000000-0000-0000-0000-000000000305")
+
+          async def main():
+              engine = create_async_engine(get_settings().database_url)
+              async with engine.connect() as connection:
+                  tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+                  course = (await connection.execute(text("SELECT id, education_stage, grade_level, semester, curriculum_release_id FROM courses WHERE id = :id"), {"id": COURSE_ID})).one()
+                  enrollment = (await connection.execute(text("SELECT id, course_id, course_version, curriculum_release_id FROM child_course_enrollments WHERE course_id = :id"), {"id": COURSE_ID})).one()
+                  progress = (await connection.execute(text("SELECT id, status FROM course_activity_progress WHERE enrollment_id = :id"), {"id": enrollment.id})).one()
+                  activity_lesson = await connection.scalar(text("SELECT lesson_id FROM learning_activities WHERE course_unit_id = (SELECT id FROM course_units WHERE course_id = :id)"), {"id": COURSE_ID})
+                  child_grade = (await connection.execute(text("SELECT current_grade_level, school_year FROM children WHERE id = :id"), {"id": CHILD_ID})).one()
+                  learning_count = await connection.scalar(text("SELECT count(*) FROM learning_records"))
+                  assessment_count = await connection.scalar(text("SELECT count(*) FROM assessment_items"))
+              await engine.dispose()
+              assert {"curriculum_releases", "course_lessons", "course_platform_events"} <= tables
+              assert tuple(course) == (COURSE_ID, "foundation", None, "full_year", None)
+              assert tuple(enrollment) == (ENROLLMENT_ID, COURSE_ID, 1, None)
+              assert tuple(progress) == (PROGRESS_ID, "completed")
+              assert activity_lesson is None
+              assert tuple(child_grade) == (None, None)
+              assert learning_count == assessment_count == 1
+              print("Curriculum Platform migration preserved Course/Enrollment/Progress/Evidence IDs")
 
           asyncio.run(main())
           PY

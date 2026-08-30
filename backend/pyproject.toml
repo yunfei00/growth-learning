@@ -26,6 +26,7 @@ dependencies = [
 
 [project.scripts]
 gl-admin = "app.cli.admin:main"
+gl-curriculum = "app.cli.curriculum:main"
 
 [project.optional-dependencies]
 dev = [

@@ -664,6 +664,8 @@ export type Child = {
   birth_date: string;
   gender: ChildGender | null;
   avatar_key: string | null;
+  current_grade_level: number | null;
+  school_year: string | null;
   is_archived: boolean;
   archived_at: string | null;
   created_at: string;
@@ -1619,6 +1621,8 @@ export function createChild(
     nickname?: string | null;
     birth_date: string;
     gender?: ChildGender | null;
+    current_grade_level?: number | null;
+    school_year?: string | null;
   },
 ): Promise<Child> {
   return request<Child>(`/api/v1/families/${familyId}/children`, {
@@ -1634,6 +1638,8 @@ export function updateChild(
     nickname: string | null;
     birth_date: string;
     gender: ChildGender | null;
+    current_grade_level: number | null;
+    school_year: string | null;
   }>,
 ): Promise<Child> {
   return request<Child>(`/api/v1/children/${childId}`, {
@@ -3171,6 +3177,7 @@ export function listEnabledCharacters(search = ""): Promise<CharacterPage> {
 }
 
 export type CoursePoint = {
+  mapping_id: string;
   knowledge_point_id: string;
   title: string;
   subject: Subject;
@@ -3182,6 +3189,8 @@ export type CoursePoint = {
   mastery_level: MasteryLevel | null;
   mastery_policy_key: string | null;
   projection_status: "configured" | "unavailable";
+  reference_code: string | null;
+  curriculum_metadata: Record<string, unknown>;
 };
 
 export type CourseActivity = {
@@ -3204,8 +3213,22 @@ export type CourseActivity = {
   instructions: string | null;
   order_index: number;
   status: "draft" | "enabled" | "archived";
+  lesson_id: string | null;
   progress_status: "pending" | "in_progress" | "completed";
   points: CoursePoint[];
+};
+
+export type CourseLesson = {
+  id: string;
+  title: string;
+  description: string | null;
+  order_index: number;
+  estimated_minutes: number | null;
+  status: "draft" | "enabled" | "archived";
+  metadata_json: Record<string, unknown>;
+  activity_count: number;
+  completed_activities: number;
+  activities: CourseActivity[];
 };
 
 export type CourseUnit = {
@@ -3220,6 +3243,7 @@ export type CourseUnit = {
   stable_count: number;
   unlearned_count: number;
   projection_unavailable_count: number;
+  lessons: CourseLesson[];
   activities: CourseActivity[];
 };
 
@@ -3231,6 +3255,16 @@ export type Course = {
   source_type: "system" | "family" | "teacher" | "textbook_reference";
   status: "draft" | "enabled" | "archived";
   version: number;
+  education_stage: "foundation" | "primary" | "junior_middle";
+  education_stage_label: string;
+  grade_level: number | null;
+  grade_level_label: string;
+  semester: "full_year" | "semester_1" | "semester_2";
+  semester_label: string;
+  curriculum_key: string | null;
+  curriculum_version: string | null;
+  curriculum_release_id: string | null;
+  curriculum_release_status: CurriculumReleaseStatus | null;
   recommended_age_min: number | null;
   recommended_age_max: number | null;
   reference_metadata: Record<string, string>;
@@ -3255,6 +3289,9 @@ export type CourseInput = {
   description?: string | null;
   source_type: "system" | "family" | "teacher" | "textbook_reference";
   reference_metadata?: Record<string, string>;
+  education_stage?: "foundation" | "primary" | "junior_middle";
+  grade_level?: number | null;
+  semester?: "full_year" | "semester_1" | "semester_2";
   units: Array<{
     title: string;
     description?: string | null;
@@ -3276,6 +3313,8 @@ export type CourseEnrollment = {
   course_id: string;
   course_title: string;
   course_version: number;
+  curriculum_release_id: string | null;
+  curriculum_version: string | null;
   status: "planned" | "active" | "paused" | "completed" | "archived";
   path_order: number;
   started_at: string | null;
@@ -3397,9 +3436,18 @@ export type RewardSettings = {
   goals: RewardGoal[];
 };
 
-export function listCourses(childId: string, subject?: Subject): Promise<Course[]> {
+export function listCourses(
+  childId: string,
+  subject?: Subject,
+  gradeLevel?: number,
+  semester?: Course["semester"],
+  educationStage?: Course["education_stage"],
+): Promise<Course[]> {
   const query = new URLSearchParams({ child_id: childId });
   if (subject) query.set("subject", subject);
+  if (gradeLevel) query.set("grade_level", String(gradeLevel));
+  if (semester) query.set("semester", semester);
+  if (educationStage) query.set("education_stage", educationStage);
   return request<Course[]>(`/api/v1/courses?${query.toString()}`);
 }
 
@@ -3501,6 +3549,212 @@ export function createAdminCourse(payload: CourseInput): Promise<Course> {
     method: "POST",
     body: jsonBody(payload),
   });
+}
+
+export type CurriculumReleaseStatus = "draft" | "in_review" | "published" | "archived";
+
+export type CurriculumValidationIssue = {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+  path: string;
+};
+
+export type CurriculumValidationReport = {
+  valid: boolean;
+  issues: CurriculumValidationIssue[];
+  error_count: number;
+  warning_count: number;
+  checks: Record<string, boolean>;
+  statistics: Record<string, number>;
+};
+
+export type CurriculumRelease = {
+  id: string;
+  course_id: string;
+  curriculum_key: string;
+  release_version: string;
+  education_stage: Course["education_stage"];
+  education_stage_label: string;
+  grade_level: number | null;
+  grade_level_label: string;
+  semester: Course["semester"];
+  semester_label: string;
+  subject: Subject;
+  title: string;
+  description: string | null;
+  status: CurriculumReleaseStatus;
+  source_type: string;
+  source_name: string;
+  source_reference: string | null;
+  license: string | null;
+  copyright_notice: string | null;
+  created_by_user_id: string;
+  reviewed_by_user_id: string | null;
+  published_by_user_id: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  published_at: string | null;
+  archived_at: string | null;
+  change_summary: string | null;
+  validation_snapshot: Record<string, unknown>;
+  metadata_json: Record<string, unknown>;
+  unit_count: number;
+  lesson_count: number;
+  activity_count: number;
+  knowledge_point_count: number;
+  course: Course | null;
+};
+
+export type CurriculumReleaseInput = {
+  curriculum_key: string;
+  release_version: string;
+  education_stage: Course["education_stage"];
+  grade_level: number | null;
+  semester: Course["semester"];
+  subject: Subject;
+  title: string;
+  description?: string | null;
+  source_type?: "project_curated" | "curriculum_standard_reference" | "textbook_reference" | "teacher_curated";
+  source_name?: string;
+  source_reference?: string | null;
+  license?: string | null;
+  copyright_notice?: string | null;
+  change_summary?: string | null;
+  metadata_json?: Record<string, unknown>;
+};
+
+export function listCurriculumReleases(filters: {
+  educationStage?: Course["education_stage"];
+  gradeLevel?: number;
+  semester?: Course["semester"];
+  subject?: Subject;
+  status?: CurriculumReleaseStatus;
+} = {}): Promise<CurriculumRelease[]> {
+  const query = new URLSearchParams();
+  if (filters.educationStage) query.set("education_stage", filters.educationStage);
+  if (filters.gradeLevel) query.set("grade_level", String(filters.gradeLevel));
+  if (filters.semester) query.set("semester", filters.semester);
+  if (filters.subject) query.set("subject", filters.subject);
+  if (filters.status) query.set("status", filters.status);
+  return request(`/api/v1/admin/curriculum/releases?${query.toString()}`);
+}
+
+export function createCurriculumRelease(payload: CurriculumReleaseInput): Promise<CurriculumRelease> {
+  return request("/api/v1/admin/curriculum/releases", {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function getCurriculumRelease(releaseId: string): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/releases/${releaseId}`);
+}
+
+export function addCurriculumUnit(
+  releaseId: string,
+  payload: { title: string; description?: string | null },
+): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/releases/${releaseId}/units`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function addCurriculumLesson(
+  unitId: string,
+  payload: { title: string; description?: string | null; estimated_minutes?: number | null },
+): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/units/${unitId}/lessons`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function addCurriculumActivity(
+  lessonId: string,
+  payload: { title: string; activity_type: CourseActivity["activity_type"]; instructions?: string | null },
+): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/lessons/${lessonId}/activities`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function addCurriculumKnowledgePoint(
+  activityId: string,
+  payload: { knowledge_point_id: string; role?: CoursePoint["role"]; reference_code?: string | null },
+): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/activities/${activityId}/knowledge-points`, {
+    method: "POST",
+    body: jsonBody(payload),
+  });
+}
+
+export function removeCurriculumKnowledgePoint(mappingId: string): Promise<{ removed: true }> {
+  return request(`/api/v1/admin/curriculum/knowledge-mappings/${mappingId}`, {
+    method: "DELETE",
+  });
+}
+
+export function updateCurriculumNode(
+  nodeType: "unit" | "lesson" | "activity",
+  nodeId: string,
+  payload: Record<string, unknown>,
+): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/nodes/${nodeType}/${nodeId}`, {
+    method: "PATCH",
+    body: jsonBody(payload),
+  });
+}
+
+export function moveCurriculumNode(
+  nodeType: "unit" | "lesson" | "activity",
+  nodeId: string,
+  direction: "up" | "down",
+): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/nodes/${nodeType}/${nodeId}/move`, {
+    method: "POST",
+    body: jsonBody({ direction }),
+  });
+}
+
+export function validateCurriculumRelease(releaseId: string): Promise<CurriculumValidationReport> {
+  return request(`/api/v1/admin/curriculum/releases/${releaseId}/validate`);
+}
+
+export function previewCurriculumRelease(releaseId: string): Promise<{
+  preview_mode: true;
+  writes_learning_data: false;
+  release: CurriculumRelease;
+}> {
+  return request(`/api/v1/admin/curriculum/releases/${releaseId}/preview`);
+}
+
+export function transitionCurriculumRelease(
+  releaseId: string,
+  action: "submit" | "return-to-draft" | "review" | "publish" | "archive",
+  confirmWarnings = false,
+): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/releases/${releaseId}/transition/${action}`, {
+    method: "POST",
+    body: jsonBody({ confirm_warnings: confirmWarnings }),
+  });
+}
+
+export function cloneCurriculumRelease(
+  releaseId: string,
+  releaseVersion: string,
+  changeSummary: string,
+): Promise<CurriculumRelease> {
+  return request(`/api/v1/admin/curriculum/releases/${releaseId}/new-version`, {
+    method: "POST",
+    body: jsonBody({ release_version: releaseVersion, change_summary: changeSummary }),
+  });
+}
+
+export function exportCurriculumRelease(releaseId: string): Promise<Record<string, unknown>> {
+  return request(`/api/v1/admin/curriculum/releases/${releaseId}/export`);
 }
 
 export function getChildToday(childId: string): Promise<ChildToday> {

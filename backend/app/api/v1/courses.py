@@ -13,7 +13,10 @@ from app.models import (
     Course,
     CourseSourceType,
     CourseSubject,
+    EducationStage,
     EnrollmentStatus,
+    GradeLevel,
+    Semester,
     TeacherProfile,
 )
 from app.schemas.course import (
@@ -52,9 +55,14 @@ async def list_available_courses(
     current_user: CurrentUser,
     session: DbSession,
     subject: Annotated[CourseSubject | None, Query()] = None,
+    grade_level: Annotated[GradeLevel | None, Query()] = None,
+    semester: Annotated[Semester | None, Query()] = None,
+    education_stage: Annotated[EducationStage | None, Query()] = None,
 ) -> list[CourseResponse]:
     child, _ = await get_authorized_child(session, current_user, child_id)
-    courses = await visible_courses(session, child.id, child.family_id, subject)
+    courses = await visible_courses(
+        session, child.id, child.family_id, subject, grade_level, semester, education_stage
+    )
     return [await course_response(session, course, child.id) for course in courses]
 
 
@@ -305,10 +313,16 @@ async def list_admin_courses(
     _admin: SystemAdmin,
     session: DbSession,
     subject: Annotated[CourseSubject | None, Query()] = None,
+    grade_level: Annotated[GradeLevel | None, Query()] = None,
+    semester: Annotated[Semester | None, Query()] = None,
 ) -> list[CourseResponse]:
     filters = [Course.source_type == CourseSourceType.SYSTEM]
     if subject is not None:
         filters.append(Course.subject == subject)
+    if grade_level is not None:
+        filters.append(Course.grade_level == grade_level)
+    if semester is not None:
+        filters.append(Course.semester == semester)
     courses = list(
         (
             await session.scalars(
@@ -352,6 +366,11 @@ async def update_admin_course(
     )
     if course is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    if course.curriculum_release_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Release-backed courses must use the curriculum workflow",
+        )
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(course, field, value)
     await session.commit()

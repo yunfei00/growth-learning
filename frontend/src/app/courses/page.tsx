@@ -37,6 +37,8 @@ function CoursesContent() {
   const { status, family, children, activeChild, setActiveChildId } = useActiveChild();
   const [courses, setCourses] = useState<Course[]>([]);
   const [subject, setSubject] = useState<Subject | "">("");
+  const [gradeOverride, setGradeOverride] = useState<number | null>(null);
+  const [semester, setSemester] = useState<Course["semester"]>("full_year");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
@@ -49,16 +51,23 @@ function CoursesContent() {
   const [searchResults, setSearchResults] = useState<ChineseCharacter[]>([]);
   const [selected, setSelected] = useState<ChineseCharacter[]>([]);
   const [copyTarget, setCopyTarget] = useState("");
+  const grade = gradeOverride ?? activeChild?.current_grade_level ?? 0;
 
   const load = useCallback(async () => {
     if (!activeChild) return;
     try {
-      setCourses(await listCourses(activeChild.id, subject || undefined));
+      setCourses(await listCourses(
+        activeChild.id,
+        subject || undefined,
+        grade || undefined,
+        grade === 0 ? "full_year" : semester,
+        grade === 0 ? "foundation" : grade <= 6 ? "primary" : "junior_middle",
+      ));
       setError("");
     } catch (requestError) {
       setError(requestError instanceof ApiClientError ? requestError.message : "课程加载失败");
     }
-  }, [activeChild, subject]);
+  }, [activeChild, grade, semester, subject]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -168,7 +177,7 @@ function CoursesContent() {
         <ChildSwitcher
           activeChildId={activeChild.id}
           childOptions={children}
-          onChange={setActiveChildId}
+          onChange={(childId) => { const next = children.find((child) => child.id === childId); setGradeOverride(null); setSemester(next?.current_grade_level ? "semester_1" : "full_year"); setActiveChildId(childId); }}
         />
       </header>
 
@@ -181,6 +190,17 @@ function CoursesContent() {
       {message ? <p className="form-message form-success">{message}</p> : null}
 
       <section className="course-actions">
+        <label>
+          年级
+          <select value={grade} onChange={(event) => { const next = Number(event.target.value); setGradeOverride(next); setSemester(next === 0 ? "full_year" : "semester_1"); }}>
+            <option value={0}>启蒙</option>
+            {Array.from({ length: 9 }, (_, index) => index + 1).map((item) => <option key={item} value={item}>{item} 年级{activeChild.current_grade_level === item ? "（当前）" : ""}</option>)}
+          </select>
+        </label>
+        {grade > 0 ? <label>
+          学期
+          <select value={semester} onChange={(event) => setSemester(event.target.value as Course["semester"])}><option value="semester_1">上学期</option><option value="semester_2">下学期</option></select>
+        </label> : null}
         <label>
           学科
           <select value={subject} onChange={(event) => setSubject(event.target.value as Subject | "")}>
@@ -285,10 +305,11 @@ function CoursesContent() {
         {courses.map((course) => (
           <article className="course-card" key={course.id}>
             <div className="course-card-topline">
-              <span>{subjectLabels[course.subject]} · {sourceLabels[course.source_type]}</span>
+              <span>{course.grade_level_label} · {course.semester_label} · {subjectLabels[course.subject]} · {sourceLabels[course.source_type]}</span>
               <span>{course.enrollment_status ? `路径：${course.enrollment_status}` : "未选择"}</span>
             </div>
             <h2>{course.title}</h2>
+            {course.curriculum_version ? <p><strong>Release {course.curriculum_version}</strong></p> : null}
             <p>{course.description}</p>
             <div className="course-stat-row">
               <span>课程完成 {course.completed_activities}/{course.activity_count}</span>

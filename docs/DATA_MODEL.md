@@ -334,3 +334,18 @@ expected/first/submitted answer、重试、提示、音频重播、结果、acto
 `LearningRecord`，Assessment 聚合为 `AssessmentItem`；两者不互相伪装。`english_daily_plans` 与
 `english_daily_plan_items` 保存可恢复的 5～10 分钟 Today 选择。四类英语 mastery 与
 `english-review-v1` 继续写入通用可重建投影，不建立竞争性的英语总分表。
+
+## Post-Phase-19 Curriculum Platform V1
+
+`courses` additive 增加 `education_stage`、nullable `grade_level`、`semester`、`curriculum_key`、
+`curriculum_version` 和 nullable `curriculum_release_id`。所有历史课程 backfill 为
+`foundation / grade_level=null / full_year`，原 Course ID、Enrollment、Activity Progress 和 Evidence
+不变。
+
+`curriculum_releases` 以 `(curriculum_key, release_version)` 唯一，保存 Draft/Review/Published/Archived
+状态、创建/审核/发布人员、时间、来源与版权预留、变更摘要和发布校验快照。`course_lessons` 位于 Unit
+与 Activity 之间；历史 Activity 允许 `lesson_id=null`，新正式课程通过 Validator 强制完整层级。
+
+`child_course_enrollments.curriculum_release_id` 固定孩子开始时的版本。`children.current_grade_level` 和
+`school_year` 由家长设置，不根据生日自动推断。`course_platform_events` 只保存第一方的课程/课次/活动
+状态事件与 ID，不记录题目正文、照片或第三方 Analytics 数据。

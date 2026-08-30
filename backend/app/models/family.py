@@ -157,6 +157,10 @@ class Child(TimestampMixin, Base):
             "gender IS NULL OR gender IN ('male', 'female', 'other')",
             name="ck_children_gender",
         ),
+        CheckConstraint(
+            "current_grade_level IS NULL OR current_grade_level BETWEEN 1 AND 9",
+            name="ck_children_current_grade_level",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -168,6 +172,8 @@ class Child(TimestampMixin, Base):
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)
     gender: Mapped[str | None] = mapped_column(String(20))
     avatar_key: Mapped[str | None] = mapped_column(String(255))
+    current_grade_level: Mapped[int | None] = mapped_column(Integer, index=True)
+    school_year: Mapped[str | None] = mapped_column(String(20))
     is_archived: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False, index=True
     )

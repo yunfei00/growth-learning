@@ -141,6 +141,8 @@ class ChildCreate(BaseModel):
     birth_date: date
     gender: GenderValue | None = None
     avatar_key: str | None = Field(default=None, max_length=255)
+    current_grade_level: int | None = Field(default=None, ge=1, le=9)
+    school_year: str | None = Field(default=None, pattern=r"^\d{4}-\d{4}$")
 
     @field_validator("display_name")
     @classmethod
@@ -171,6 +173,8 @@ class ChildUpdate(BaseModel):
     birth_date: date | None = None
     gender: GenderValue | None = None
     avatar_key: str | None = Field(default=None, max_length=255)
+    current_grade_level: int | None = Field(default=None, ge=1, le=9)
+    school_year: str | None = Field(default=None, pattern=r"^\d{4}-\d{4}$")
 
     @field_validator("display_name")
     @classmethod
@@ -207,6 +211,8 @@ class ChildResponse(BaseModel):
     birth_date: date
     gender: GenderValue | None
     avatar_key: str | None
+    current_grade_level: int | None
+    school_year: str | None
     is_archived: bool
     archived_at: datetime | None
     created_at: datetime

@@ -321,3 +321,21 @@ KnowledgePoint(subject=english, type=letter|word|phonics|phrase) ──> English
 `EnglishExerciseAttempt` 是题目级权威过程；音频重播与显式提示分开存储。Phonics audio provider
 禁止使用 letter name 代替 phoneme。System Admin 维护内容但不读取家庭私有进度。完整设计见
 [English Foundation V1](ENGLISH_FOUNDATION_V1.md)。
+
+## 22. Curriculum Platform V1
+
+```text
+CurriculumRelease ──1:1──> Course ──> CourseUnit ──> CourseLesson ──> LearningActivity
+       │                                                             │
+       │                                                             └──> ActivityKnowledgePoint
+       │                                                                        │
+       └──> ChildCourseEnrollment (version pin)                                 └──> KnowledgePoint
+```
+
+`CurriculumRelease` 是课程身份 `curriculum_key` 的不可歧义发布版本；`Course` 是该版本的可执行路径。
+Draft 才能修改结构，送审后锁定，Published 保存校验快照并只读；修改已发布内容必须复制为新的 Draft。
+Enrollment 固定 Release，升级另行设计，绝不静默替换孩子历史路径。
+
+教材路径仅引用 canonical `KnowledgePoint`。课程进度由 Lesson/Activity 完成度计算，Mastery 继续由
+Evidence 派生，换课程、换版本或换年级均不清空。Preview 只读取内容，不创建任何儿童 Evidence。
+JSON 合同与 CLI 见 [Curriculum Platform V1](CURRICULUM_PLATFORM_V1.md)。
