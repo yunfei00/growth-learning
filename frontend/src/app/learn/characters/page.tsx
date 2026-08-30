@@ -485,7 +485,14 @@ function CharacterLearningContent() {
     setIsLoading(true);
     resetFeedback();
     try {
-      setSettings(await updateLearningSettings(childId, settings));
+      setSettings(await updateLearningSettings(childId, {
+        max_new_characters_per_day: settings.max_new_characters_per_day,
+        daily_review_capacity: settings.daily_review_capacity,
+        weekly_assessment_enabled: settings.weekly_assessment_enabled,
+        monthly_assessment_enabled: settings.monthly_assessment_enabled,
+        timezone: settings.timezone,
+        character_review_mode: settings.character_review_mode,
+      }));
       setMessage("学习设置已保存；已有今日计划保持不变，明天按新设置生成。 ");
     } catch (requestError) {
       setError(messageFrom(requestError, "学习设置保存失败"));
