@@ -52,6 +52,7 @@ export function CharacterSpeechReview({
   onFallback,
 }: Props) {
   const providerRef = useRef<SpeechRecognitionProvider | null>(null);
+  const targetInitializedRef = useRef<string | null>(null);
   const [started, setStarted] = useState(false);
   const [machine, setMachine] = useState<SpeechReviewMachine>(initialSpeechReviewMachine);
   const [attempts, setAttempts] = useState<SpeechAttempt[]>([]);
@@ -71,6 +72,8 @@ export function CharacterSpeechReview({
   }, []);
 
   useEffect(() => {
+    if (targetInitializedRef.current === target.knowledge_point_id) return;
+    targetInitializedRef.current = target.knowledge_point_id;
     const timer = window.setTimeout(() => {
       setAttempts(target.speech_attempts ?? []);
       setMachine({ ...initialSpeechReviewMachine, hintUsed: Boolean(target.hint_requested_at) });
@@ -194,7 +197,7 @@ export function CharacterSpeechReview({
       window.setTimeout(() => {
         dispatch({ type: "RETRY" });
         void listen();
-      }, 900);
+      }, 1300);
     } finally {
       setBusy(false);
     }
