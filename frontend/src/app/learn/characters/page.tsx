@@ -592,7 +592,7 @@ function CharacterLearningContent() {
                   <span>{reviewEntry?.title ?? "每日复习"}</span>
                   <strong>{plan.review_count}</strong>
                   <small>{reviewTaskCompleted ? "已完成 ✓" : `待复习总数 ${plan.due_count}`}</small>
-                  {!reviewEntry?.speechEnabled ? <p className="daily-review-mode">当前：家长陪伴复习</p> : <p className="daily-review-mode">进入后开启麦克风，直接读出大字</p>}
+                  {!reviewEntry?.speechEnabled ? <p className="daily-review-mode">当前：家长陪伴复习</p> : <p className="daily-review-mode">{reviewTaskCompleted ? "今天已完成，查看记录不会重新测评" : "进入后开启麦克风，直接读出大字"}</p>}
                   <button onClick={() => void beginPlannedSession("daily_review")} disabled={!reviewEntry?.hasTask} type="button">{reviewEntry?.buttonLabel ?? "开始 / 继续复习"}</button>
                   {!reviewEntry?.speechEnabled && settings?.speech_review_feature_enabled && family.current_role === "admin" ? (
                     <button className="review-mode-link" onClick={openSpeechSettings} type="button">开启儿童朗读复习</button>

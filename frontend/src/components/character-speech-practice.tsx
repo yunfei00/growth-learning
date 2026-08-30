@@ -105,14 +105,19 @@ export function CharacterSpeechPractice({
       <p aria-live="polite" className={`speech-practice-message ${state}`}>{message}</p>
       <button
         className="button button-primary"
-        disabled={active}
+        disabled={active || state === "unsupported"}
         onClick={() => void start()}
         type="button"
       >
-        {state === "idle" ? "开启麦克风" : active ? "正在听…" : "再读一次"}
+        {state === "idle"
+          ? "开启麦克风"
+          : active
+            ? "正在听…"
+            : state === "unsupported"
+              ? "需要 HTTPS"
+              : "再读一次"}
       </button>
       <small>自由练习不会创建 AssessmentItem，不会修改掌握度或今日完成数。</small>
     </aside>
   );
 }
-
