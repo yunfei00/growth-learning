@@ -115,7 +115,10 @@ def test_representative_positions_cover_all_120_ten_character_strata() -> None:
     positions = representative_catalog_positions(1200, seed=42, sample_size=120)
     assert len(positions) == 120
     assert len(set(positions)) == 120
-    assert all(index * 10 <= position < (index + 1) * 10 for index, position in enumerate(positions))
+    assert all(
+        index * 10 <= position < (index + 1) * 10
+        for index, position in enumerate(positions)
+    )
     assert positions == representative_catalog_positions(1200, seed=42, sample_size=120)
     assert positions != representative_catalog_positions(1200, seed=43, sample_size=120)
 
