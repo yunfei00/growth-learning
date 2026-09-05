@@ -46,11 +46,8 @@ MAX_STORY_PARAGRAPHS = 24
 def _split_long_line(line: str) -> list[str]:
     if len(line) <= MAX_TTS_PARAGRAPH_CHARS:
         return [line]
-    sentences = [
-        part.strip()
-        for part in re.findall(r"[^。！？!?；;]+[。！？!?；;]?", line)
-        if part.strip()
-    ]
+    sentence_matches = re.findall(r"[^。！？!?；;]+[。！？!?；;]?", line)
+    sentences = [part.strip() for part in sentence_matches if part.strip()]
     chunks: list[str] = []
     current = ""
     for sentence in sentences:
