@@ -28,7 +28,11 @@ from app.models import (
 from app.schemas.story import ParentStoryCreateRequest
 from app.services.daily_reading import attach_story_to_today
 from app.services.review_planning import get_or_create_daily_plan
-from app.services.story_analysis import ANALYZER_VERSION, COVERAGE_POLICY_VERSION, analyze_story_coverage
+from app.services.story_analysis import (
+    ANALYZER_VERSION,
+    COVERAGE_POLICY_VERSION,
+    analyze_story_coverage,
+)
 from app.services.story_generation import MasterySnapshot, build_mastery_snapshot
 
 MANUAL_STORY_PROMPT_VERSION = "parent-story-v1"
@@ -42,7 +46,11 @@ MAX_STORY_PARAGRAPHS = 24
 def _split_long_line(line: str) -> list[str]:
     if len(line) <= MAX_TTS_PARAGRAPH_CHARS:
         return [line]
-    sentences = [part.strip() for part in re.findall(r"[^。！？!?；;]+[。！？!?；;]?", line) if part.strip()]
+    sentences = [
+        part.strip()
+        for part in re.findall(r"[^。！？!?；;]+[。！？!?；;]?", line)
+        if part.strip()
+    ]
     chunks: list[str] = []
     current = ""
     for sentence in sentences:
