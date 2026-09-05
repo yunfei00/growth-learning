@@ -64,9 +64,7 @@ async def start_literacy_diagnostic(
 ) -> LiteracyDiagnosticSessionResponse:
     await get_authorized_child(session, current_user, child_id)
     try:
-        return await start_or_resume_literacy_diagnostic(
-            session, child_id, current_user.id
-        )
+        return await start_or_resume_literacy_diagnostic(session, child_id, current_user.id)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(error)
