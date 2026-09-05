@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     literacy_asr_timeout_seconds: float = 15.0
     literacy_asr_max_audio_bytes: int = 2 * 1024 * 1024
 
+    # Reading TTS intentionally reuses the already server-only Model Studio
+    # credential/base URL.  It never exposes that credential to the browser.
+    reading_tts_enabled: bool = True
+    reading_tts_model: str = "qwen3-tts-flash"
+    reading_tts_voice: str = "Cherry"
+    reading_tts_timeout_seconds: float = 30.0
+
     @property
     def cors_origin_list(self) -> list[str]:
         """Return normalized origins from the comma-separated environment value."""
@@ -88,6 +95,17 @@ class Settings(BaseSettings):
             and self.literacy_asr_api_key.get_secret_value().strip()
             and self.literacy_asr_model.strip()
             and self.literacy_asr_base_url.strip()
+        )
+
+    @property
+    def reading_tts_configured(self) -> bool:
+        """Return whether server-side story TTS can use the Model Studio account."""
+        return bool(
+            self.reading_tts_enabled
+            and self.literacy_asr_api_key.get_secret_value().strip()
+            and self.literacy_asr_base_url.strip()
+            and self.reading_tts_model.strip()
+            and self.reading_tts_voice.strip()
         )
 
     @model_validator(mode="after")
@@ -122,6 +140,8 @@ class Settings(BaseSettings):
             raise ValueError("LITERACY_ASR_TIMEOUT_SECONDS must be positive")
         if self.literacy_asr_max_audio_bytes < 1024:
             raise ValueError("LITERACY_ASR_MAX_AUDIO_BYTES must be at least 1024")
+        if self.reading_tts_timeout_seconds <= 0:
+            raise ValueError("READING_TTS_TIMEOUT_SECONDS must be positive")
         return self
 
     @property
