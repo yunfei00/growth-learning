@@ -39,13 +39,13 @@ def test_curated_polyphone_is_accepted_without_accepting_every_reading() -> None
     )
     assert (
         evaluate_character_speech(character("行", "xíng", ["hang2"]), "hang3").decision
-        == SpeechReviewDecision.UNCERTAIN
+        == SpeechReviewDecision.NO_MATCH
     )
 
 
-def test_tone_difference_is_uncertain_and_no_tone_is_partial() -> None:
+def test_tone_difference_is_incorrect_and_no_tone_is_partial() -> None:
     tone = evaluate_character_speech(character("东", "dōng"), "懂")
-    assert tone.decision in {SpeechReviewDecision.UNCERTAIN, SpeechReviewDecision.NO_MATCH}
+    assert tone.decision == SpeechReviewDecision.NO_MATCH
     assert tone.syllable_match is True
     assert tone.tone_match is False
     assert (
