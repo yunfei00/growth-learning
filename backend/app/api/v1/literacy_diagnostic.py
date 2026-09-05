@@ -196,11 +196,7 @@ async def submit_literacy_diagnostic_audio_attempt(
     except LookupError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
     target = next(
-        (
-            item
-            for item in snapshot.targets
-            if item.knowledge_point_id == knowledge_point_id
-        ),
+        (item for item in snapshot.targets if item.knowledge_point_id == knowledge_point_id),
         None,
     )
     if target is None:
