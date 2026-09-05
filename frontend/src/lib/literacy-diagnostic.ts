@@ -1,15 +1,14 @@
-import type {
-  LiteracyDiagnosticOutcome,
-  LiteracyDiagnosticTarget,
-} from "@/lib/literacy-diagnostic-api";
+export type DiagnosticOutcome = "correct" | "uncertain" | "incorrect";
 
-export function nextDiagnosticTarget(
-  targets: LiteracyDiagnosticTarget[],
-): LiteracyDiagnosticTarget | null {
+export type DiagnosticTargetLike = {
+  outcome: DiagnosticOutcome | null;
+};
+
+export function nextDiagnosticTarget<T extends DiagnosticTargetLike>(targets: T[]): T | null {
   return targets.find((target) => target.outcome === null) ?? null;
 }
 
-export function diagnosticCounts(targets: LiteracyDiagnosticTarget[]): {
+export function diagnosticCounts(targets: DiagnosticTargetLike[]): {
   correct: number;
   uncertain: number;
   incorrect: number;
@@ -18,7 +17,7 @@ export function diagnosticCounts(targets: LiteracyDiagnosticTarget[]): {
   const counts = { correct: 0, uncertain: 0, incorrect: 0, completed: 0 };
   for (const target of targets) {
     if (!target.outcome) continue;
-    counts[target.outcome as LiteracyDiagnosticOutcome] += 1;
+    counts[target.outcome] += 1;
     counts.completed += 1;
   }
   return counts;
