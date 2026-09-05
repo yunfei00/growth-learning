@@ -197,19 +197,22 @@ function StoryReader() {
     }
   };
 
-  const stopAudio = () => {
+  const stopAudio = useCallback(() => {
     audioRef.current?.pause();
     audioRef.current = null;
     setAudioWorking(false);
     setPlayingParagraph(null);
     setAudioMessage("");
-  };
+  }, []);
 
-  const selectCharacter = (detail: CharacterGlossary) => {
-    stopAudio();
-    setSelectedGlossary(detail);
-    childFeedbackAudio.speakInstruction(detail.character);
-  };
+  const selectCharacter = useCallback(
+    (detail: CharacterGlossary) => {
+      stopAudio();
+      setSelectedGlossary(detail);
+      childFeedbackAudio.speakInstruction(detail.character);
+    },
+    [stopAudio],
+  );
 
   const renderText = (paragraph: string) =>
     Array.from(paragraph).map((character, index) => {
