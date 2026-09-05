@@ -109,3 +109,6 @@ class LiteracyDiagnosticOverviewResponse(BaseModel):
     recommended_sample_size: int
     segment_size: int
     limitation: str
+    server_asr_enabled: bool = False
+    server_asr_provider: str | None = None
+    server_asr_model: str | None = None
