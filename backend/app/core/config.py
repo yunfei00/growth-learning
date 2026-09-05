@@ -63,10 +63,32 @@ class Settings(BaseSettings):
     ai_story_max_attempts: int = 3
     character_speech_review_enabled: bool = False
 
+    # Independent from the text-AI provider so an existing DeepSeek key/model
+    # remains untouched. This secret is server-only and is never bundled into
+    # the browser application.
+    literacy_asr_provider: Literal["disabled", "dashscope"] = "disabled"
+    literacy_asr_base_url: str = (
+        "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
+    )
+    literacy_asr_api_key: SecretStr = SecretStr("")
+    literacy_asr_model: str = "qwen-audio-3.0-asr-flash"
+    literacy_asr_timeout_seconds: float = 15.0
+    literacy_asr_max_audio_bytes: int = 2 * 1024 * 1024
+
     @property
     def cors_origin_list(self) -> list[str]:
         """Return normalized origins from the comma-separated environment value."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def literacy_asr_configured(self) -> bool:
+        """Return whether the high-accuracy diagnostic ASR path is usable."""
+        return bool(
+            self.literacy_asr_provider == "dashscope"
+            and self.literacy_asr_api_key.get_secret_value().strip()
+            and self.literacy_asr_model.strip()
+            and self.literacy_asr_base_url.strip()
+        )
 
     @model_validator(mode="after")
     def validate_security_configuration(self) -> "Settings":
@@ -96,6 +118,10 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Production REGISTRATION_MODE currently supports only closed or invite_only"
             )
+        if self.literacy_asr_timeout_seconds <= 0:
+            raise ValueError("LITERACY_ASR_TIMEOUT_SECONDS must be positive")
+        if self.literacy_asr_max_audio_bytes < 1024:
+            raise ValueError("LITERACY_ASR_MAX_AUDIO_BYTES must be at least 1024")
         return self
 
     @property

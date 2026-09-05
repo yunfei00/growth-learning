@@ -79,6 +79,9 @@ export type LiteracyDiagnosticOverview = {
   recommended_sample_size: number;
   segment_size: number;
   limitation: string;
+  server_asr_enabled: boolean;
+  server_asr_provider: string | null;
+  server_asr_model: string | null;
 };
 
 type ApiErrorPayload = { detail?: string };
@@ -167,4 +170,45 @@ export function createLiteracyDiagnosticSpeechAttempt(
     `/api/v1/children/${childId}/literacy-diagnostic/sessions/${sessionId}/speech-attempts`,
     { method: "POST", body: JSON.stringify({ ...payload, hint_used: false }) },
   );
+}
+
+export async function createLiteracyDiagnosticAudioAttempt(
+  childId: string,
+  sessionId: string,
+  payload: {
+    knowledge_point_id: string;
+    attempt_index: number;
+    audio: Blob;
+    capture_duration_ms?: number;
+  },
+): Promise<SpeechAttempt> {
+  const form = new FormData();
+  form.set("knowledge_point_id", payload.knowledge_point_id);
+  form.set("attempt_index", String(payload.attempt_index));
+  if (typeof payload.capture_duration_ms === "number") {
+    form.set("capture_duration_ms", String(payload.capture_duration_ms));
+  }
+  const extension = payload.audio.type.includes("mp4")
+    ? "m4a"
+    : payload.audio.type.includes("ogg")
+      ? "ogg"
+      : payload.audio.type.includes("wav")
+        ? "wav"
+        : "webm";
+  form.set("audio", payload.audio, `diagnostic-utterance.${extension}`);
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/v1/children/${childId}/literacy-diagnostic/sessions/${sessionId}/audio-attempts`,
+    {
+      method: "POST",
+      body: form,
+      cache: "no-store",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    },
+  );
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as ApiErrorPayload | null;
+    throw new Error(body?.detail || `请求失败（HTTP ${response.status}）`);
+  }
+  return (await response.json()) as SpeechAttempt;
 }
