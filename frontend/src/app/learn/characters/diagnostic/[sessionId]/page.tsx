@@ -37,7 +37,6 @@ function messageFrom(error: unknown, fallback: string): string {
 function latestSpeechSummary(target: LiteracyDiagnosticTarget): {
   transcript: string | null;
   readings: string[];
-  provider: string | null;
 } {
   const attempt = [...target.speech_attempts]
     .sort((a, b) => b.attempt_index - a.attempt_index)
@@ -45,7 +44,6 @@ function latestSpeechSummary(target: LiteracyDiagnosticTarget): {
   return {
     transcript: attempt?.transcript ?? null,
     readings: attempt?.normalized_readings ?? [],
-    provider: attempt?.provider ?? null,
   };
 }
 
@@ -65,7 +63,7 @@ function ResultDetail() {
     } catch (requestError) {
       setError(messageFrom(requestError, "暂时无法读取这次识字检测详情"));
     }
-  }, [activeChild?.id, params.sessionId]);
+  }, [activeChild, params.sessionId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
