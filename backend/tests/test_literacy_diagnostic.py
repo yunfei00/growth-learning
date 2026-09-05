@@ -37,12 +37,16 @@ async def register_and_login(client: httpx.AsyncClient, email: str) -> dict:
         json={"email": email, "display_name": "识字检测家长", "password": PASSWORD},
     )
     assert registered.status_code == 201
-    logged_in = await client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
+    logged_in = await client.post(
+        "/api/v1/auth/login", json={"email": email, "password": PASSWORD}
+    )
     assert logged_in.status_code == 200
     return registered.json()
 
 
-async def create_family_and_child(client: httpx.AsyncClient, suffix: str = "") -> tuple[dict, dict]:
+async def create_family_and_child(
+    client: httpx.AsyncClient, suffix: str = ""
+) -> tuple[dict, dict]:
     family_response = await client.post(
         "/api/v1/families", json={"name": f"识字检测家庭{suffix}"}
     )
@@ -119,8 +123,12 @@ def test_representative_positions_cover_all_120_ten_character_strata() -> None:
         index * 10 <= position < (index + 1) * 10
         for index, position in enumerate(positions)
     )
-    assert positions == representative_catalog_positions(1200, seed=42, sample_size=120)
-    assert positions != representative_catalog_positions(1200, seed=43, sample_size=120)
+    assert positions == representative_catalog_positions(
+        1200, seed=42, sample_size=120
+    )
+    assert positions != representative_catalog_positions(
+        1200, seed=43, sample_size=120
+    )
 
 
 def test_wilson_estimate_scales_only_independent_correct_answers() -> None:
@@ -139,7 +147,9 @@ async def test_standard_diagnostic_is_resumable_and_only_updates_tested_characte
     _, child = await create_family_and_child(client)
     id_to_order = await seed_catalog(session_factory, 240)
 
-    started = await client.post(f"/api/v1/children/{child['id']}/literacy-diagnostic/start")
+    started = await client.post(
+        f"/api/v1/children/{child['id']}/literacy-diagnostic/start"
+    )
     assert started.status_code == 200
     body = started.json()
     assert body["source"] == "literacy_diagnostic"
@@ -155,10 +165,14 @@ async def test_standard_diagnostic_is_resumable_and_only_updates_tested_characte
     for index, target_id in enumerate(target_ids):
         assert index * 2 <= id_to_order[target_id] < (index + 1) * 2
 
-    resumed = await client.post(f"/api/v1/children/{child['id']}/literacy-diagnostic/start")
+    resumed = await client.post(
+        f"/api/v1/children/{child['id']}/literacy-diagnostic/start"
+    )
     assert resumed.status_code == 200
     assert resumed.json()["id"] == body["id"]
-    assert [item["knowledge_point_id"] for item in resumed.json()["targets"]] == target_ids
+    assert [
+        item["knowledge_point_id"] for item in resumed.json()["targets"]
+    ] == target_ids
 
     first = body["targets"][0]
     technical = await client.post(
@@ -175,9 +189,14 @@ async def test_standard_diagnostic_is_resumable_and_only_updates_tested_characte
     assert technical.json()["decision"] == "no_speech"
 
     async with session_factory() as session:
-        assert await session.scalar(select(func.count()).select_from(AssessmentItem)) == 0
+        assert (
+            await session.scalar(select(func.count()).select_from(AssessmentItem)) == 0
+        )
         assert await session.scalar(select(func.count()).select_from(LearningRecord)) == 0
-        assert await session.scalar(select(func.count()).select_from(ChildKnowledgeState)) == 0
+        assert (
+            await session.scalar(select(func.count()).select_from(ChildKnowledgeState))
+            == 0
+        )
 
     first_answer = await client.post(
         f"/api/v1/children/{child['id']}/literacy-diagnostic/sessions/{body['id']}/items",
@@ -196,7 +215,10 @@ async def test_standard_diagnostic_is_resumable_and_only_updates_tested_characte
     assert first_answer.json()["completed_items"] == 1
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(LearningRecord)) == 0
-        assert await session.scalar(select(func.count()).select_from(ChildKnowledgeState)) == 1
+        assert (
+            await session.scalar(select(func.count()).select_from(ChildKnowledgeState))
+            == 1
+        )
 
     # Complete the persisted sample in child-sized batches.  Overall mix:
     # 60 independent correct, 30 uncertain, 30 incorrect.
@@ -238,14 +260,21 @@ async def test_standard_diagnostic_is_resumable_and_only_updates_tested_characte
     assert overview.json()["active_session"] is None
     assert overview.json()["latest_result"]["assessment_session_id"] == body["id"]
 
-    history = await client.get(f"/api/v1/children/{child['id']}/literacy-diagnostic/history")
+    history = await client.get(
+        f"/api/v1/children/{child['id']}/literacy-diagnostic/history"
+    )
     assert history.status_code == 200
     assert history.json()[0]["directly_known"] == 60
 
     async with session_factory() as session:
         assert await session.scalar(select(func.count()).select_from(LearningRecord)) == 0
-        assert await session.scalar(select(func.count()).select_from(AssessmentItem)) == 120
-        assert await session.scalar(select(func.count()).select_from(ChildKnowledgeState)) == 120
+        assert (
+            await session.scalar(select(func.count()).select_from(AssessmentItem)) == 120
+        )
+        assert (
+            await session.scalar(select(func.count()).select_from(ChildKnowledgeState))
+            == 120
+        )
         estimate = await session.scalar(select(LiteracyEstimate))
         assert estimate is not None
         assert estimate.estimation_version == LITERACY_DIAGNOSTIC_ESTIMATION_VERSION
