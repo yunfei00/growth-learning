@@ -83,6 +83,9 @@ function LearningHubContent() {
           <Link className="learning-entry-card characters" href="/learn/characters">
             <span aria-hidden="true">字</span><div><h3>识字</h3><p>1200字学习路径</p><small>{characters ? `稳定掌握 ${characters.stable} / ${characters.total_enabled} 字` : errors.characters ? "识字进度暂时不可用" : "正在读取进度…"}</small></div>
           </Link>
+          <Link className="learning-entry-card characters" href="/learn/characters/diagnostic">
+            <span aria-hidden="true">测</span><div><h3>识字检测</h3><p>120字标准检测</p><small>估算当前1200字库内的独立识字情况</small></div>
+          </Link>
           <Link className="learning-entry-card pinyin" href="/learn/pinyin">
             <span aria-hidden="true">ā</span><div><h3>拼音</h3><p>声母 · 韵母 · 声调 · 拼读</p><small>{pinyin ? `已学习 ${pinyin.learned} / ${pinyin.total} · 稳定 ${pinyin.stable}` : errors.pinyin ? "拼音进度暂时不可用" : "正在读取进度…"}</small></div>
           </Link>
