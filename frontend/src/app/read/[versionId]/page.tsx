@@ -205,13 +205,25 @@ function StoryReader() {
     setAudioMessage("");
   };
 
+  const selectCharacter = (detail: CharacterGlossary) => {
+    stopAudio();
+    setSelectedGlossary(detail);
+    childFeedbackAudio.speakInstruction(detail.character);
+  };
+
   const renderText = (paragraph: string) =>
     Array.from(paragraph).map((character, index) => {
       const detail = glossary.get(character);
       const className = targets.has(character) ? "story-character target" : "story-character";
       if (!detail) return <span key={`${index}-${character}`}>{character}</span>;
       return (
-        <button className={className} key={`${index}-${character}`} onClick={() => setSelectedGlossary(detail)} type="button">
+        <button
+          aria-label={`听“${character}”并查看解释`}
+          className={className}
+          key={`${index}-${character}`}
+          onClick={() => selectCharacter(detail)}
+          type="button"
+        >
           {showPinyin ? <ruby>{character}<rt>{detail.pinyin}</rt></ruby> : character}
         </button>
       );
@@ -248,7 +260,7 @@ function StoryReader() {
       {!session ? (
         <div className="reading-start-card">
           <strong>准备好了吗？</strong>
-          <p>拼音默认关闭。轻点故事中的汉字，可以查看字库里的拼音、解释和常用词。</p>
+          <p>拼音默认关闭。轻点故事中的汉字会直接读出来，并打开拼音、解释和常用词。</p>
           <div className="mode-buttons">
             <button className={mode === "independent" ? "selected" : ""} onClick={() => setMode("independent")} type="button">独立阅读</button>
             <button className={mode === "with_help" ? "selected" : ""} onClick={() => setMode("with_help")} type="button">家长陪读</button>
@@ -286,7 +298,7 @@ function StoryReader() {
             onClick={() => childFeedbackAudio.speakInstruction(selectedGlossary.character)}
             type="button"
           >
-            🔊 听这个字
+            🔊 再听一次
           </button>
         </aside>
       ) : null}
