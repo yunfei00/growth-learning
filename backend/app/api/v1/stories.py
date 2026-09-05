@@ -1,14 +1,18 @@
-"""Mastery-aware story generation and household-private reading routes."""
+"""Mastery-aware generation plus parent-authored household-private reading routes."""
 
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from minio.error import S3Error
 
 from app.api.dependencies import CurrentUser, DbSession
 from app.integrations.ai.base import AIProvider
 from app.integrations.ai.factory import build_ai_provider
+from app.integrations.object_storage import PrivateObjectStorage, build_private_object_storage
+from app.integrations.tts import DashScopeTTSProvider, TTSProviderError
 from app.schemas.story import (
+    ParentStoryCreateRequest,
     ReadingAnswersSubmit,
     ReadingCompleteRequest,
     ReadingSessionResponse,
@@ -21,6 +25,8 @@ from app.schemas.story import (
     StoryVersionResponse,
 )
 from app.services.authorization import get_authorized_child
+from app.services.manual_story import create_parent_story
+from app.services.story_audio import paragraph_audio_key, prepare_story_paragraph_audio
 from app.services.story_generation import (
     StoryGenerationError,
     generate_story,
@@ -43,7 +49,12 @@ def get_story_ai_provider(request: Request) -> AIProvider:
     return build_ai_provider(request.app.state.settings)
 
 
+def get_story_storage(request: Request) -> PrivateObjectStorage:
+    return build_private_object_storage(request.app.state.settings)
+
+
 StoryAIProvider = Annotated[AIProvider, Depends(get_story_ai_provider)]
+StoryStorage = Annotated[PrivateObjectStorage, Depends(get_story_storage)]
 
 
 def _provider_config(request: Request) -> tuple[bool, str, str]:
@@ -54,6 +65,19 @@ def _provider_config(request: Request) -> tuple[bool, str, str]:
         and settings.ai_model
     )
     return configured, settings.ai_provider, settings.ai_model
+
+
+def _story_tts_provider(request: Request) -> DashScopeTTSProvider | None:
+    settings = request.app.state.settings
+    if not settings.reading_tts_configured:
+        return None
+    return DashScopeTTSProvider(
+        api_key=settings.literacy_asr_api_key.get_secret_value(),
+        base_url=settings.literacy_asr_base_url,
+        model=settings.reading_tts_model,
+        voice=settings.reading_tts_voice,
+        timeout_seconds=settings.reading_tts_timeout_seconds,
+    )
 
 
 @router.get("/{child_id}/reading-context", response_model=StoryGenerationContextResponse)
@@ -112,6 +136,113 @@ async def create_story(
         status="succeeded",
         attempt_count=run.attempt_count,
         version=await story_version_response(session, child_id, version),
+    )
+
+
+@router.post(
+    "/{child_id}/stories/manual",
+    response_model=StoryGenerationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_manual_story(
+    child_id: uuid.UUID,
+    payload: ParentStoryCreateRequest,
+    request: Request,
+    session: DbSession,
+    current_user: CurrentUser,
+) -> StoryGenerationResponse:
+    """Save a parent-pasted story without literacy gating and prepare narration."""
+
+    child, _ = await get_authorized_child(session, current_user, child_id, admin_required=True)
+    try:
+        run, version = await create_parent_story(
+            session,
+            child=child,
+            created_by_user_id=current_user.id,
+            payload=payload,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    tts = _story_tts_provider(request)
+    if tts is not None:
+        try:
+            storage = build_private_object_storage(request.app.state.settings)
+            await prepare_story_paragraph_audio(
+                storage,
+                tts,
+                child_id=child_id,
+                version=version,
+            )
+        except (TTSProviderError, S3Error, ValueError):
+            # The authored story is already safely persisted. Narration is a
+            # recoverable enhancement and must never destroy the reading item.
+            pass
+
+    return StoryGenerationResponse(
+        generation_run_id=run.id,
+        status="succeeded",
+        attempt_count=run.attempt_count,
+        version=await story_version_response(session, child_id, version),
+    )
+
+
+@router.post("/{child_id}/story-versions/{story_version_id}/audio/prepare")
+async def prepare_story_audio(
+    child_id: uuid.UUID,
+    story_version_id: uuid.UUID,
+    request: Request,
+    session: DbSession,
+    current_user: CurrentUser,
+    storage: StoryStorage,
+) -> dict[str, object]:
+    await get_authorized_child(session, current_user, child_id, admin_required=True)
+    row = await get_private_story_version(session, child_id, story_version_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Story version not found")
+    _, version = row
+    tts = _story_tts_provider(request)
+    if tts is None:
+        raise HTTPException(status_code=503, detail="故事朗读服务尚未配置")
+    try:
+        count = await prepare_story_paragraph_audio(
+            storage,
+            tts,
+            child_id=child_id,
+            version=version,
+        )
+    except TTSProviderError as error:
+        raise HTTPException(status_code=503, detail="故事音频生成失败，请稍后重试") from error
+    return {"prepared": True, "segments": count, "model": tts.model, "voice": tts.voice}
+
+
+@router.get(
+    "/{child_id}/story-versions/{story_version_id}/audio/paragraphs/{paragraph_index}",
+    response_class=Response,
+)
+async def get_story_paragraph_audio(
+    child_id: uuid.UUID,
+    story_version_id: uuid.UUID,
+    paragraph_index: int,
+    session: DbSession,
+    current_user: CurrentUser,
+    storage: StoryStorage,
+) -> Response:
+    await get_authorized_child(session, current_user, child_id)
+    row = await get_private_story_version(session, child_id, story_version_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Story version not found")
+    _, version = row
+    if paragraph_index < 0 or paragraph_index >= len(version.paragraphs):
+        raise HTTPException(status_code=404, detail="Story paragraph not found")
+    try:
+        content = await storage.read(paragraph_audio_key(child_id, version.id, paragraph_index))
+    except S3Error as error:
+        raise HTTPException(status_code=404, detail="Story narration not prepared") from error
+    return Response(
+        content=content,
+        media_type="audio/wav",
+        headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff"},
     )
 
 

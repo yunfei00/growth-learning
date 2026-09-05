@@ -38,6 +38,7 @@ const THEME_LABELS: Record<string, string> = {
   nature: "自然",
   family_life: "家庭生活",
   science: "科学探索",
+  parent_authored: "家长添加",
 };
 
 const DIFFICULTY_LABELS: Record<StoryDifficulty, string> = {
@@ -139,9 +140,9 @@ function ReadingLibrary() {
     <section className="reading-hub section-shell">
       <div className="dashboard-toolbar">
         <div>
-          <p className="eyebrow">Mastery-aware reading</p>
+          <p className="eyebrow">阅读</p>
           <h1>我的故事书</h1>
-          <p className="role-note">每篇故事都保存生成当时的识字掌握快照与实际覆盖率。</p>
+          <p className="role-note">独立阅读和辅助阅读可以同时进行；每篇故事都会保存当时的识字覆盖情况。</p>
         </div>
         <ChildSwitcher
           activeChildId={activeChild.id}
@@ -165,14 +166,35 @@ function ReadingLibrary() {
 
       <section className="story-generator-panel">
         <div className="section-title-row">
-          <div><p className="eyebrow">今日阅读</p><h2>生成适合当前识字水平的故事</h2></div>
+          <div>
+            <p className="eyebrow">辅助阅读</p>
+            <h2>家长添加一篇故事</h2>
+          </div>
+          <span>不受当前识字量限制</span>
+        </div>
+        <p>
+          把你选好的故事直接粘贴进来。系统会分析生字、提供点字查看拼音和解释，
+          并在百炼语音可用时自动缓存分段朗读。识字量只用于提示难度，不会阻止孩子开始阅读。
+        </p>
+        {canGenerate ? (
+          <Link className="button button-primary" href="/read/new">
+            ＋ 家长添加故事
+          </Link>
+        ) : (
+          <p className="catalog-note">家庭管理员可以添加故事，其他成员可以陪孩子阅读。</p>
+        )}
+      </section>
+
+      <section className="story-generator-panel">
+        <div className="section-title-row">
+          <div><p className="eyebrow">独立阅读</p><h2>生成适合当前识字水平的故事</h2></div>
           <span>强掌握 {context?.strong_known_count ?? 0} 字 · 可用识别 {context?.usable_recognizing_count ?? 0} 字</span>
         </div>
 
         {context && !context.provider_configured ? (
           <div className="provider-disabled">
             <strong>AI 服务尚未配置</strong>
-            <p>故事书、阅读历史和全部本地能力可用；配置服务器 AI Provider 后即可生成新故事。</p>
+            <p>故事书、阅读历史和家长添加故事都可用；配置文字 AI 后即可自动生成新故事。</p>
           </div>
         ) : null}
         {context?.feasibility_message ? <p className="form-message form-error">{context.feasibility_message}</p> : null}
@@ -181,7 +203,7 @@ function ReadingLibrary() {
           <label>
             安全主题
             <select value={theme} onChange={(event) => setTheme(event.target.value)}>
-              {(context?.safe_themes ?? Object.keys(THEME_LABELS)).map((value) => (
+              {(context?.safe_themes ?? Object.keys(THEME_LABELS).filter((value) => value !== "parent_authored")).map((value) => (
                 <option key={value} value={value}>{THEME_LABELS[value] ?? value}</option>
               ))}
             </select>
@@ -242,13 +264,13 @@ function ReadingLibrary() {
           onClick={() => void handleGenerate()}
           type="button"
         >
-          {isGenerating ? "正在生成并校验实际覆盖率…" : canGenerate ? "生成故事" : "陪伴成员可阅读，家庭管理员可生成"}
+          {isGenerating ? "正在生成并校验实际覆盖率…" : canGenerate ? "生成独立阅读故事" : "陪伴成员可阅读，家庭管理员可生成"}
         </button>
         <p className="catalog-note">{context?.catalog_limitation}</p>
       </section>
 
       <section className="storybook-section">
-        <div className="section-title-row"><div><p className="eyebrow">Archive</p><h2>按时间保存的真实版本</h2></div><span>{stories?.total ?? 0} 个版本</span></div>
+        <div className="section-title-row"><div><p className="eyebrow">故事库</p><h2>按时间保存的真实版本</h2></div><span>{stories?.total ?? 0} 个版本</span></div>
         <div className="storybook-filters">
           <label>
             搜索标题
@@ -266,16 +288,20 @@ function ReadingLibrary() {
           <div className="storybook-grid">
             {stories.items.map((story) => (
               <Link className="story-card" href={`/read/${story.story_version_id}`} key={story.story_version_id}>
-                <div><span>{THEME_LABELS[story.theme] ?? story.theme}</span><span>{DIFFICULTY_LABELS[story.difficulty]}</span></div>
+                <div><span>{THEME_LABELS[story.theme] ?? story.theme}</span><span>{story.theme === "parent_authored" ? "辅助阅读" : DIFFICULTY_LABELS[story.difficulty]}</span></div>
                 <h3>{story.title}</h3>
-                <p>实际已知字覆盖率 {(story.actual_known_coverage * 100).toFixed(1)}%</p>
-                <p>目标字：{story.target_characters.join("、")}</p>
+                <p>当前已知字覆盖率 {(story.actual_known_coverage * 100).toFixed(1)}%</p>
+                <p>{story.target_characters.length ? `目标字：${story.target_characters.join("、")}` : "可点字查看拼音、解释和常用词"}</p>
                 <small>{new Date(story.generated_at).toLocaleDateString("zh-CN")} · {story.reading_status === "completed" ? "已读完" : story.reading_status === "in_progress" ? "继续阅读" : "尚未阅读"} · 理解题 {story.comprehension_answered}/{story.comprehension_total}</small>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="empty-storybook"><strong>故事书还是空的</strong><p>具备足够字符掌握证据并配置 AI 服务后，可以生成第一篇故事。</p></div>
+          <div className="empty-storybook">
+            <strong>故事书还是空的</strong>
+            <p>不用等识字量达标，家庭管理员现在就可以添加第一篇辅助阅读故事。</p>
+            {canGenerate ? <Link className="button button-primary" href="/read/new">添加第一篇故事</Link> : null}
+          </div>
         )}
       </section>
     </section>

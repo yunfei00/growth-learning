@@ -52,6 +52,21 @@ class StoryGenerationRequest(BaseModel):
     story_id: uuid.UUID | None = None
 
 
+class ParentStoryCreateRequest(BaseModel):
+    """A household parent can paste a story regardless of current literacy count."""
+
+    title: str = Field(min_length=1, max_length=120)
+    content: str = Field(min_length=1, max_length=5000)
+
+    @field_validator("title", "content")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("内容不能为空")
+        return cleaned
+
+
 class CoverageMetricsResponse(BaseModel):
     analyzer_version: str
     total_han_occurrences: int
