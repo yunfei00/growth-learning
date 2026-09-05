@@ -1,12 +1,13 @@
 """Parent-authored assisted stories without a literacy admission gate.
 
 Manual stories reuse the immutable Story/StoryVersion model and the existing
-reading evidence pipeline.  Coverage is measured for guidance only; it never
+reading evidence pipeline. Coverage is measured for guidance only; it never
 blocks a parent from saving a story for assisted reading.
 """
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import UTC, datetime
 
@@ -34,19 +35,49 @@ MANUAL_STORY_PROMPT_VERSION = "parent-story-v1"
 MANUAL_STORY_PROVIDER = "parent_manual"
 MANUAL_STORY_MODEL = "parent-authored"
 MANUAL_STORY_THEME = "parent_authored"
+MAX_TTS_PARAGRAPH_CHARS = 220
+MAX_STORY_PARAGRAPHS = 24
+
+
+def _split_long_line(line: str) -> list[str]:
+    if len(line) <= MAX_TTS_PARAGRAPH_CHARS:
+        return [line]
+    sentences = [part.strip() for part in re.findall(r"[^。！？!?；;]+[。！？!?；;]?", line) if part.strip()]
+    chunks: list[str] = []
+    current = ""
+    for sentence in sentences:
+        if len(sentence) > MAX_TTS_PARAGRAPH_CHARS:
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.extend(
+                sentence[index : index + MAX_TTS_PARAGRAPH_CHARS]
+                for index in range(0, len(sentence), MAX_TTS_PARAGRAPH_CHARS)
+            )
+            continue
+        if current and len(current) + len(sentence) > MAX_TTS_PARAGRAPH_CHARS:
+            chunks.append(current)
+            current = sentence
+        else:
+            current += sentence
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def split_story_paragraphs(text: str) -> list[str]:
-    """Normalize pasted story text into a bounded list of readable paragraphs."""
+    """Normalize pasted text and bound each paragraph for reliable TTS calls."""
 
     normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
     if not normalized:
         raise ValueError("故事内容不能为空")
-    paragraphs = [line.strip() for line in normalized.split("\n") if line.strip()]
+    paragraphs: list[str] = []
+    for line in (line.strip() for line in normalized.split("\n") if line.strip()):
+        paragraphs.extend(_split_long_line(line))
     if not paragraphs:
         raise ValueError("故事内容不能为空")
-    if len(paragraphs) > 20:
-        raise ValueError("故事最多支持 20 段，请先精简或合并段落")
+    if len(paragraphs) > MAX_STORY_PARAGRAPHS:
+        raise ValueError("故事分段后超过 24 段，请先精简内容")
     return paragraphs
 
 
