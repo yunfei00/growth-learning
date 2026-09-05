@@ -104,11 +104,13 @@ def evaluate_character_speech(
     confidence: float | None = None,
     confidence_available: bool = False,
 ) -> SpeechEvaluation:
-    """Evaluate a browser transcript conservatively.
+    """Evaluate one short character-reading transcript conservatively.
 
     Confidence is retained as evidence but deliberately does not decide mastery.
-    A transcript can match a curated alternate reading (for example ``行``/``hang2``),
-    while a tone-only disagreement remains uncertain instead of incorrect.
+    A transcript can match a curated alternate reading (for example ``行``/``hang2``).
+    A usable reading with the right syllable but the wrong tone is still a valid
+    incorrect answer for literacy recognition; only genuinely missing tone data
+    remains partial/uncertain.
     """
 
     del confidence, confidence_available  # never use ASR confidence as mastery
@@ -176,7 +178,7 @@ def evaluate_character_speech(
         for valid in valid_readings
     ):
         return SpeechEvaluation(
-            SpeechReviewDecision.UNCERTAIN,
+            SpeechReviewDecision.NO_MATCH,
             tuple(normalized),
             True,
             False,
