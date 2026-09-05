@@ -209,7 +209,10 @@ async def submit_literacy_diagnostic_audio_attempt(
             detail="Audio target is outside the persisted diagnostic sample",
         )
     if target.outcome is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Diagnostic target answered")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Diagnostic target answered",
+        )
     existing = next(
         (item for item in target.speech_attempts if item.attempt_index == attempt_index),
         None,
