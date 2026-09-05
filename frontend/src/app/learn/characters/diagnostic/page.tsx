@@ -511,6 +511,12 @@ function DiagnosticContent() {
           </section>
           <p className={styles.limitation}>{result.limitation}</p>
           <div className={styles.footerActions}>
+            <Link
+              className="button button-primary"
+              href={`/learn/characters/diagnostic/${session.id}`}
+            >
+              查看本次逐字结果
+            </Link>
             <button
               className="button button-secondary"
               onClick={() => {
@@ -521,7 +527,7 @@ function DiagnosticContent() {
             >
               返回检测中心
             </button>
-            <Link className="button button-primary" href="/learn/characters">
+            <Link className="button button-secondary" href="/learn/characters">
               回到识字学习
             </Link>
           </div>
@@ -648,6 +654,12 @@ function DiagnosticContent() {
                 95% 估算范围约 {latest.lower_bound}～{latest.upper_bound} 字 · 本次直接认识{" "}
                 {latest.directly_known} / {latest.sample_size}
               </p>
+              <Link
+                className="button button-secondary"
+                href={`/learn/characters/diagnostic/${latest.assessment_session_id}`}
+              >
+                查看最近一次逐字结果
+              </Link>
             </section>
           ) : null}
           <section className={styles.introCard}>
@@ -701,6 +713,12 @@ function DiagnosticContent() {
                   ) : (
                     <p>已完成 {item.completed_items} / {item.total_items}</p>
                   )}
+                  <Link
+                    className="button button-secondary"
+                    href={`/learn/characters/diagnostic/${item.id}`}
+                  >
+                    查看详情
+                  </Link>
                 </article>
               ))}
             </section>
