@@ -216,7 +216,9 @@ async def _create_result(
     assessment: AssessmentSession,
 ) -> LiteracyEstimate:
     existing = await session.scalar(
-        select(LiteracyEstimate).where(LiteracyEstimate.assessment_session_id == assessment.id)
+        select(LiteracyEstimate).where(
+            LiteracyEstimate.assessment_session_id == assessment.id
+        )
     )
     if existing is not None:
         return existing
@@ -478,7 +480,10 @@ async def submit_literacy_diagnostic_items(
         raise RuntimeError("One or more diagnostic characters already have preserved evidence")
 
     for item in payload.items:
-        if item.evaluation_method == "speech_assisted" and not item.speech_attempt_ids:
+        if (
+            item.evaluation_method == "speech_assisted"
+            and not item.speech_attempt_ids
+        ):
             raise ValueError("Speech-assisted outcomes require speech attempt evidence")
         if item.speech_attempt_ids:
             valid_attempt_ids = set(
@@ -607,7 +612,9 @@ async def persist_literacy_diagnostic_speech_attempt(
         confidence_available=payload.confidence_available,
         normalized_readings_json=normalized_readings,
         decision=decision,
-        syllable_match=evaluation.syllable_match if has_transcript else payload.syllable_match,
+        syllable_match=(
+            evaluation.syllable_match if has_transcript else payload.syllable_match
+        ),
         tone_match=evaluation.tone_match if has_transcript else payload.tone_match,
         tone_evaluation=(
             evaluation.tone_evaluation if has_transcript else payload.tone_evaluation
@@ -701,10 +708,14 @@ async def literacy_diagnostic_overview(
     )
     return LiteracyDiagnosticOverviewResponse(
         active_session=(
-            await literacy_diagnostic_session_response(session, active) if active else None
+            await literacy_diagnostic_session_response(session, active)
+            if active
+            else None
         ),
         latest_result=(
-            await _result_for_assessment(session, latest_completed) if latest_completed else None
+            await _result_for_assessment(session, latest_completed)
+            if latest_completed
+            else None
         ),
         history=history,
         recommended_sample_size=LITERACY_DIAGNOSTIC_SAMPLE_SIZE,
