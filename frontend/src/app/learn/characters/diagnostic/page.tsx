@@ -183,7 +183,6 @@ function DiagnosticContent() {
   const handleSavedAttempt = useCallback(
     async (
       target: LiteracyDiagnosticTarget,
-      attemptIndex: number,
       saved: Awaited<ReturnType<typeof createLiteracyDiagnosticSpeechAttempt>>,
     ) => {
       applyAttemptToSession(target.knowledge_point_id, saved);
@@ -192,15 +191,17 @@ function DiagnosticContent() {
         setFeedback("听到了，很棒！");
         await playCorrectFeedback();
         await submitOutcome(target, "correct", "speech_assisted", attemptIds);
-      } else if (saved.explicit_unknown) {
-        setFeedback("知道啦，我们把这个字留给以后学习。");
+      } else if (saved.decision === "no_match") {
+        setFeedback(
+          saved.explicit_unknown
+            ? "知道啦，我们把这个字留给以后学习。"
+            : "读音不对，这个字先记为不认识。",
+        );
         await playIncorrectFeedback();
         await submitOutcome(target, "incorrect", "speech_assisted", attemptIds);
-      } else if (attemptIndex >= 3) {
-        setFeedback("这几次都没法可靠判断，先记作待确认。不会算成不认识。");
-        await submitOutcome(target, "uncertain", "speech_assisted", attemptIds);
       } else {
-        setFeedback("没有判断准，可以再读一次；也可以让家长判断。");
+        setFeedback("这次听到了，但不能可靠确认，先记作待确认。");
+        await submitOutcome(target, "uncertain", "speech_assisted", attemptIds);
       }
     },
     [applyAttemptToSession, submitOutcome],
@@ -222,7 +223,7 @@ function DiagnosticContent() {
           audio: recording.blob,
           capture_duration_ms: recording.durationMs,
         });
-        await handleSavedAttempt(target, attemptIndex, saved);
+        await handleSavedAttempt(target, saved);
         return true;
       } catch (reason) {
         const code = errorCodeFrom(reason);
@@ -283,7 +284,7 @@ function DiagnosticContent() {
           decision: "uncertain",
           provider_metadata: { language: result.language, fallback: true },
         });
-        await handleSavedAttempt(target, attemptIndex, saved);
+        await handleSavedAttempt(target, saved);
       } catch (reason) {
         const code: SpeechRecognitionErrorCode =
           typeof reason === "object" && reason && "code" in reason
@@ -596,7 +597,7 @@ function DiagnosticContent() {
             ) : (
               <div className={styles.speechActions}>
                 <button disabled={listening} onClick={() => void listen()} type="button">
-                  🎙️ 再读一次
+                  🎙️ 重试录音
                 </button>
                 <button disabled={listening} onClick={() => void explicitUnknown()} type="button">
                   🤷 不知道
@@ -660,7 +661,8 @@ function DiagnosticContent() {
             </div>
             <div className={styles.featureList}>
               <span>4 小段 × 30 字</span>
-              <span>{overview?.server_asr_enabled ? "高精度云端听读，失败可本机/家长判断" : "语音优先，也可家长判断"}</span>
+              <span>{overview?.server_asr_enabled ? "高精度云端听读，技术失败可本机/家长判断" : "语音优先，也可家长判断"}</span>
+              <span>每个字按第一次有效读音判定，只有技术问题才重试</span>
               <span>没有提示音，不提前暴露答案</span>
               <span>技术没听清 ≠ 孩子不认识</span>
             </div>
