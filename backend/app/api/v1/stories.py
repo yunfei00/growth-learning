@@ -150,7 +150,6 @@ async def create_manual_story(
     request: Request,
     session: DbSession,
     current_user: CurrentUser,
-    storage: StoryStorage,
 ) -> StoryGenerationResponse:
     """Save a parent-pasted story without literacy gating and prepare narration."""
 
@@ -168,13 +167,14 @@ async def create_manual_story(
     tts = _story_tts_provider(request)
     if tts is not None:
         try:
+            storage = build_private_object_storage(request.app.state.settings)
             await prepare_story_paragraph_audio(
                 storage,
                 tts,
                 child_id=child_id,
                 version=version,
             )
-        except (TTSProviderError, S3Error):
+        except (TTSProviderError, S3Error, ValueError):
             # The authored story is already safely persisted. Narration is a
             # recoverable enhancement and must never destroy the reading item.
             pass
