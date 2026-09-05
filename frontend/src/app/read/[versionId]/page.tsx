@@ -23,6 +23,37 @@ function messageFrom(error: unknown, fallback: string) {
   return error instanceof ApiClientError || error instanceof Error ? error.message : fallback;
 }
 
+type StoryTextProps = {
+  paragraph: string;
+  glossary: Map<string, CharacterGlossary>;
+  targets: Set<string>;
+  showPinyin: boolean;
+  onCharacterTap: (detail: CharacterGlossary) => void;
+};
+
+function StoryText({ paragraph, glossary, targets, showPinyin, onCharacterTap }: StoryTextProps) {
+  return (
+    <>
+      {Array.from(paragraph).map((character, index) => {
+        const detail = glossary.get(character);
+        const className = targets.has(character) ? "story-character target" : "story-character";
+        if (!detail) return <span key={`${index}-${character}`}>{character}</span>;
+        return (
+          <button
+            aria-label={`听“${character}”并查看解释`}
+            className={className}
+            key={`${index}-${character}`}
+            onClick={() => onCharacterTap(detail)}
+            type="button"
+          >
+            {showPinyin ? <ruby>{character}<rt>{detail.pinyin}</rt></ruby> : character}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
 function StoryReader() {
   const params = useParams<{ versionId: string }>();
   const { activeChild, family } = useActiveChild();
@@ -66,6 +97,23 @@ function StoryReader() {
       childFeedbackAudio.cancel();
     },
     [],
+  );
+
+  const stopAudio = useCallback(() => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setAudioWorking(false);
+    setPlayingParagraph(null);
+    setAudioMessage("");
+  }, []);
+
+  const selectCharacter = useCallback(
+    (detail: CharacterGlossary) => {
+      stopAudio();
+      setSelectedGlossary(detail);
+      childFeedbackAudio.speakInstruction(detail.character);
+    },
+    [stopAudio],
   );
 
   const glossary = useMemo(
@@ -197,41 +245,6 @@ function StoryReader() {
     }
   };
 
-  const stopAudio = useCallback(() => {
-    audioRef.current?.pause();
-    audioRef.current = null;
-    setAudioWorking(false);
-    setPlayingParagraph(null);
-    setAudioMessage("");
-  }, []);
-
-  const selectCharacter = useCallback(
-    (detail: CharacterGlossary) => {
-      stopAudio();
-      setSelectedGlossary(detail);
-      childFeedbackAudio.speakInstruction(detail.character);
-    },
-    [stopAudio],
-  );
-
-  const renderText = (paragraph: string) =>
-    Array.from(paragraph).map((character, index) => {
-      const detail = glossary.get(character);
-      const className = targets.has(character) ? "story-character target" : "story-character";
-      if (!detail) return <span key={`${index}-${character}`}>{character}</span>;
-      return (
-        <button
-          aria-label={`听“${character}”并查看解释`}
-          className={className}
-          key={`${index}-${character}`}
-          onClick={() => selectCharacter(detail)}
-          type="button"
-        >
-          {showPinyin ? <ruby>{character}<rt>{detail.pinyin}</rt></ruby> : character}
-        </button>
-      );
-    });
-
   return (
     <section className="reader-page section-shell">
       <div className="reader-topbar">
@@ -275,7 +288,15 @@ function StoryReader() {
       <article className="story-paper">
         {story.paragraphs.map((paragraph, index) => (
           <div className="story-paragraph-block" key={index}>
-            <p>{renderText(paragraph)}</p>
+            <p>
+              <StoryText
+                glossary={glossary}
+                onCharacterTap={selectCharacter}
+                paragraph={paragraph}
+                showPinyin={showPinyin}
+                targets={targets}
+              />
+            </p>
             {manualStory ? (
               <button
                 className="button button-secondary"
