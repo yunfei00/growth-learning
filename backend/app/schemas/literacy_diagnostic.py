@@ -31,7 +31,7 @@ class LiteracyDiagnosticBatchSubmit(BaseModel):
     items: list[LiteracyDiagnosticItemSubmit] = Field(min_length=1, max_length=30)
 
     @model_validator(mode="after")
-    def unique_items(self) -> "LiteracyDiagnosticBatchSubmit":
+    def unique_items(self) -> LiteracyDiagnosticBatchSubmit:
         ids = [item.knowledge_point_id for item in self.items]
         if len(ids) != len(set(ids)):
             raise ValueError("A character can appear only once per diagnostic submission")
