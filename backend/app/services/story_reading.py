@@ -38,6 +38,8 @@ from app.schemas.story import (
     StoryVersionResponse,
 )
 from app.services.daily_reading import mark_reading_completed, mark_reading_started
+from app.services.story_analysis import extract_han
+from app.services.story_pinyin import first_contextual_readings
 
 
 async def get_private_story_version(
@@ -50,6 +52,58 @@ async def get_private_story_version(
             .where(Story.child_id == child_id, StoryVersion.id == version_id)
         )
     ).one_or_none()
+
+
+async def _story_glossary(
+    session: AsyncSession, version: StoryVersion
+) -> list[CharacterGlossaryResponse]:
+    """Build reading help for every Han character without altering mastery data."""
+
+    story_characters = set(extract_han("\n".join(version.paragraphs)))
+    contextual_readings = first_contextual_readings(version.paragraphs)
+    catalog_rows: list[tuple[uuid.UUID, ChineseCharacter]] = []
+    if story_characters:
+        catalog_rows = list(
+            (
+                await session.execute(
+                    select(KnowledgePoint.id, ChineseCharacter)
+                    .join(ChineseCharacter)
+                    .where(ChineseCharacter.character.in_(story_characters))
+                )
+            ).all()
+        )
+    catalog_by_character = {
+        character.character: (point_id, character) for point_id, character in catalog_rows
+    }
+
+    items: list[CharacterGlossaryResponse] = []
+    for character_text in sorted(story_characters):
+        reading = contextual_readings.get(character_text)
+        if reading is None:
+            continue
+        catalog_entry = catalog_by_character.get(character_text)
+        if catalog_entry is None:
+            items.append(
+                CharacterGlossaryResponse(
+                    knowledge_point_id=None,
+                    character=character_text,
+                    pinyin=reading,
+                    simple_meaning=None,
+                    common_words=[],
+                )
+            )
+            continue
+        point_id, character = catalog_entry
+        items.append(
+            CharacterGlossaryResponse(
+                knowledge_point_id=point_id,
+                character=character_text,
+                pinyin=reading,
+                simple_meaning=character.simple_meaning,
+                common_words=character.common_words,
+            )
+        )
+    return items
 
 
 async def story_version_response(
@@ -69,20 +123,7 @@ async def story_version_response(
             )
         ).all()
     )
-    glossary_rows = list(
-        (
-            await session.execute(
-                select(KnowledgePoint.id, ChineseCharacter)
-                .join(ChineseCharacter)
-                .join(
-                    StoryKnowledgePoint,
-                    StoryKnowledgePoint.knowledge_point_id == KnowledgePoint.id,
-                )
-                .where(StoryKnowledgePoint.story_version_id == version.id)
-                .order_by(ChineseCharacter.character)
-            )
-        ).all()
-    )
+    glossary = await _story_glossary(session, version)
     return StoryVersionResponse(
         id=version.id,
         story_id=story.id,
@@ -119,16 +160,7 @@ async def story_version_response(
             )
             for question in questions
         ],
-        glossary=[
-            CharacterGlossaryResponse(
-                knowledge_point_id=point_id,
-                character=character.character,
-                pinyin=character.pinyin,
-                simple_meaning=character.simple_meaning,
-                common_words=character.common_words,
-            )
-            for point_id, character in glossary_rows
-        ],
+        glossary=glossary,
         created_at=version.created_at,
     )
 
