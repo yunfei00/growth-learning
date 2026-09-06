@@ -48,7 +48,7 @@ function PictureBookReader() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const startingRef = useRef(false);
-  const startedAtRef = useRef(Date.now());
+  const startedAtRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     if (!activeChild || !params.versionId) return;
@@ -184,9 +184,12 @@ function PictureBookReader() {
 
   const finishReading = async () => {
     if (!activeChild || !session || session.status === "completed") return;
+    const startedAt = startedAtRef.current;
     try {
       const completed = await completeReading(activeChild.id, session.id, {
-        duration_seconds: Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000)),
+        duration_seconds: startedAt
+          ? Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+          : undefined,
       });
       setSession(completed);
       setMessage("这本绘本读完了，阅读记录已经保存。");
