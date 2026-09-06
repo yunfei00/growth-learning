@@ -28,17 +28,44 @@ def upgrade() -> None:
         sa.Column("source_url", sa.String(length=500), nullable=False),
         sa.Column("license_name", sa.String(length=80), nullable=False),
         sa.Column("reading_level", sa.String(length=40), nullable=False),
-        sa.Column("attribution", sa.JSON(), server_default=sa.text("'{}'::json"), nullable=False),
-        sa.Column("pages", sa.JSON(), server_default=sa.text("'[]'::json"), nullable=False),
+        sa.Column(
+            "attribution",
+            sa.JSON(),
+            server_default=sa.text("'{}'::json"),
+            nullable=False,
+        ),
+        sa.Column(
+            "pages",
+            sa.JSON(),
+            server_default=sa.text("'[]'::json"),
+            nullable=False,
+        ),
         sa.Column("cover_object_key", sa.String(length=500)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["child_id"], ["children.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(["story_version_id"], ["story_versions.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(["imported_by_user_id"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["story_version_id"], ["story_versions.id"], ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["imported_by_user_id"], ["users.id"], ondelete="RESTRICT"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "child_id", "source_provider", "source_book_id", name="uq_picture_book_child_source"
+            "child_id",
+            "source_provider",
+            "source_book_id",
+            name="uq_picture_book_child_source",
         ),
         sa.UniqueConstraint("story_version_id", name="uq_picture_book_story_version"),
     )
@@ -50,5 +77,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     for column in ("imported_by_user_id", "story_version_id", "child_id"):
-        op.drop_index(op.f(f"ix_picture_book_imports_{column}"), table_name="picture_book_imports")
+        op.drop_index(
+            op.f(f"ix_picture_book_imports_{column}"), table_name="picture_book_imports"
+        )
     op.drop_table("picture_book_imports")
