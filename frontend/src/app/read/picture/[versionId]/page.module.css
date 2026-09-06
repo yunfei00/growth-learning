@@ -1,0 +1,177 @@
+.reader {
+  display: grid;
+  gap: 18px;
+  max-width: 920px;
+}
+
+.topbar,
+.heading,
+.navigation,
+.audioActions,
+.finishRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.heading h1,
+.heading p {
+  margin: 0;
+}
+
+.pageCard {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: var(--surface);
+}
+
+.illustration {
+  width: 100%;
+  min-height: min(58vh, 560px);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.noImage {
+  display: grid;
+  place-items: center;
+  font-size: 88px;
+  min-height: 300px;
+}
+
+.textArea {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.storyText {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.75;
+  letter-spacing: 0.03em;
+}
+
+.character {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.character ruby {
+  ruby-position: over;
+}
+
+.character rt {
+  font-size: 0.42em;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.audioActions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.message {
+  min-height: 1.4em;
+}
+
+.navigation {
+  padding: 8px 0;
+}
+
+.navigation button {
+  min-width: 120px;
+  min-height: 54px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.navigation button:disabled {
+  opacity: 0.4;
+}
+
+.wordCard {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 18px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+}
+
+.wordCard > strong {
+  grid-row: span 3;
+  font-size: 4rem;
+}
+
+.wordCard p,
+.wordCard small {
+  margin: 0;
+}
+
+.wordCard .close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  font-size: 1.6rem;
+}
+
+.wordCard :global(.button) {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.finishRow {
+  justify-content: center;
+}
+
+.attribution {
+  display: grid;
+  gap: 5px;
+  padding: 16px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 720px) {
+  .heading {
+    align-items: flex-end;
+  }
+
+  .illustration {
+    min-height: 48vh;
+  }
+
+  .textArea {
+    padding: 18px;
+  }
+
+  .storyText {
+    font-size: clamp(2rem, 10vw, 2.8rem);
+  }
+
+  .audioActions :global(.button) {
+    flex: 1 1 140px;
+  }
+
+  .navigation button {
+    min-width: 96px;
+  }
+}
