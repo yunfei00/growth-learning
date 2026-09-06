@@ -164,7 +164,11 @@ async def get_picture_page_image(
         content = await storage.read(object_key)
     except S3Error as error:
         raise HTTPException(status_code=404, detail="Page image not found") from error
-    return Response(content=content, media_type=mime, headers={"Cache-Control": "private, max-age=3600"})
+    return Response(
+        content=content,
+        media_type=mime,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.post("/{child_id}/story-versions/{story_version_id}/picture/audio/prepare")
@@ -230,4 +234,8 @@ async def get_picture_page_audio(
         content = await storage.read(key)
     except S3Error as error:
         raise HTTPException(status_code=404, detail="Page audio not ready") from error
-    return Response(content=content, media_type="audio/x-wav", headers={"Cache-Control": "private, max-age=3600"})
+    return Response(
+        content=content,
+        media_type="audio/x-wav",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
