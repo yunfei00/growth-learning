@@ -39,6 +39,7 @@ const THEME_LABELS: Record<string, string> = {
   family_life: "家庭生活",
   science: "科学探索",
   parent_authored: "家长添加",
+  open_picture_book: "开放绘本",
 };
 
 const DIFFICULTY_LABELS: Record<StoryDifficulty, string> = {
@@ -167,6 +168,23 @@ function ReadingLibrary() {
       <section className="story-generator-panel">
         <div className="section-title-row">
           <div>
+            <p className="eyebrow">绘本阅读</p>
+            <h2>从开放绘本库选一本</h2>
+          </div>
+          <span>图片 · 点字 · 拼音 · 每页朗读</span>
+        </div>
+        <p>
+          先接入 Global Digital Library 的简体中文 Level 1 / Level 2 开放绘本。
+          系统只导入许可明确的内容，保留原作者与许可信息，并使用我们自己的百炼语音生成朗读。
+        </p>
+        <Link className="button button-primary" href="/read/library">
+          📚 打开在线绘本库
+        </Link>
+      </section>
+
+      <section className="story-generator-panel">
+        <div className="section-title-row">
+          <div>
             <p className="eyebrow">辅助阅读</p>
             <h2>家长添加一篇故事</h2>
           </div>
@@ -203,7 +221,7 @@ function ReadingLibrary() {
           <label>
             安全主题
             <select value={theme} onChange={(event) => setTheme(event.target.value)}>
-              {(context?.safe_themes ?? Object.keys(THEME_LABELS).filter((value) => value !== "parent_authored")).map((value) => (
+              {(context?.safe_themes ?? Object.keys(THEME_LABELS).filter((value) => !["parent_authored", "open_picture_book"].includes(value))).map((value) => (
                 <option key={value} value={value}>{THEME_LABELS[value] ?? value}</option>
               ))}
             </select>
@@ -287,11 +305,18 @@ function ReadingLibrary() {
         {stories && stories.items.length > 0 ? (
           <div className="storybook-grid">
             {stories.items.map((story) => (
-              <Link className="story-card" href={`/read/${story.story_version_id}`} key={story.story_version_id}>
-                <div><span>{THEME_LABELS[story.theme] ?? story.theme}</span><span>{story.theme === "parent_authored" ? "辅助阅读" : DIFFICULTY_LABELS[story.difficulty]}</span></div>
+              <Link
+                className="story-card"
+                href={story.theme === "open_picture_book" ? `/read/picture/${story.story_version_id}` : `/read/${story.story_version_id}`}
+                key={story.story_version_id}
+              >
+                <div>
+                  <span>{THEME_LABELS[story.theme] ?? story.theme}</span>
+                  <span>{story.theme === "parent_authored" ? "辅助阅读" : story.theme === "open_picture_book" ? "分页绘本" : DIFFICULTY_LABELS[story.difficulty]}</span>
+                </div>
                 <h3>{story.title}</h3>
                 <p>当前已知字覆盖率 {(story.actual_known_coverage * 100).toFixed(1)}%</p>
-                <p>{story.target_characters.length ? `目标字：${story.target_characters.join("、")}` : "可点字查看拼音、解释和常用词"}</p>
+                <p>{story.target_characters.length ? `目标字：${story.target_characters.join("、")}` : story.theme === "open_picture_book" ? "翻页阅读 · 点字听音 · 拼音可选" : "可点字查看拼音、解释和常用词"}</p>
                 <small>{new Date(story.generated_at).toLocaleDateString("zh-CN")} · {story.reading_status === "completed" ? "已读完" : story.reading_status === "in_progress" ? "继续阅读" : "尚未阅读"} · 理解题 {story.comprehension_answered}/{story.comprehension_total}</small>
               </Link>
             ))}
@@ -299,8 +324,11 @@ function ReadingLibrary() {
         ) : (
           <div className="empty-storybook">
             <strong>故事书还是空的</strong>
-            <p>不用等识字量达标，家庭管理员现在就可以添加第一篇辅助阅读故事。</p>
-            {canGenerate ? <Link className="button button-primary" href="/read/new">添加第一篇故事</Link> : null}
+            <p>可以从在线绘本库选一本，也可以由家庭管理员添加第一篇辅助阅读故事。</p>
+            <div className="mode-buttons">
+              <Link className="button button-primary" href="/read/library">打开在线绘本库</Link>
+              {canGenerate ? <Link className="button button-secondary" href="/read/new">家长添加故事</Link> : null}
+            </div>
           </div>
         )}
       </section>
