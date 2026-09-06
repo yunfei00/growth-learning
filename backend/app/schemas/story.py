@@ -114,7 +114,7 @@ class ReadingQuestionResponse(BaseModel):
 
 
 class CharacterGlossaryResponse(BaseModel):
-    knowledge_point_id: uuid.UUID
+    knowledge_point_id: uuid.UUID | None
     character: str
     pinyin: str
     simple_meaning: str | None
