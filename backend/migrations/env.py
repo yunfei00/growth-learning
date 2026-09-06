@@ -9,6 +9,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import get_settings
+import app.models.picture_book  # noqa: F401  # register additive picture-book table metadata
 from app.models import Base
 
 config = context.config
