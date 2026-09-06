@@ -18,6 +18,7 @@ from app.api.v1.learning import router as learning_router
 from app.api.v1.literacy_diagnostic import router as literacy_diagnostic_router
 from app.api.v1.math import admin_router as math_admin_router
 from app.api.v1.math import router as math_router
+from app.api.v1.picture_books import router as picture_books_router
 from app.api.v1.pinyin import admin_router as pinyin_admin_router
 from app.api.v1.pinyin import router as pinyin_router
 from app.api.v1.platform_admin import router as platform_admin_router
@@ -46,6 +47,7 @@ router.include_router(families_router)
 router.include_router(growth_router)
 router.include_router(learning_router)
 router.include_router(literacy_diagnostic_router)
+router.include_router(picture_books_router)
 router.include_router(science_admin_router)
 router.include_router(science_router)
 router.include_router(stories_router)
