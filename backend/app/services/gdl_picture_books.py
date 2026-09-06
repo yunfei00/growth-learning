@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import re
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -26,7 +27,7 @@ from app.models import (
     StoryVersion,
 )
 from app.models.picture_book import PictureBookImport
-from app.schemas.picture_book import OpenPictureBookSummary, PictureBookDetail, OpenPictureBookPage
+from app.schemas.picture_book import OpenPictureBookPage, OpenPictureBookSummary, PictureBookDetail
 from app.services.daily_reading import attach_story_to_today
 from app.services.manual_story import _snapshot_payload
 from app.services.review_planning import get_or_create_daily_plan
@@ -237,7 +238,8 @@ def parse_h5p_pages(payload: Any, *, h5p_id: str) -> list[ParsedPage]:
         image_urls: list[str] = []
         image_alt: str | None = None
         for key, raw in strings:
-            if any(token in key for token in ("alt", "description")) and raw.strip() and image_alt is None:
+            is_alt = any(token in key for token in ("alt", "description"))
+            if is_alt and raw.strip() and image_alt is None:
                 candidate_alt = _plain_text(raw)
                 if candidate_alt and len(candidate_alt) <= 160:
                     image_alt = candidate_alt
@@ -255,7 +257,13 @@ def parse_h5p_pages(payload: Any, *, h5p_id: str) -> list[ParsedPage]:
         text = " ".join(dict.fromkeys(texts)).strip()
         if not text:
             continue
-        pages.append(ParsedPage(text=text, image_url=image_urls[0] if image_urls else None, image_alt=image_alt))
+        pages.append(
+            ParsedPage(
+                text=text,
+                image_url=image_urls[0] if image_urls else None,
+                image_alt=image_alt,
+            )
+        )
     if len(pages) < 2:
         raise GDLImportError("这个 GDL 绘本暂时无法可靠提取为分页阅读内容")
     return pages
@@ -351,6 +359,7 @@ async def import_gdl_picture_book(
             prompt_version=GDL_PROMPT_VERSION,
             attempt_count=0,
             latency_ms=0,
+            completed_at=snapshot.at,
         )
         session.add(run)
         await session.flush()
@@ -441,10 +450,8 @@ async def import_gdl_picture_book(
                 )
         except Exception:
             for key in stored_keys:
-                try:
+                with suppress(Exception):
                     await storage.remove(key)
-                except Exception:
-                    pass
             await session.rollback()
             raise
 
@@ -468,15 +475,13 @@ async def import_gdl_picture_book(
             reading_level=summary.reading_level,
             attribution=attribution,
             pages=page_payloads,
-            cover_object_key=(
-                next(
-                    (
-                        str(page["image_object_key"])
-                        for page in page_payloads
-                        if page.get("image_object_key")
-                    ),
-                    None,
-                )
+            cover_object_key=next(
+                (
+                    str(page["image_object_key"])
+                    for page in page_payloads
+                    if page.get("image_object_key")
+                ),
+                None,
             ),
         )
         session.add(picture_book)
@@ -488,10 +493,8 @@ async def import_gdl_picture_book(
         except Exception:
             await session.rollback()
             for key in stored_keys:
-                try:
+                with suppress(Exception):
                     await storage.remove(key)
-                except Exception:
-                    pass
             raise
         await session.refresh(picture_book)
         await session.refresh(version)
