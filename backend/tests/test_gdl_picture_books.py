@@ -41,7 +41,9 @@ def test_book_summary_rejects_missing_or_unsupported_license() -> None:
 
 
 def test_gdl_url_validation_rejects_ssrf_and_non_https() -> None:
-    assert _safe_official_url("https://digitallibrary.io/path") == "https://digitallibrary.io/path"
+    assert _safe_official_url("https://digitallibrary.io/path") == (
+        "https://digitallibrary.io/path"
+    )
     with pytest.raises(GDLImportError):
         _safe_official_url("http://digitallibrary.io/path")
     with pytest.raises(GDLImportError):
@@ -56,7 +58,16 @@ def test_parse_h5p_pages_extracts_ordered_text_and_images() -> None:
             {
                 "params": {
                     "content": [
-                        {"content": {"params": {"file": {"path": "images/page-1.jpg", "mime": "image/jpeg"}}}},
+                        {
+                            "content": {
+                                "params": {
+                                    "file": {
+                                        "path": "images/page-1.jpg",
+                                        "mime": "image/jpeg",
+                                    }
+                                }
+                            }
+                        },
                         {"content": {"params": {"text": "<p>小猫来到窗边。</p>"}}},
                     ]
                 }
@@ -64,8 +75,16 @@ def test_parse_h5p_pages_extracts_ordered_text_and_images() -> None:
             {
                 "params": {
                     "content": [
-                        {"content": {"params": {"file": {"path": "images/page-2.png"}}}},
-                        {"content": {"params": {"text": "<p>太阳暖暖的，小猫开心地坐下来。</p>"}}},
+                        {
+                            "content": {
+                                "params": {"file": {"path": "images/page-2.png"}}
+                            }
+                        },
+                        {
+                            "content": {
+                                "params": {"text": "<p>太阳暖暖的，小猫开心地坐下来。</p>"}
+                            }
+                        },
                     ]
                 }
             },
