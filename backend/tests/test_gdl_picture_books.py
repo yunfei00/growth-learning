@@ -9,6 +9,7 @@ from app.services.gdl_picture_books import (
 
 
 def _book(*, license_name: str = "CC-BY-4.0", level: str = "Level 1") -> dict:
+    license_slug = "cc-by-4-0" if license_name == "CC-BY-4.0" else "all-rights-reserved"
     return {
         "postId": 42,
         "title": "小熊回家",
@@ -18,7 +19,7 @@ def _book(*, license_name: str = "CC-BY-4.0", level: str = "Level 1") -> dict:
         "thumbnail": "https://digitallibrary.io/wp-content/uploads/cover.jpg",
         "language": [{"slug": "zh-cn", "name": "Chinese"}],
         "level": [{"slug": "level-1", "name": level}],
-        "license": [{"slug": "cc-by-4-0", "name": license_name}],
+        "license": [{"slug": license_slug, "name": license_name}],
         "publisher": "Open Publisher",
         "authors": [{"name": "作者甲"}],
     }
