@@ -75,16 +75,8 @@ def test_parse_h5p_pages_extracts_ordered_text_and_images() -> None:
             {
                 "params": {
                     "content": [
-                        {
-                            "content": {
-                                "params": {"file": {"path": "images/page-2.png"}}
-                            }
-                        },
-                        {
-                            "content": {
-                                "params": {"text": "<p>太阳暖暖的，小猫开心地坐下来。</p>"}
-                            }
-                        },
+                        {"content": {"params": {"file": {"path": "images/page-2.png"}}}},
+                        {"content": {"params": {"text": "<p>太阳暖暖的，小猫开心地坐下来。</p>"}}},
                     ]
                 }
             },
@@ -102,6 +94,4 @@ def test_parse_h5p_pages_extracts_ordered_text_and_images() -> None:
 
 def test_parse_h5p_pages_refuses_unreliable_single_page_shape() -> None:
     with pytest.raises(GDLImportError):
-        parse_h5p_pages(
-            {"chapters": [{"params": {"text": "<p>只有一页。</p>"}}]}, h5p_id="123"
-        )
+        parse_h5p_pages({"chapters": [{"params": {"text": "<p>只有一页。</p>"}}]}, h5p_id="123")
