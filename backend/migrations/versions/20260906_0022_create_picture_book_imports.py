@@ -54,12 +54,8 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.ForeignKeyConstraint(["child_id"], ["children.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(
-            ["story_version_id"], ["story_versions.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["imported_by_user_id"], ["users.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["story_version_id"], ["story_versions.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["imported_by_user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "child_id",
@@ -70,14 +66,10 @@ def upgrade() -> None:
         sa.UniqueConstraint("story_version_id", name="uq_picture_book_story_version"),
     )
     for column in ("child_id", "story_version_id", "imported_by_user_id"):
-        op.create_index(
-            op.f(f"ix_picture_book_imports_{column}"), "picture_book_imports", [column]
-        )
+        op.create_index(op.f(f"ix_picture_book_imports_{column}"), "picture_book_imports", [column])
 
 
 def downgrade() -> None:
     for column in ("imported_by_user_id", "story_version_id", "child_id"):
-        op.drop_index(
-            op.f(f"ix_picture_book_imports_{column}"), table_name="picture_book_imports"
-        )
+        op.drop_index(op.f(f"ix_picture_book_imports_{column}"), table_name="picture_book_imports")
     op.drop_table("picture_book_imports")
