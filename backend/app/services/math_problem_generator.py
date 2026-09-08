@@ -256,7 +256,7 @@ def _taking_away(
     removed = rng.randint(1, start - 1)
     answer = start - removed
     return _numeric_payload(
-        "拿走一些以后，还剩几个？",
+        f"原来有 {start} 个，拿走 {removed} 个，还剩几个？",
         template.representation_type,
         answer,
         _nearby_options(rng, answer, low=0, high=maximum),
@@ -290,17 +290,61 @@ PATTERN_TOKENS = (
         "size": "medium",
         "label": "绿色正方形",
     },
+    {
+        "key": "orange-rectangle",
+        "color": "orange",
+        "shape": "rectangle",
+        "size": "medium",
+        "label": "橙色长方形",
+    },
+    {
+        "key": "purple-circle",
+        "color": "purple",
+        "shape": "circle",
+        "size": "medium",
+        "label": "紫色圆形",
+    },
+    {
+        "key": "yellow-square",
+        "color": "yellow",
+        "shape": "square",
+        "size": "medium",
+        "label": "黄色正方形",
+    },
+    {
+        "key": "teal-triangle",
+        "color": "teal",
+        "shape": "triangle",
+        "size": "medium",
+        "label": "青色三角形",
+    },
 )
 
 
-def _pattern(rng: random.Random, template: MathProblemTemplate) -> tuple[dict[str, object], object]:
+def _pattern(
+    rng: random.Random,
+    template: MathProblemTemplate,
+    *,
+    variant: int | None = None,
+) -> tuple[dict[str, object], object]:
     pattern_key = str(template.config_json.get("pattern", "abab"))
-    cycle_length = {"abab": 2, "aab": 3, "abc": 3}[pattern_key]
-    tokens = list(PATTERN_TOKENS[:cycle_length])
+    cycle_length = {"abab": 2, "aab": 2, "abc": 3}[pattern_key]
+    variant = variant if variant is not None else rng.randrange(1_000_000)
+    token_count = len(PATTERN_TOKENS)
+    start_index = variant % token_count
+    step = 1 + (variant // token_count) % (token_count - 1)
+    tokens = [
+        PATTERN_TOKENS[(start_index + index * step) % token_count]
+        for index in range(cycle_length)
+    ]
     cycle = [tokens[0], tokens[0], tokens[1]] if pattern_key == "aab" else tokens
-    sequence = [cycle[index % len(cycle)] for index in range(5)]
+    visible_count = 4 + ((variant // (token_count * (token_count - 1))) % 2)
+    sequence = [cycle[index % len(cycle)] for index in range(visible_count)]
     answer = cycle[len(sequence) % len(cycle)]["key"]
-    options = [{"value": token["key"], "label": token["label"], "token": token} for token in tokens]
+    options = [
+        {"value": token["key"], "label": token["label"], "token": token}
+        for token in tokens
+    ]
     rng.shuffle(options)
     return (
         {
@@ -539,7 +583,11 @@ class MathProblemGeneratorRegistry:
         handler = self._handlers.get(generator_key)
         if handler is None:
             raise LookupError(f"Unknown math generator: {generator_key}")
-        payload, expected = handler(random.Random(seed), template)
+        rng = random.Random(seed)
+        if generator_key == "pattern_v1":
+            payload, expected = _pattern(rng, template, variant=seed)
+        else:
+            payload, expected = handler(rng, template)
         return GeneratedMathProblem(
             template_key=template.template_key,
             generator_version=template.generator_version,
