@@ -199,7 +199,7 @@ function MathDetailContent() {
   };
 
   const answer = async (value: unknown, answeredAt: number) => {
-    if (!activeChild || !session || answered || answerLocked.current) return;
+    if (!activeChild || !skill || !session || answered || answerLocked.current) return;
     answerLocked.current = true;
     childFeedbackAudio.cancel();
     const generation = ++flowGeneration.current;
