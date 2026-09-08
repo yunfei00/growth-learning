@@ -229,6 +229,29 @@ async def admin_update_pinyin(
     new_status = values.pop("status", None)
     if new_status is not None:
         point.status = new_status
+
+    if "teaching_cue" in values:
+        teaching_cue = values.pop("teaching_cue")
+        values.pop("pronunciation_cue", None)
+        item.pronunciation_cue = teaching_cue.strip() or None if teaching_cue else None
+
+    metadata = dict(item.metadata_json or {})
+    for field_name in (
+        "target_pronunciation",
+        "target_audio_text",
+        "target_audio_text_verified",
+    ):
+        if field_name not in values:
+            continue
+        value = values.pop(field_name)
+        if isinstance(value, str):
+            value = value.strip() or None
+        if value is None:
+            metadata.pop(field_name, None)
+        else:
+            metadata[field_name] = value
+    item.metadata_json = metadata
+
     for field_name, value in values.items():
         setattr(item, field_name, value.strip() or None if isinstance(value, str) else value)
     await session.commit()

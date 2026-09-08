@@ -58,7 +58,10 @@ function AdminPinyinContent() {
     try {
       const updated = await updateAdminPinyin(selected.knowledge_point_id, {
         status: selected.status,
-        pronunciation_cue: selected.pronunciation_cue,
+        target_pronunciation: selected.target_pronunciation,
+        teaching_cue: selected.teaching_cue,
+        target_audio_text: selected.target_audio_text,
+        target_audio_text_verified: selected.target_audio_text_verified,
         example_text: selected.example_text,
         example_pinyin: selected.example_pinyin,
         description: selected.description,
@@ -90,7 +93,7 @@ function AdminPinyinContent() {
 
   return (
     <section className="admin-page admin-pinyin-page">
-      <header className="admin-page-header"><div><p className="eyebrow">内容管理</p><h2>拼音</h2><p>维护正式拼音内容、发音线索和音频状态；不在这里修改儿童 mastery。</p></div><button className="button button-secondary" disabled={working} onClick={() => void runImport()} type="button">同步 pinyin-foundation-v1</button></header>
+      <header className="admin-page-header"><div><p className="eyebrow">内容管理</p><h2>拼音</h2><p>分别维护目标发音、教学说明和例子；不在这里修改儿童 mastery。</p></div><button className="button button-secondary" disabled={working} onClick={() => void runImport()} type="button">同步 pinyin-foundation-v2</button></header>
       {error ? <p className="form-message form-error" role="alert">{error}</p> : null}
       {message ? <p className="form-message form-success" role="status">{message}</p> : null}
       <form className="admin-filter-bar" onSubmit={(event) => { event.preventDefault(); void load(); }}>
@@ -107,12 +110,15 @@ function AdminPinyinContent() {
           <form className="admin-pinyin-editor" onSubmit={save}>
             <header><div><p className="eyebrow">{KIND_LABELS[selected.kind]} · #{selected.order_index + 1}</p><h3>{selected.display_text}</h3><code>{selected.canonical_key}</code></div><span className={`audio-${selected.audio.mode}`}>{AUDIO_LABELS[selected.audio.mode]}</span></header>
             <label>状态<select onChange={(event) => setSelected({ ...selected, status: event.target.value as "active" | "archived" })} value={selected.status}><option value="active">启用</option><option value="archived">归档</option></select></label>
-            <label>发音提示<textarea onChange={(event) => setSelected({ ...selected, pronunciation_cue: event.target.value })} value={selected.pronunciation_cue ?? ""} /></label>
+            <label>目标拼音<input onChange={(event) => setSelected({ ...selected, target_pronunciation: event.target.value })} value={selected.target_pronunciation} /><small>孩子当前真正要学习和模仿的声音。</small></label>
+            <label>教学说明<textarea onChange={(event) => setSelected({ ...selected, teaching_cue: event.target.value })} value={selected.teaching_cue ?? ""} /><small>只显示在页面，不会进入主播放或听音题。</small></label>
+            <label>最短目标音代理<input onChange={(event) => setSelected({ ...selected, target_audio_text: event.target.value || null })} placeholder="单个经人工确认的汉字" value={selected.target_audio_text ?? ""} /><small>只能是 1 个汉字；不能填写例词或教学句。</small></label>
+            <label className="checkbox-label"><input checked={selected.target_audio_text_verified} onChange={(event) => setSelected({ ...selected, target_audio_text_verified: event.target.checked })} type="checkbox" />已人工确认该代理只表达目标音</label>
             <label>例词<input onChange={(event) => setSelected({ ...selected, example_text: event.target.value })} value={selected.example_text ?? ""} /></label>
             <label>例词拼音<input onChange={(event) => setSelected({ ...selected, example_pinyin: event.target.value })} value={selected.example_pinyin ?? ""} /></label>
             <label>儿童提示<textarea onChange={(event) => setSelected({ ...selected, description: event.target.value })} value={selected.description ?? ""} /></label>
             <label>家长提示<textarea onChange={(event) => setSelected({ ...selected, parent_tip: event.target.value })} value={selected.parent_tip ?? ""} /></label>
-            <label>正式音频 object key<input onChange={(event) => setSelected({ ...selected, audio_key: event.target.value || null })} placeholder="pinyin/b.mp3" value={selected.audio_key ?? ""} /><small>为空时只使用安全中文 pronunciation cue；不会朗读 Latin 字母名。</small></label>
+            <label>正式音频 object key<input onChange={(event) => setSelected({ ...selected, audio_key: event.target.value || null })} placeholder="pinyin/b.mp3" value={selected.audio_key ?? ""} /><small>优先播放正式目标录音；其后只允许已确认的最短目标音代理，否则返回缺失。绝不朗读 Latin 字母名。</small></label>
             <button className="button button-primary" disabled={working} type="submit">保存</button>
           </form>
         ) : <div className="admin-empty-panel"><h3>选择一个拼音项目</h3><p>右侧会显示适合该领域的维护字段。</p></div>}

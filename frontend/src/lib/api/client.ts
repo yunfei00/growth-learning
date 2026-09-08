@@ -207,8 +207,14 @@ export type PinyinNavigationItem = {
 
 export type PinyinItemDetail = PinyinItem & {
   canonical_key: string;
+  target_pronunciation: string;
+  teaching_cue: string | null;
+  target_audio_text: string | null;
+  target_audio_text_verified: boolean;
   pronunciation_cue: string | null;
   example_pinyin: string | null;
+  example_focus: string | null;
+  blend_equation: string | null;
   description: string | null;
   parent_tip: string | null;
   audio_key: string | null;
@@ -218,6 +224,8 @@ export type PinyinItemDetail = PinyinItem & {
     mode: "curated" | "tts_fallback" | "missing";
     audio_url: string | null;
     speech_text: string | null;
+    purpose: "target_pronunciation";
+    target_pronunciation: string;
   };
   position: number;
   total: number;
@@ -266,7 +274,11 @@ export type PinyinPractice = {
   underlying_final: string;
   display_final: string;
   display_syllable: string;
+  target_pronunciation: string;
+  teaching_cue: string;
+  example_focus: string | null;
   pronunciation_cue: string;
+  audio: PinyinItemDetail["audio"];
   order_index: number;
   metadata: Record<string, string | number | boolean>;
 };
@@ -1939,6 +1951,10 @@ export function updateAdminPinyin(
   id: string,
   payload: Partial<{
     status: "active" | "archived";
+    target_pronunciation: string | null;
+    teaching_cue: string | null;
+    target_audio_text: string | null;
+    target_audio_text_verified: boolean;
     pronunciation_cue: string | null;
     example_text: string | null;
     example_pinyin: string | null;

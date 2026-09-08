@@ -15,6 +15,8 @@ class PinyinAudioResponse(BaseModel):
     mode: Literal["curated", "tts_fallback", "missing"]
     audio_url: str | None
     speech_text: str | None
+    purpose: Literal["target_pronunciation"]
+    target_pronunciation: str
 
 
 class PinyinItemSummary(BaseModel):
@@ -46,8 +48,14 @@ class PinyinNavigationItem(BaseModel):
 
 class PinyinItemDetail(PinyinItemSummary):
     canonical_key: str
+    target_pronunciation: str
+    teaching_cue: str | None
+    target_audio_text: str | None
+    target_audio_text_verified: bool
     pronunciation_cue: str | None
     example_pinyin: str | None
+    example_focus: str | None
+    blend_equation: str | None
     description: str | None
     parent_tip: str | None
     audio_key: str | None = None
@@ -103,7 +111,11 @@ class PinyinPracticeResponse(BaseModel):
     underlying_final: str
     display_final: str
     display_syllable: str
+    target_pronunciation: str
+    teaching_cue: str
+    example_focus: str | None
     pronunciation_cue: str
+    audio: PinyinAudioResponse
     order_index: int
     metadata: dict[str, object]
 
@@ -140,6 +152,11 @@ class PinyinItemUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: Literal["active", "archived"] | None = None
+    target_pronunciation: str | None = Field(default=None, max_length=32)
+    teaching_cue: str | None = Field(default=None, max_length=160)
+    target_audio_text: str | None = Field(default=None, max_length=1)
+    target_audio_text_verified: bool | None = None
+    # Deprecated API alias retained while clients migrate to teaching_cue.
     pronunciation_cue: str | None = Field(default=None, max_length=160)
     example_text: str | None = Field(default=None, max_length=120)
     example_pinyin: str | None = Field(default=None, max_length=160)

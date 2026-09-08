@@ -19,7 +19,7 @@
 
 | 表 | 作用 |
 | --- | --- |
-| `pinyin_catalog_releases` | `pinyin-foundation-v1` 来源、数量、导入时间与当前版本 |
+| `pinyin_catalog_releases` | `pinyin-foundation-v2` 来源、数量、导入时间与当前版本 |
 | `pinyin_items` | 声母、韵母、声调、整体认读的显示、中文语音线索、例子、家长提示、顺序与可替换 `audio_key` |
 | `pinyin_practice_items` | 小规模拼读练习；保存 underlying/display 韵母，不把数百音节变成 Stable 目标 |
 | `pinyin_daily_plans` | 每个 Child 每个本地日期唯一的小任务，默认最多 3 新内容与 5 个到期复习 |

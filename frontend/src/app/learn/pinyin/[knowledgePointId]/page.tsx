@@ -60,14 +60,16 @@ function PinyinDetailContent() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const play = async () => {
-    if (!item) return;
+  const play = async (): Promise<boolean> => {
+    if (!item) return false;
     setError("");
     try {
       const played = await playPinyinAudio(item);
-      if (!played) setError("这个拼音暂时没有可用声音，请让家长示范。 ");
+      if (!played) setError("这个拼音暂时没有可用声音，请让家长示范。");
+      return played;
     } catch {
       setError("声音暂时没有播放出来，可以再试一次。");
+      return false;
     }
   };
 
@@ -113,10 +115,14 @@ function PinyinDetailContent() {
   };
 
   const startListening = async (startedAtMs: number) => {
+    setMessage("");
+    const played = await play();
+    if (!played) {
+      setListeningOpen(false);
+      return;
+    }
     startedAt.current = startedAtMs;
     setListeningOpen(true);
-    setMessage("");
-    await play();
   };
 
   const answerListening = async (answerId: string, answeredAtMs: number) => {
@@ -160,6 +166,8 @@ function PinyinDetailContent() {
 
   const gesture = typeof item.metadata.gesture === "string" ? item.metadata.gesture : null;
   const shape = typeof item.metadata.shape === "string" ? item.metadata.shape : null;
+  const auxiliaryCue = typeof item.metadata.auxiliary_cue === "string" ? item.metadata.auxiliary_cue : null;
+  const hasTargetAudio = item.audio.mode !== "missing";
 
   return (
     <main className="pinyin-detail-page section-shell">
@@ -175,8 +183,9 @@ function PinyinDetailContent() {
           <h1>{item.display_text}</h1>
           {gesture ? <div className="pinyin-tone-gesture"><strong>{gesture}</strong><span>{shape}</span></div> : null}
           {item.kind === "whole" ? <strong className="whole-reading-note">整体认读 · 直接读出来</strong> : null}
-          <button aria-label={`播放 ${item.display_text} 的发音`} className="pinyin-main-audio" onClick={() => void play()} type="button"><span aria-hidden="true">🔊</span> 听一听</button>
-          <button aria-label={`重新播放 ${item.display_text} 的发音`} className="pinyin-repeat-audio" onClick={() => void play()} type="button">👂 再听一次</button>
+          <button aria-label={`播放目标拼音 ${item.target_pronunciation}`} className="pinyin-main-audio" onClick={() => void play()} type="button"><span aria-hidden="true">🔊</span> 听一听</button>
+          <button aria-label={`重新播放目标拼音 ${item.target_pronunciation}`} className="pinyin-repeat-audio" onClick={() => void play()} type="button">👂 再听一次</button>
+          {!hasTargetAudio ? <small className="pinyin-audio-missing">暂无可靠目标音频，请家长示范</small> : null}
           <span className={`pinyin-state state-${item.state_code}`}>{STATE_LABELS[item.state_code]}</span>
           <nav aria-label="拼音前后导航" className="pinyin-sequence-nav">
             {item.previous ? <Link href={`/learn/pinyin/${item.previous.knowledge_point_id}?source=path`}><span>← 上一个</span><strong>{item.previous.display_text}</strong></Link> : <span aria-disabled="true">← 上一个</span>}
@@ -185,21 +194,22 @@ function PinyinDetailContent() {
         </aside>
 
         <div className="pinyin-learning-content">
-          <article><p className="eyebrow">听一听</p><h2>{item.pronunciation_cue || "请家长示范这个中文拼音声音。"}</h2><button aria-label={`播放 ${item.display_text} 的中文示范`} onClick={() => void play()} type="button">🔊 播放中文示范</button></article>
-          <article><p className="eyebrow">例子</p><h2>{item.example_text || "听完后跟着读一读"}</h2>{item.example_pinyin ? <p className="pinyin-example-text">{item.example_pinyin}</p> : null}</article>
+          <article className="pinyin-how-to"><p className="eyebrow">怎么读</p><h2>{item.teaching_cue || "请家长示范这个拼音的目标声音。"}</h2>{auxiliaryCue ? <p className="pinyin-auxiliary-cue">{auxiliaryCue}</p> : null}<button aria-label={`播放目标拼音 ${item.target_pronunciation}`} onClick={() => void play()} type="button">🔊 只听目标音</button></article>
+          {item.blend_equation ? <article><p className="eyebrow">拼一拼</p><h2 className="pinyin-blend-equation">{item.blend_equation}</h2></article> : null}
+          <article><p className="eyebrow">例子</p><h2>{item.example_focus || item.example_text || "听完后跟着读一读"}</h2>{item.example_pinyin ? <p className="pinyin-example-text">{item.example_pinyin}</p> : null}</article>
           <article><p className="eyebrow">小提示</p><p>{item.description}</p></article>
-          <article className="parent-learning-tip"><p className="eyebrow">家长提示</p><p>{item.parent_tip}</p>{item.confusing.length ? <div className="pinyin-confusions"><span>容易混淆：</span>{item.confusing.map((value) => <Link href={`/learn/pinyin/${value.knowledge_point_id}`} key={value.knowledge_point_id}>{value.display_text}</Link>)}</div> : null}</article>
+          {!childMode ? <article className="parent-learning-tip"><p className="eyebrow">家长提示</p><p>{item.parent_tip}</p>{item.confusing.length ? <div className="pinyin-confusions"><span>容易混淆：</span>{item.confusing.map((value) => <Link href={`/learn/pinyin/${value.knowledge_point_id}`} key={value.knowledge_point_id}>{value.display_text}</Link>)}</div> : null}</article> : null}
         </div>
       </section>
 
       <section className="pinyin-action-panel">
-        <div><h2>跟我读</h2><p>播放声音后让孩子自然模仿。系统不会自动给儿童发音打分。</p><button className="button button-primary" onClick={() => void play()} type="button">🗣 跟我读</button><button className="button button-secondary" disabled={working} onClick={() => void completeLearning()} type="button">{item.learned ? "完成这次复习" : "完成这次学习"}</button></div>
+        <div><h2>跟我读</h2><p>只播放目标音，让孩子自然模仿。系统不会自动给儿童发音打分。</p><button className="button button-primary" onClick={() => void play()} type="button">🗣 跟我读</button><button className="button button-secondary" disabled={working} onClick={() => void completeLearning()} type="button">{item.learned ? "完成这次复习" : "完成这次学习"}</button></div>
         {!childMode ? <div><h3>家长观察 · 认出符号</h3><div className="pinyin-observation-buttons"><button disabled={working} onClick={() => void observe("recognition", "correct")} type="button">认出来了</button><button disabled={working} onClick={() => void observe("recognition", "hinted_correct")} type="button">需要提示</button><button disabled={working} onClick={() => void observe("recognition", "uncertain")} type="button">还不熟</button></div></div> : null}
         {!childMode ? <div><h3>家长观察 · 跟读</h3><div className="pinyin-observation-buttons"><button disabled={working} onClick={() => void observe("pronunciation", "correct")} type="button">孩子能跟读</button><button disabled={working} onClick={() => void observe("pronunciation", "hinted_correct")} type="button">需要提示</button><button disabled={working} onClick={() => void observe("pronunciation", "uncertain")} type="button">暂时不会</button></div></div> : null}
       </section>
 
       <section className="pinyin-listening-task">
-        <header><div><p className="eyebrow">听音选择</p><h2>听一听，哪个是刚才的声音？</h2></div><button aria-label={`重新播放 ${item.display_text} 的发音`} onClick={(event) => void startListening(event.timeStamp)} type="button">🔊 {listeningOpen ? "重新播放" : "开始听音"}</button></header>
+        <header><div><p className="eyebrow">听音选择</p><h2>听一听，哪个是刚才的目标声音？</h2></div><button aria-label={`重新播放目标拼音 ${item.target_pronunciation}`} disabled={!hasTargetAudio} onClick={(event) => void startListening(event.timeStamp)} type="button">🔊 {listeningOpen ? "重新播放" : "开始听音"}</button></header>
         {listeningOpen ? <div className="pinyin-listening-options">{item.listening_options.map((option) => <button disabled={working} key={option.knowledge_point_id} onClick={(event) => void answerListening(option.knowledge_point_id, event.timeStamp)} type="button">{option.display_text}</button>)}</div> : <p>选项很少，可以反复听；没有扣分，也不会出现羞辱性的红叉。</p>}
       </section>
       <p className="pinyin-policy-note">掌握策略：{item.policy_key} · 听音、认读、声调、拼读与跟读观察分别保存；同一天重复点击不能直接变成稳定掌握。</p>

@@ -19,11 +19,13 @@ from app.models import (
     KnowledgeRelation,
     PinyinCatalogRelease,
     PinyinItem,
+    PinyinKind,
     PinyinPracticeItem,
     SystemRole,
     User,
 )
 from app.services.mastery import PinyinMasteryPolicy, mastery_policy_for_type
+from app.services.pinyin_audio import pinyin_audio_provider
 from app.services.pinyin_catalog import (
     PINYIN_CATALOG_VERSION,
     PINYIN_COURSE_KEY,
@@ -173,6 +175,72 @@ async def test_catalog_is_complete_versioned_and_idempotent(
         assert units[-1].title == "综合拼读"
 
 
+async def test_catalog_separates_target_teaching_example_and_audio(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await import_catalog(session_factory)
+    async with session_factory() as session:
+        items = list(await session.scalars(select(PinyinItem).order_by(PinyinItem.order_index)))
+        assert len(items) == 68
+        assert {
+            kind: sum(item.kind == kind for item in items)
+            for kind in (PinyinKind.INITIAL, PinyinKind.FINAL, PinyinKind.TONE, PinyinKind.WHOLE)
+        } == {
+            PinyinKind.INITIAL: 23,
+            PinyinKind.FINAL: 24,
+            PinyinKind.TONE: 5,
+            PinyinKind.WHOLE: 16,
+        }
+
+        for item in items:
+            metadata = item.metadata_json
+            assert metadata["audio_semantics_version"] == "target-pronunciation-v1"
+            assert metadata["target_pronunciation"]
+            assert item.pronunciation_cue
+            assert item.example_text
+            audio = pinyin_audio_provider.resolve(item)
+            assert audio.purpose == "target_pronunciation"
+            assert audio.target_pronunciation == metadata["target_pronunciation"]
+            assert audio.speech_text != item.pronunciation_cue
+            assert audio.speech_text != item.example_text
+
+        tone_expectations = {
+            "tone:1": ("ā", "这是 a 的第一声：ā。声音平平的。", ("阿姨", "第一声", "声音平平")),
+            "tone:2": ("á", "这是 a 的第二声：á。声音向上扬。", ("回答", "答", "第二声")),
+            "tone:3": ("ǎ", "这是 a 的第三声：ǎ。声音先下降，再转上来。", ("小马", "马", "第三声")),
+            "tone:4": ("à", "这是 a 的第四声：à。声音从高往下降。", ("大树", "大", "第四声")),
+        }
+        for symbol, (display, teaching, forbidden) in tone_expectations.items():
+            item = next(candidate for candidate in items if candidate.symbol == symbol)
+            assert item.display_text == display
+            assert item.metadata_json["target_pronunciation"] == display
+            assert item.pronunciation_cue == teaching
+            audio = pinyin_audio_provider.resolve(item)
+            assert audio.mode == "missing"
+            playback_text = audio.speech_text or ""
+            assert all(fragment not in playback_text for fragment in forbidden)
+
+        tone_four = next(item for item in items if item.symbol == "tone:4")
+        assert tone_four.metadata_json["blend_equation"] == "d + à = dà"
+        assert tone_four.metadata_json["example_focus"] == "大树的“大”"
+
+        for symbol in ("b", "p", "m", "f", "d", "t"):
+            item = next(candidate for candidate in items if candidate.symbol == symbol)
+            audio = pinyin_audio_provider.resolve(item)
+            assert audio.mode == "tts_fallback"
+            assert audio.speech_text not in {symbol, symbol.upper(), f"{symbol}ee"}
+            assert audio.speech_text is not None and len(audio.speech_text) <= 2
+
+        b_item = next(item for item in items if item.symbol == "b")
+        b_item.metadata_json = {
+            "target_pronunciation": "b",
+            "target_audio_text": "玻璃的玻",
+            "target_audio_text_verified": True,
+        }
+        b_item.pronunciation_cue = "这是会泄漏答案的教学说明。"
+        assert pinyin_audio_provider.resolve(b_item).mode == "missing"
+
+
 def test_pinyin_normalization_tone_marks_and_umlaut_rules() -> None:
     assert normalize_pinyin("v") == "ü"
     assert normalize_pinyin("u:") == "ü"
@@ -258,10 +326,20 @@ async def test_admin_can_archive_restore_and_call_specific_import_route(
 
         archived = await admin.patch(
             f"/api/v1/admin/pinyin/{b_item['knowledge_point_id']}",
-            json={"status": "archived", "parent_tip": "归档测试提示"},
+            json={
+                "status": "archived",
+                "target_pronunciation": "b",
+                "teaching_cue": "这是人工维护的声母 b 教学说明。",
+                "target_audio_text": "玻",
+                "target_audio_text_verified": True,
+                "parent_tip": "归档测试提示",
+            },
         )
         assert archived.status_code == 200, archived.text
         assert archived.json()["status"] == "archived"
+        assert archived.json()["target_pronunciation"] == "b"
+        assert archived.json()["teaching_cue"] == "这是人工维护的声母 b 教学说明。"
+        assert archived.json()["audio"]["speech_text"] == "玻"
         assert archived.json()["parent_tip"] == "归档测试提示"
         public = await admin.get("/api/v1/pinyin/items?page_size=100")
         assert public.status_code == 200 and public.json()["total"] == 67
@@ -302,10 +380,14 @@ async def test_child_api_records_all_evidence_and_keeps_character_domains_clean(
         detail = await parent.get(f"/api/v1/children/{child_id}/pinyin/items/{b_id}")
         assert detail.status_code == 200
         assert detail.json()["display_text"] == "b"
+        assert detail.json()["target_pronunciation"] == "b"
+        assert detail.json()["teaching_cue"] == "这是声母 b。发音要轻、短。"
         assert detail.json()["audio"] == {
             "mode": "tts_fallback",
             "audio_url": None,
-            "speech_text": "玻，玻璃的玻。",
+            "speech_text": "玻",
+            "purpose": "target_pronunciation",
+            "target_pronunciation": "b",
         }
         assert len(detail.json()["listening_options"]) == 3
         assert any(item["display_text"] == "p" for item in detail.json()["confusing"])
@@ -315,6 +397,9 @@ async def test_child_api_records_all_evidence_and_keeps_character_domains_clean(
         assert practices.status_code == 200 and practices.json()["total"] == 18
         ju = next(item for item in practices.json()["items"] if item["display_syllable"] == "ju")
         assert ju["underlying_final"] == "ü" and ju["display_final"] == "u"
+        assert ju["target_pronunciation"] == "jū"
+        assert ju["audio"]["speech_text"] == "居"
+        assert ju["audio"]["purpose"] == "target_pronunciation"
 
         today = await parent.get(f"/api/v1/children/{child_id}/pinyin/today")
         assert today.status_code == 200

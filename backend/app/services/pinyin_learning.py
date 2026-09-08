@@ -212,17 +212,29 @@ async def pinyin_item_detail(
         key=lambda candidate: candidate.order_index,
     )
     audio = pinyin_audio_provider.resolve(item)
+    metadata = item.metadata_json or {}
+
+    def metadata_text(key: str) -> str | None:
+        value = metadata.get(key)
+        return value if isinstance(value, str) and value else None
+
     base = pinyin_item_summary(point, item, state)
     return PinyinItemDetail(
         **base.model_dump(),
         canonical_key=point.canonical_key,
+        target_pronunciation=metadata_text("target_pronunciation") or item.display_text,
+        teaching_cue=item.pronunciation_cue,
+        target_audio_text=metadata_text("target_audio_text"),
+        target_audio_text_verified=metadata.get("target_audio_text_verified") is True,
         pronunciation_cue=item.pronunciation_cue,
         example_pinyin=item.example_pinyin,
+        example_focus=metadata_text("example_focus"),
+        blend_equation=metadata_text("blend_equation"),
         description=item.description,
         parent_tip=item.parent_tip,
         audio_key=item.audio_key,
         catalog_version=item.catalog_version,
-        metadata=item.metadata_json,
+        metadata=metadata,
         audio=PinyinAudioResponse(**audio.__dict__),
         position=current_index + 1,
         total=len(enabled_rows),
@@ -496,7 +508,19 @@ async def pinyin_practice_page(session: AsyncSession) -> PinyinPracticePage:
                 underlying_final=practice.underlying_final,
                 display_final=practice.display_final,
                 display_syllable=practice.display_syllable,
+                target_pronunciation=str(
+                    practice.metadata_json.get("target_pronunciation") or practice.display_syllable
+                ),
+                teaching_cue=practice.pronunciation_cue,
+                example_focus=(
+                    str(practice.metadata_json["example_focus"])
+                    if practice.metadata_json.get("example_focus")
+                    else None
+                ),
                 pronunciation_cue=practice.pronunciation_cue,
+                audio=PinyinAudioResponse(
+                    **pinyin_audio_provider.resolve_practice(practice).__dict__
+                ),
                 order_index=practice.order_index,
                 metadata=practice.metadata_json,
             )

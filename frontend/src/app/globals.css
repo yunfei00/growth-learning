@@ -3485,6 +3485,7 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .pinyin-repeat-audio { min-height: 54px; padding: 12px 20px; border: 0; border-radius: 18px; font-size: 1rem; font-weight: 900; cursor: pointer; }
 .pinyin-main-audio { background: #5142a6; color: #fff; }
 .pinyin-repeat-audio { margin-top: 8px; background: #fff; color: #5142a6; }
+.pinyin-audio-missing { margin-top: 9px; color: #8a5f25; font-weight: 800; }
 .pinyin-state { margin-top: 13px; padding: 7px 12px; border-radius: 999px; background: #fff; color: var(--ink-soft); font-size: .8rem; font-weight: 900; }
 .pinyin-state.state-stable { background: #5142a6; color: #fff; }
 .pinyin-tone-gesture { display: flex; align-items: center; gap: 10px; margin: -4px 0 16px; }
@@ -3501,6 +3502,8 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .pinyin-learning-content .parent-learning-tip { grid-column: 1 / -1; }
 .pinyin-learning-content h2 { margin: 7px 0 14px; font-size: clamp(1.4rem, 2.6vw, 2rem); line-height: 1.55; }
 .pinyin-learning-content article > button { min-height: 46px; padding: 10px 14px; border: 0; border-radius: 14px; background: #ece9ff; color: #5142a6; font-weight: 900; cursor: pointer; }
+.pinyin-auxiliary-cue { padding: 11px 13px; border-radius: 14px; background: #f8f5ee; color: var(--ink-soft); font-weight: 800; }
+.pinyin-blend-equation { color: #5142a6; font-size: clamp(2rem, 4vw, 3rem) !important; }
 .pinyin-example-text { font-size: 1.25rem; color: #5142a6; }
 .pinyin-confusions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
 .pinyin-confusions a { padding: 6px 11px; border-radius: 12px; background: #fff; color: #5142a6; font-size: 1.2rem; font-weight: 900; text-decoration: none; }
@@ -3515,6 +3518,7 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .pinyin-listening-task { margin-top: 16px; padding: 24px; border-radius: 26px; background: #fff8df; border: 1px solid #eadcae; }
 .pinyin-listening-task h2 { margin: 4px 0; }
 .pinyin-listening-task header > button { min-height: 52px; padding: 12px 18px; border: 0; border-radius: 17px; background: #5142a6; color: #fff; font-weight: 900; cursor: pointer; }
+.pinyin-listening-task header > button:disabled { cursor: not-allowed; opacity: .48; }
 .pinyin-listening-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
 .pinyin-listening-options button { min-height: 110px; border: 2px solid #d8d0b7; border-radius: 22px; background: #fff; color: #312762; font-size: clamp(2.8rem, 6vw, 4.5rem); font-weight: 900; cursor: pointer; }
 .pinyin-policy-note { margin-top: 14px; color: var(--ink-soft); font-size: .83rem; }
@@ -3532,6 +3536,9 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .pinyin-blend-lines i:first-child { rotate: 8deg; transform-origin: right; }
 .pinyin-blend-lines i:last-child { rotate: -8deg; transform-origin: left; }
 .pinyin-blend-result { grid-column: 1 / -1; justify-self: center; width: min(100%, 420px); background: #fff4cb !important; }
+.pinyin-blend-explanation { max-width: 900px; margin: -10px auto 18px; padding: 20px 24px; border: 1px solid var(--line); border-radius: 22px; background: #fff; text-align: center; }
+.pinyin-blend-explanation h2 { margin: 5px 0 8px; color: #312762; }
+.pinyin-blend-explanation p:last-child { margin-bottom: 0; color: var(--ink-soft); font-weight: 800; }
 .pinyin-blend-stage.is-blending > button:first-child { animation: pinyin-pulse 900ms ease; }
 .pinyin-blend-stage.is-blending > button:nth-child(3) { animation: pinyin-pulse 900ms ease 1.3s; }
 .pinyin-blend-stage.is-blending .pinyin-blend-result { animation: pinyin-pulse 900ms ease 2.6s; }
@@ -3565,6 +3572,8 @@ a.learning-entry-card:hover { translate: 0 -3px; box-shadow: var(--shadow-soft);
 .admin-pinyin-editor textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: inherit; }
 .admin-pinyin-editor textarea { min-height: 86px; resize: vertical; }
 .admin-pinyin-editor small { color: var(--ink-soft); font-weight: 500; }
+.admin-pinyin-editor .checkbox-label { grid-template-columns: auto 1fr; align-items: center; }
+.admin-pinyin-editor .checkbox-label input { width: 18px; height: 18px; }
 
 @media (min-width: 1280px) {
   .pinyin-detail-page { padding-top: 16px; }
