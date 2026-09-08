@@ -30,6 +30,7 @@ import {
   playIncorrectFeedback,
 } from "@/lib/child-feedback-audio";
 import { useResolvedChildExperienceMode } from "@/lib/experience-mode";
+import { mathPraise, mathRetryHint } from "@/lib/math-child-feedback";
 
 const STATE_LABELS: Record<MathState, string> = {
   unlearned: "未学习",
@@ -62,6 +63,7 @@ function MathDetailContent() {
   const startedAt = useRef(0);
   const answerLocked = useRef(false);
   const flowGeneration = useRef(0);
+  const feedbackTurn = useRef(0);
   const autoStartedSkill = useRef<string | null>(null);
 
   const load = useCallback(async (expectedGeneration?: number) => {
@@ -81,6 +83,7 @@ function MathDetailContent() {
 
   useEffect(() => {
     flowGeneration.current += 1;
+    feedbackTurn.current = 0;
     autoStartedSkill.current = null;
     answerLocked.current = false;
     childFeedbackAudio.cancel();
@@ -209,21 +212,44 @@ function MathDetailContent() {
         hintUsed,
         responseTimeMs: Math.max(0, Math.round(answeredAt - startedAt.current)),
       });
-      setCorrectAnswer(result.correct_answer);
       if (childMode) {
-        const correct = result.outcome === "correct";
-        setMessage(correct ? "答对啦！" : "再看看哦。正确答案亮起来了。");
+        const mayRetry = session.mode === "practice" && result.outcome === "incorrect";
+        if (mayRetry) {
+          const hint = mathRetryHint(skill.domain, feedbackTurn.current++);
+          setCorrectAnswer(undefined);
+          setAnswered(false);
+          setHintUsed(true);
+          setMessage(hint);
+          await playIncorrectFeedback();
+          childFeedbackAudio.speakInstruction(hint);
+          await wait(650);
+          if (generation !== flowGeneration.current) return;
+          setSelectedAnswer(undefined);
+          answerLocked.current = false;
+          return;
+        }
+
+        const solved = result.outcome !== "incorrect";
+        setCorrectAnswer(result.correct_answer);
         setAnswered(true);
-        setWorking(false);
-        if (correct) await playCorrectFeedback();
-        else await playIncorrectFeedback();
-        await wait(correct ? 480 : 1050);
+        if (solved) {
+          const praise = mathPraise(hintUsed, feedbackTurn.current++);
+          setMessage(praise);
+          await playCorrectFeedback();
+          childFeedbackAudio.speakInstruction(praise);
+          await wait(1100);
+        } else {
+          setMessage("这题先记下来，我们继续看看下一题。");
+          await playIncorrectFeedback();
+          await wait(900);
+        }
         if (generation !== flowGeneration.current) return;
         if (index + 1 >= session.problems.length) await completeChildSkill(generation);
         else moveToProblem(index + 1, session);
         return;
       }
 
+      setCorrectAnswer(result.correct_answer);
       setMessage(result.feedback);
       const mayRetry = session.mode === "practice" && result.outcome === "incorrect";
       setAnswered(!mayRetry);
