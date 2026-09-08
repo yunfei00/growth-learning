@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -30,8 +30,9 @@ from app.models import (
     RelationType,
 )
 
-PINYIN_CATALOG_VERSION = "pinyin-foundation-v1"
+PINYIN_CATALOG_VERSION = "pinyin-foundation-v2"
 PINYIN_COURSE_KEY = "system-pinyin-foundation-v1"
+PINYIN_AUDIO_SEMANTICS_VERSION = "target-pronunciation-v1"
 
 
 @dataclass(frozen=True)
@@ -40,12 +41,26 @@ class PinyinSeed:
     kind: str
     subcategory: str
     display_text: str
-    pronunciation_cue: str
+    target_pronunciation: str
+    teaching_cue: str
     example_text: str
     example_pinyin: str
     description: str
     parent_tip: str
+    target_audio_text: str | None = None
     metadata: dict[str, object] = field(default_factory=dict)
+
+    @property
+    def catalog_metadata(self) -> dict[str, object]:
+        metadata = {
+            **self.metadata,
+            "audio_semantics_version": PINYIN_AUDIO_SEMANTICS_VERSION,
+            "target_pronunciation": self.target_pronunciation,
+            "target_audio_text_verified": self.target_audio_text is not None,
+        }
+        if self.target_audio_text is not None:
+            metadata["target_audio_text"] = self.target_audio_text
+        return metadata
 
     @property
     def canonical_key(self) -> str:
@@ -77,11 +92,14 @@ def _initial(
         kind=PinyinKind.INITIAL,
         subcategory=subcategory,
         display_text=symbol,
-        pronunciation_cue=f"{cue}，{example}的{cue}。",
+        target_pronunciation=symbol,
+        teaching_cue=f"这是声母 {symbol}。发音要轻、短。",
         example_text=example,
         example_pinyin=example_pinyin,
-        description="先听中文示范音，再看符号并跟读。",
+        description="先听目标声母，再看符号并跟读。",
         parent_tip=tip,
+        target_audio_text=cue,
+        metadata={"auxiliary_cue": f"可以听“{cue}”开头的声音。"},
     )
 
 
@@ -108,11 +126,13 @@ def _final(
         kind=PinyinKind.FINAL,
         subcategory=subcategory,
         display_text=symbol,
-        pronunciation_cue=f"{cue}，{example}的{cue}。",
+        target_pronunciation=symbol,
+        teaching_cue=f"这是韵母 {symbol}。{tip}",
         example_text=example,
         example_pinyin=example_pinyin,
-        description="把声音拉长一点听清楚，再看嘴形跟读。",
+        description="把目标韵母拉长一点听清楚，再看嘴形跟读。",
         parent_tip=tip,
+        target_audio_text=cue,
     )
 
 
@@ -212,7 +232,7 @@ FINALS = {
     item.symbol: item
     for item in (
         _final("a", "啊", "阿姨", "ā yí", "single_final", "嘴巴自然张大，声音响亮而放松。"),
-        _final("o", "喔", "喔喔叫", "ō ō jiào", "嘴唇拢圆，听清中文示范音。"),
+        _final("o", "喔", "喔喔叫", "ō ō jiào", "嘴唇拢圆，听清目标韵母。"),
         _final("e", "鹅", "白鹅", "bái é", "嘴角自然展开，听“鹅”的声音。"),
         _final("i", "衣", "衣服", "yī fu", "嘴角向两边展开，声音可以稍微拉长。"),
         _final("u", "乌", "乌云", "wū yún", "嘴唇拢成小圆形，听“乌”的声音。"),
@@ -242,80 +262,124 @@ FINALS = {
 
 TONES = {
     "tone:1": PinyinSeed(
-        "tone:1",
-        PinyinKind.TONE,
-        "tone",
-        "ā",
-        "第一声，阿姨的阿，声音平平的。",
-        "阿姨",
-        "ā yí",
-        "第一声像一条平平的路。",
-        "用手平平地划过去，动作只是辅助，仍要多听。",
-        {"tone": 1, "label": "第一声", "gesture": "→", "shape": "平"},
+        symbol="tone:1",
+        kind=PinyinKind.TONE,
+        subcategory="tone",
+        display_text="ā",
+        target_pronunciation="ā",
+        teaching_cue="这是 a 的第一声：ā。声音平平的。",
+        example_text="阿姨",
+        example_pinyin="ā yí",
+        description="第一声像一条平平的路。",
+        parent_tip="用手平平地划过去，动作只是辅助，仍要多听。",
+        metadata={
+            "tone": 1,
+            "label": "第一声",
+            "gesture": "→",
+            "shape": "平",
+            "blend_equation": "ā，例如 ā yí",
+            "example_focus": "阿姨的“阿”",
+        },
     ),
     "tone:2": PinyinSeed(
-        "tone:2",
-        PinyinKind.TONE,
-        "tone",
-        "á",
-        "第二声，回答的答，声音向上扬。",
-        "回答",
-        "huí dá",
-        "第二声像声音沿着小坡向上走。",
-        "手势可以向右上方划，听音比背口诀更重要。",
-        {"tone": 2, "label": "第二声", "gesture": "↗", "shape": "上扬"},
+        symbol="tone:2",
+        kind=PinyinKind.TONE,
+        subcategory="tone",
+        display_text="á",
+        target_pronunciation="á",
+        teaching_cue="这是 a 的第二声：á。声音向上扬。",
+        example_text="回答",
+        example_pinyin="huí dá",
+        description="第二声像声音沿着小坡向上走。",
+        parent_tip="手势可以向右上方划，听音比背口诀更重要。",
+        metadata={
+            "tone": 2,
+            "label": "第二声",
+            "gesture": "↗",
+            "shape": "上扬",
+            "blend_equation": "d + á = dá",
+            "example_focus": "回答的“答”",
+        },
     ),
     "tone:3": PinyinSeed(
-        "tone:3",
-        PinyinKind.TONE,
-        "tone",
-        "ǎ",
-        "第三声，小马的马，声音先下再上。",
-        "小马",
-        "xiǎo mǎ",
-        "第三声先往下，再轻轻转上来。",
-        "慢一点示范，不要求孩子夸张地压低声音。",
-        {"tone": 3, "label": "第三声", "gesture": "↘↗", "shape": "先下再上"},
+        symbol="tone:3",
+        kind=PinyinKind.TONE,
+        subcategory="tone",
+        display_text="ǎ",
+        target_pronunciation="ǎ",
+        teaching_cue="这是 a 的第三声：ǎ。声音先下降，再转上来。",
+        example_text="小马",
+        example_pinyin="xiǎo mǎ",
+        description="第三声先往下，再轻轻转上来。",
+        parent_tip="慢一点示范，不要求孩子夸张地压低声音。",
+        metadata={
+            "tone": 3,
+            "label": "第三声",
+            "gesture": "↘↗",
+            "shape": "先下再上",
+            "blend_equation": "m + ǎ = mǎ",
+            "example_focus": "小马的“马”",
+        },
     ),
     "tone:4": PinyinSeed(
-        "tone:4",
-        PinyinKind.TONE,
-        "tone",
-        "à",
-        "第四声，大树的大，声音干脆下降。",
-        "大树",
-        "dà shù",
-        "第四声像从高处快速滑下来。",
-        "手势向右下方划，保持自然，不需要大声喊。",
-        {"tone": 4, "label": "第四声", "gesture": "↘", "shape": "下降"},
+        symbol="tone:4",
+        kind=PinyinKind.TONE,
+        subcategory="tone",
+        display_text="à",
+        target_pronunciation="à",
+        teaching_cue="这是 a 的第四声：à。声音从高往下降。",
+        example_text="大树",
+        example_pinyin="dà shù",
+        description="第四声像从高处快速滑下来。",
+        parent_tip="手势向右下方划，保持自然，不需要大声喊。",
+        metadata={
+            "tone": 4,
+            "label": "第四声",
+            "gesture": "↘",
+            "shape": "下降",
+            "blend_equation": "d + à = dà",
+            "example_focus": "大树的“大”",
+        },
     ),
     "tone:neutral": PinyinSeed(
-        "tone:neutral",
-        PinyinKind.TONE,
-        "tone",
-        "a",
-        "轻声，妈妈第二个妈，读得轻轻短短。",
-        "妈妈",
-        "mā ma",
-        "轻声没有调号，声音轻而短。",
-        "用熟悉词语对比即可，不必给低龄孩子讲复杂变调。",
-        {"tone": "neutral", "label": "轻声", "gesture": "·", "shape": "轻短"},
+        symbol="tone:neutral",
+        kind=PinyinKind.TONE,
+        subcategory="tone",
+        display_text="a",
+        target_pronunciation="a（轻声）",
+        teaching_cue="这是 a 的轻声。声音轻轻的、短短的。",
+        example_text="妈妈",
+        example_pinyin="mā ma",
+        description="轻声没有调号，声音轻而短。",
+        parent_tip="用熟悉词语对比即可，不必给低龄孩子讲复杂变调。",
+        metadata={
+            "tone": "neutral",
+            "label": "轻声",
+            "gesture": "·",
+            "shape": "轻短",
+            "blend_equation": "m + a = ma",
+            "example_focus": "妈妈第二个“妈”",
+        },
     ),
 }
 
 
 def _whole(symbol: str, cue: str, example: str, example_pinyin: str) -> PinyinSeed:
+    target_pronunciation = example_pinyin.split()[0]
+    target_audio_text = cue[-1]
     return PinyinSeed(
         symbol=symbol,
         kind=PinyinKind.WHOLE,
         subcategory="whole_recognition",
         display_text=symbol,
-        pronunciation_cue=f"{cue}，{example}。",
+        target_pronunciation=target_pronunciation,
+        teaching_cue=f"这是整体认读音节 {symbol}，看到后直接读 {target_pronunciation}。",
         example_text=example,
         example_pinyin=example_pinyin,
         description="这是整体认读音节，看到后直接读出来，不拆成普通拼读。",
         parent_tip="把它当作一个完整声音来听和记，不要强行拆分声母、韵母。",
-        metadata={"whole_recognition": True},
+        target_audio_text=target_audio_text,
+        metadata={"whole_recognition": True, "example_focus": cue},
     )
 
 
@@ -432,24 +496,24 @@ CONFUSING_PAIRS = (
 )
 
 PRACTICE_SEEDS = (
-    ("b", "a", "ba", "八，数字八。"),
-    ("m", "a", "ma", "妈，妈妈的妈。"),
-    ("d", "a", "da", "大，大小的大。"),
-    ("l", "i", "li", "梨，鸭梨的梨。"),
-    ("g", "e", "ge", "哥，哥哥的哥。"),
-    ("h", "u", "hu", "湖，湖水的湖。"),
-    ("p", "o", "po", "坡，山坡的坡。"),
-    ("t", "u", "tu", "兔，小兔的兔。"),
-    ("n", "i", "ni", "你，你好的你。"),
-    ("k", "e", "ke", "科，科学的科。"),
-    ("j", "ü", "ju", "居，居住的居。"),
-    ("q", "ü", "qu", "区，小区的区。"),
-    ("x", "ü", "xu", "需，需要的需。"),
-    ("zh", "u", "zhu", "猪，小猪的猪。"),
-    ("ch", "a", "cha", "茶，喝茶的茶。"),
-    ("sh", "u", "shu", "书，看书的书。"),
-    ("z", "u", "zu", "租，租借的租。"),
-    ("c", "ao", "cao", "草，小草的草。"),
+    ("b", "a", "ba", "bā", "八", "数字“八”"),
+    ("m", "a", "ma", "mā", "妈", "妈妈的“妈”"),
+    ("d", "a", "da", "dà", "大", "大小的“大”"),
+    ("l", "i", "li", "lí", "梨", "鸭梨的“梨”"),
+    ("g", "e", "ge", "gē", "哥", "哥哥的“哥”"),
+    ("h", "u", "hu", "hú", "湖", "湖水的“湖”"),
+    ("p", "o", "po", "pō", "坡", "山坡的“坡”"),
+    ("t", "u", "tu", "tù", "兔", "小兔的“兔”"),
+    ("n", "i", "ni", "nǐ", "你", "你好的“你”"),
+    ("k", "e", "ke", "kē", "科", "科学的“科”"),
+    ("j", "ü", "ju", "jū", "居", "居住的“居”"),
+    ("q", "ü", "qu", "qū", "区", "小区的“区”"),
+    ("x", "ü", "xu", "xū", "需", "需要的“需”"),
+    ("zh", "u", "zhu", "zhū", "猪", "小猪的“猪”"),
+    ("ch", "a", "cha", "chá", "茶", "喝茶的“茶”"),
+    ("sh", "u", "shu", "shū", "书", "看书的“书”"),
+    ("z", "u", "zu", "zū", "租", "租借的“租”"),
+    ("c", "ao", "cao", "cǎo", "草", "小草的“草”"),
 )
 
 COURSE_UNITS = (
@@ -567,6 +631,11 @@ def _seed_lookup_key(seed: PinyinSeed) -> str:
 async def _seed_course(session: AsyncSession, point_ids: dict[str, uuid.UUID]) -> bool:
     course = await session.scalar(select(Course).where(Course.system_key == PINYIN_COURSE_KEY))
     if course is not None:
+        course.reference_metadata = {
+            **(course.reference_metadata or {}),
+            "catalog_version": PINYIN_CATALOG_VERSION,
+            "audio_strategy": PINYIN_AUDIO_SEMANTICS_VERSION,
+        }
         return False
     course = Course(
         subject=CourseSubject.CHINESE,
@@ -580,7 +649,7 @@ async def _seed_course(session: AsyncSession, point_ids: dict[str, uuid.UUID]) -
         recommended_age_max=8,
         reference_metadata={
             "catalog_version": PINYIN_CATALOG_VERSION,
-            "audio_strategy": "curated-or-safe-zh-cn-cue",
+            "audio_strategy": PINYIN_AUDIO_SEMANTICS_VERSION,
         },
     )
     session.add(course)
@@ -655,14 +724,15 @@ async def import_pinyin_foundation(session: AsyncSession) -> PinyinImportResult:
                 "kind": seed.kind,
                 "subcategory": seed.subcategory,
                 "display_text": seed.display_text,
-                "pronunciation_cue": seed.pronunciation_cue,
+                # Keep the legacy column as teaching copy. Main playback reads only metadata.
+                "pronunciation_cue": seed.teaching_cue,
                 "example_text": seed.example_text,
                 "example_pinyin": seed.example_pinyin,
                 "description": seed.description,
                 "parent_tip": seed.parent_tip,
                 "order_index": order_index,
                 "catalog_version": PINYIN_CATALOG_VERSION,
-                "metadata_json": seed.metadata,
+                "metadata_json": seed.catalog_metadata,
             }
             changed = created
             point_values = {
@@ -718,7 +788,14 @@ async def import_pinyin_foundation(session: AsyncSession) -> PinyinImportResult:
                 )
                 result.relations_created += 1
 
-    for order_index, (initial, final, expected_syllable, cue) in enumerate(PRACTICE_SEEDS):
+    for order_index, (
+        initial,
+        final,
+        expected_syllable,
+        target_pronunciation,
+        target_audio_text,
+        example_focus,
+    ) in enumerate(PRACTICE_SEEDS):
         underlying_final, display_final, syllable = spell_blend(initial, final)
         if syllable != expected_syllable:
             result.errors.append(f"Invalid practice spelling: {initial}+{final}")
@@ -736,15 +813,32 @@ async def import_pinyin_foundation(session: AsyncSession) -> PinyinImportResult:
         practice.display_syllable = syllable
         practice.underlying_final = underlying_final
         practice.display_final = display_final
-        practice.pronunciation_cue = cue
+        practice.pronunciation_cue = (
+            f"把 {initial} 和 {display_final} 连起来，读成 {target_pronunciation}。"
+        )
         practice.order_index = order_index
         practice.catalog_version = PINYIN_CATALOG_VERSION
         practice.metadata_json = {
             "underlying_final": underlying_final,
             "display_final": display_final,
             "umlaut_omitted": underlying_final != display_final,
+            "audio_semantics_version": PINYIN_AUDIO_SEMANTICS_VERSION,
+            "target_pronunciation": target_pronunciation,
+            "target_audio_text": target_audio_text,
+            "target_audio_text_verified": True,
+            "example_focus": example_focus,
         }
 
+    await session.execute(
+        update(PinyinCatalogRelease)
+        .where(PinyinCatalogRelease.catalog_version != PINYIN_CATALOG_VERSION)
+        .values(is_current=False)
+    )
+    release_metadata = {
+        "subject": "chinese",
+        "audio_policy": "curated target audio, verified short target proxy, then missing",
+        "audio_semantics_version": PINYIN_AUDIO_SEMANTICS_VERSION,
+    }
     release = await session.scalar(
         select(PinyinCatalogRelease).where(
             PinyinCatalogRelease.catalog_version == PINYIN_CATALOG_VERSION
@@ -759,16 +853,14 @@ async def import_pinyin_foundation(session: AsyncSession) -> PinyinImportResult:
             item_count=len(PINYIN_SEEDS),
             practice_item_count=len(PRACTICE_SEEDS),
             is_current=True,
-            metadata_json={
-                "subject": "chinese",
-                "audio_policy": "curated audio, then safe Chinese pronunciation cue",
-            },
+            metadata_json=release_metadata,
         )
         session.add(release)
     else:
         release.item_count = len(PINYIN_SEEDS)
         release.practice_item_count = len(PRACTICE_SEEDS)
         release.is_current = True
+        release.metadata_json = release_metadata
     result.course_created = await _seed_course(session, point_ids)
     if result.errors:
         await session.rollback()

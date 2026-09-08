@@ -16,7 +16,6 @@ import {
 } from "@/lib/api/client";
 import { playPinyinAudio } from "@/lib/pinyin-audio";
 import { useChildExperienceMode } from "@/lib/experience-mode";
-import { speakChinese } from "@/lib/speech";
 
 function PinyinBlendingContent() {
   const { activeChild } = useActiveChild();
@@ -62,13 +61,20 @@ function PinyinBlendingContent() {
     void loadPracticeDetails(next);
   };
 
+  const playPracticeTarget = async () => {
+    if (!practice) return false;
+    const played = await playPinyinAudio(practice);
+    if (!played) setError("这个音节暂时没有可靠的目标音频，请让家长示范。");
+    return played;
+  };
+
   const blend = () => {
     if (!practice || !initial || !finalItem) return;
     setAnimating(true);
     setMessage("先听声母，再听韵母，最后连起来。");
     void playPinyinAudio(initial);
     window.setTimeout(() => void playPinyinAudio(finalItem), 1400);
-    window.setTimeout(() => speakChinese(practice.pronunciation_cue), 2800);
+    window.setTimeout(() => void playPracticeTarget(), 2800);
     window.setTimeout(() => setAnimating(false), 4200);
   };
 
@@ -111,8 +117,9 @@ function PinyinBlendingContent() {
         <span className="pinyin-blend-plus">+</span>
         <button aria-label={`播放韵母 ${practice.display_final} 的发音`} onClick={() => void playPinyinAudio(finalItem)} type="button"><strong>{practice.display_final}</strong><span>🔊 听韵母</span></button>
         <div className="pinyin-blend-lines" aria-hidden="true"><i /><i /></div>
-        <button aria-label={`播放音节 ${practice.display_syllable} 的中文示范`} className="pinyin-blend-result" onClick={() => speakChinese(practice.pronunciation_cue)} type="button"><strong>{practice.display_syllable}</strong><span>🔊 {practice.pronunciation_cue}</span></button>
+        <button aria-label={`播放目标音节 ${practice.target_pronunciation}`} className="pinyin-blend-result" onClick={() => void playPracticeTarget()} type="button"><strong>{practice.target_pronunciation}</strong><span>🔊 只听目标音</span></button>
       </section>
+      <section className="pinyin-blend-explanation"><p className="eyebrow">怎么拼</p><h2>{practice.teaching_cue}</h2>{practice.example_focus ? <p>例子：{practice.example_focus}</p> : null}</section>
       {practice.metadata.umlaut_omitted ? <aside className="pinyin-umlaut-note"><strong>ü 的小规则</strong><p>{practice.initial} 和 ü 相拼时，显示为 {practice.display_syllable}，但系统仍然保留 underlying final = ü，不会丢失规则。</p></aside> : null}
       <div className="pinyin-blend-actions"><button className="button button-primary" onClick={blend} type="button">拼一拼</button><small>播放只是练习，不会自动写成“答对”。</small></div>
       {!childMode ? <section className="pinyin-blend-observation"><h2>家长观察</h2><p>孩子真正尝试以后再选择；没有自动语音评分。</p><div><button disabled={working} onClick={() => void observe("correct")} type="button">能独立拼出</button><button disabled={working} onClick={() => void observe("hinted_correct")} type="button">需要提示</button><button disabled={working} onClick={() => void observe("uncertain")} type="button">还不熟</button></div></section> : null}

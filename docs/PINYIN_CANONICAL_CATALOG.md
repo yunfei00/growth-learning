@@ -2,7 +2,20 @@
 
 ## 版本与来源
 
-正式版本为 `pinyin-foundation-v1`，由项目人工维护，固定顺序、来源 metadata 和导入时间保存在 `pinyin_catalog_releases`。导入按 canonical key upsert，重复执行不新建 KnowledgePoint，也不改变既有 UUID。
+正式版本为 `pinyin-foundation-v2`，由项目人工维护，固定顺序、来源 metadata 和导入时间保存在 `pinyin_catalog_releases`。v2 只升级教学素材与音频语义；导入仍按原 canonical key upsert，重复执行不新建 KnowledgePoint，也不改变既有 UUID、mastery、Assessment 或课程映射。
+
+每个正式条目的 metadata 都包含 `audio_semantics_version=target-pronunciation-v1`、`target_pronunciation` 和 `target_audio_text_verified`。可选的 `target_audio_text` 只能是人工确认的单汉字最短发音代理；`pronunciation_cue` 列现在只承载 `teaching_cue` 兼容数据，绝不作为播放 fallback。例词、例词拼音、例字焦点与拼读算式保持独立。
+
+## v2 全量发音语义审计
+
+| 分类 | 正式项 | 目标/教学/例子已拆分 | 当前仓库 fallback |
+| --- | ---: | ---: | --- |
+| 声母 | 23 | 23 | 23 个单汉字短音代理 |
+| 韵母 | 24 | 24 | 24 个单汉字短音代理 |
+| 声调（含轻声） | 5 | 5 | 0；无正式录音时返回 `missing` |
+| 整体认读 | 16 | 16 | 16 个单汉字短音代理 |
+
+另有 18 个拼读练习项完成同样拆分，并使用单汉字目标音节代理。当前仓库不包含正式拼音录音文件；四声应优先补录，其他 63 个正式项和 18 个拼读代理也建议逐步替换为经审核的真人录音。
 
 所有条目 `subject=chinese`，类型和 canonical key 如下：
 
@@ -21,7 +34,9 @@
 
 通过双向 `KnowledgeRelation.confusing` 导入 8 对、16 条关系：`b/p`、`d/t`、`g/k`、`z/c`、`zh/ch`、`an/ang`、`en/eng`、`in/ing`。
 
-V1 只建立 18 个小而明确的 `PinyinPracticeItem`，覆盖基本拼读及 `ü` 规则。它们是 practice material，不是数百个都必须达到 Stable 的 canonical syllable KnowledgePoint。
+V2 只建立 18 个小而明确的 `PinyinPracticeItem`，覆盖基本拼读及 `ü` 规则。它们是 practice material，不是数百个都必须达到 Stable 的 canonical syllable KnowledgePoint。
+
+18 个拼读项也分别保存 `target_pronunciation`、最短目标音代理、教学说明和例子。结果按钮只播放目标音节，不播放“八，数字八”等解释句。
 
 ## 课程顺序
 

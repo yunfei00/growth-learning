@@ -216,7 +216,7 @@ Provider 未配置时 context 返回 `provider_configured=false`，生成返回 
 | `GET` | `/api/v1/pinyin/practices` | 18 个受控拼读练习及 `ü` underlying/display 规则 |
 | `GET` | `/api/v1/pinyin/items/{point_id}/audio` | 仅在存在 curated `audio_key` 时读取私有正式音频 |
 | `GET/PATCH` | `/api/v1/admin/pinyin[/{point_id}]` | 搜索、类型/状态筛选、归档、提示/例子/家长提示/audio_key 维护 |
-| `POST` | `/api/v1/admin/pinyin/import-foundation` | 幂等导入 `pinyin-foundation-v1` 与 16 Unit 系统课程 |
+| `POST` | `/api/v1/admin/pinyin/import-foundation` | 幂等导入 `pinyin-foundation-v2` 与 16 Unit 系统课程 |
 
 学习与测评继续使用通用 `/learning-sessions` 和 `/assessment-sessions`。播放声音只产生 exposure，不自动写 `correct`；家长发音观察使用 `assessment_kind=oral_check`、`skill_dimension=pronunciation`，不表示机器语音评分。
 

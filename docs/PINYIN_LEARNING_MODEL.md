@@ -21,12 +21,12 @@ V1 不做儿童语音自动评分、语音诊断、手写识别、排行榜或�
     └── 阅读
 ```
 
-路径页允许多项总览和任意入口；真正的学习页一次聚焦一个大符号，提供中文语音、例子、提示、前后导航和听音选择。整体认读明确显示“直接读出来”，不伪装为普通声韵拼读。
+路径页允许多项总览和任意入口；真正的学习页一次聚焦一个大符号，并依次呈现“目标拼音 → 声调动作 → 怎么读 → 拼一拼 → 例子”。目标发音、中文教学说明和例词是三个独立语义，只有目标发音可进入主播放、跟读与听音选择。整体认读明确显示“直接读出来”，不伪装为普通声韵拼读。
 
 ## 数据流
 
 ```text
-pinyin-foundation-v1
+pinyin-foundation-v2
   → KnowledgePoint + PinyinItem
   → 16 Unit system Course
   → child learning / listening / observation
@@ -37,6 +37,8 @@ pinyin-foundation-v1
 ```
 
 播放声音、打开卡片和拼读动画本身不是答对证据。只有明确完成学习才创建 `LearningRecord`；听音选择、家长观察或拼读结果才创建对应维度 `AssessmentItem`。
+
+听音选择只有在目标音频实际开始播放后才展示选项。教学说明或例词不会作为 fallback，因此孩子不能借“第四声，大树的大”等中文提示猜答案。目录语义升级不会清理或重算既有 LearningRecord、Assessment、daily plan、course progress 或 mastery。
 
 ## 家庭协作与隔离
 

@@ -203,7 +203,7 @@ Growth Learning V1 的 Phase 1–12 已收敛到 `1.0.0`。每阶段都以迁移
 
 ## Phase 17：儿童拼音学习系统 V1
 
-- Chinese subject 下的 23 声母、24 韵母、5 声调、16 整体认读，版本为 `pinyin-foundation-v1`
+- Chinese subject 下的 23 声母、24 韵母、5 声调、16 整体认读，版本为 `pinyin-foundation-v2`
 - 16 Unit `拼音启蒙` 系统课程与 18 个受控拼读练习，不把全部音节组合变成强制 Stable 知识点
 - 一次一个的大符号、音频优先、前后导航、听音选择、声调手势和 reduced-motion 拼读体验
 - 正式音频优先；缺失时只使用包含汉字的 zh-CN 发音线索，禁止 Latin 字母进入默认英文 TTS

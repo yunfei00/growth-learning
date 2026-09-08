@@ -1,8 +1,14 @@
-import { getApiBaseUrl, type PinyinItemDetail } from "@/lib/api/client";
+import {
+  getApiBaseUrl,
+  type PinyinItemDetail,
+  type PinyinPractice,
+} from "@/lib/api/client";
 import { resolvePinyinPlayback } from "@/lib/pinyin-playback";
 import { speakChinese } from "@/lib/speech";
 
-export async function playPinyinAudio(item: PinyinItemDetail): Promise<boolean> {
+export async function playPinyinAudio(
+  item: PinyinItemDetail | PinyinPractice,
+): Promise<boolean> {
   const playback = resolvePinyinPlayback(item, getApiBaseUrl());
   if (playback.mode === "curated") {
     const audio = new Audio(playback.url);
