@@ -321,6 +321,28 @@ PATTERN_TOKENS = (
 )
 
 
+def _pick_distinct_pattern_tokens(
+    rng: random.Random,
+    count: int,
+) -> list[dict[str, str]]:
+    """Pick visually distinct pattern symbols, preferring unique shapes."""
+    pool = list(PATTERN_TOKENS)
+    rng.shuffle(pool)
+    chosen: list[dict[str, str]] = []
+    used_shapes: set[str] = set()
+
+    for token in pool:
+        shape = str(token["shape"])
+        if shape in used_shapes:
+            continue
+        chosen.append(token)
+        used_shapes.add(shape)
+        if len(chosen) == count:
+            return chosen
+
+    raise ValueError("Not enough distinct shapes for math pattern generation")
+
+
 def _pattern(
     rng: random.Random,
     template: MathProblemTemplate,
@@ -330,22 +352,17 @@ def _pattern(
     pattern_key = str(template.config_json.get("pattern", "abab"))
     cycle_length = {"abab": 2, "aab": 2, "abc": 3}[pattern_key]
     variant = variant if variant is not None else rng.randrange(1_000_000)
-    token_count = len(PATTERN_TOKENS)
-    start_index = variant % token_count
-    step = 1 + (variant // token_count) % (token_count - 1)
-    tokens = [
-        PATTERN_TOKENS[(start_index + index * step) % token_count]
-        for index in range(cycle_length)
-    ]
+    local_rng = random.Random(variant)
+    tokens = _pick_distinct_pattern_tokens(local_rng, cycle_length)
     cycle = [tokens[0], tokens[0], tokens[1]] if pattern_key == "aab" else tokens
-    visible_count = 4 + ((variant // (token_count * (token_count - 1))) % 2)
+    visible_count = 4 + ((variant // max(1, len(PATTERN_TOKENS))) % 2)
     sequence = [cycle[index % len(cycle)] for index in range(visible_count)]
     answer = cycle[len(sequence) % len(cycle)]["key"]
     options = [
         {"value": token["key"], "label": token["label"], "token": token}
         for token in tokens
     ]
-    rng.shuffle(options)
+    local_rng.shuffle(options)
     return (
         {
             "kind": "pattern_choice",
