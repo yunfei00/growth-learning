@@ -214,13 +214,22 @@ def _number_sequence(
 
 
 def _composition(
-    rng: random.Random, template: MathProblemTemplate
+    rng: random.Random,
+    template: MathProblemTemplate,
+    *,
+    variant: int | None = None,
 ) -> tuple[dict[str, object], object]:
     total = int(template.config_json["total"])
     known = rng.randint(1, total - 1)
     missing = total - known
-    return _numeric_payload(
+    variant_index = (variant if variant is not None else rng.randrange(3)) % 3
+    instructions = (
         f"{known} 和几合起来是 {total}？",
+        f"{total} 可以分成 {known} 和几？",
+        f"已经有 {known} 个，还要几个才是 {total} 个？",
+    )
+    return _numeric_payload(
+        instructions[variant_index],
         template.representation_type,
         missing,
         _nearby_options(rng, missing, low=0, high=total),
@@ -392,6 +401,12 @@ SHAPE_COLORS = {
     "sphere": "purple",
     "cube": "teal",
 }
+SHAPE_CONFUSING_PAIRS = {
+    "circle": {"sphere"},
+    "sphere": {"circle"},
+    "square": {"cube"},
+    "cube": {"square"},
+}
 
 
 def _shape_token(shape: str, *, key: str | None = None, label: str | None = None) -> dict[str, str]:
@@ -416,7 +431,10 @@ def _shape_choice(
     rng: random.Random, template: MathProblemTemplate
 ) -> tuple[dict[str, object], object]:
     target = str(template.config_json["target_shape"])
-    distractors = [shape for shape in SHAPES if shape != target]
+    confusing = SHAPE_CONFUSING_PAIRS.get(target, set())
+    distractors = [
+        shape for shape in SHAPES if shape != target and shape not in confusing
+    ]
     rng.shuffle(distractors)
     choices = [target, *distractors[:2]]
     rng.shuffle(choices)
@@ -603,6 +621,8 @@ class MathProblemGeneratorRegistry:
         rng = random.Random(seed)
         if generator_key == "pattern_v1":
             payload, expected = _pattern(rng, template, variant=seed)
+        elif generator_key == "composition_v1":
+            payload, expected = _composition(rng, template, variant=seed)
         else:
             payload, expected = handler(rng, template)
         return GeneratedMathProblem(
