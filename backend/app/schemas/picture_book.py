@@ -2,7 +2,7 @@
 
 import uuid
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class OpenPictureBookSummary(BaseModel):
