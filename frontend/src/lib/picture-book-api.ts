@@ -98,6 +98,25 @@ export async function uploadFamilyPictureBook(
   return (await response.json()) as PictureBookImportResult;
 }
 
+export async function updateFamilyPictureBook(
+  childId: string,
+  versionId: string,
+  payload: { title: string; pageTexts: string[] },
+): Promise<PictureBookDetail> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture-book/manual`,
+    {
+      method: "PUT",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ title: payload.title, page_texts: payload.pageTexts }),
+    },
+  );
+  if (!response.ok) throw await errorFrom(response);
+  return (await response.json()) as PictureBookDetail;
+}
+
 export async function getPictureBook(
   childId: string,
   versionId: string,
