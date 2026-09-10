@@ -15,6 +15,7 @@ import styles from "./page.module.css";
 type PageDraft = {
   file: File;
   text: string;
+  pageNumber: number;
 };
 
 function sortFiles(files: File[]): File[] {
@@ -45,7 +46,7 @@ function FamilyPictureBookEditor() {
 
   const choosePages = (event: ChangeEvent<HTMLInputElement>) => {
     const selected = sortFiles(Array.from(event.target.files ?? [])).slice(0, 24);
-    setPages(selected.map((file) => ({ file, text: "" })));
+    setPages(selected.map((file, index) => ({ file, text: "", pageNumber: index + 1 })));
     setError("");
   };
 
@@ -53,6 +54,38 @@ function FamilyPictureBookEditor() {
     setPages((current) =>
       current.map((page, pageIndex) => (pageIndex === index ? { ...page, text } : page)),
     );
+  };
+
+  const updatePageNumber = (index: number, value: number) => {
+    setPages((current) =>
+      current.map((page, pageIndex) =>
+        pageIndex === index ? { ...page, pageNumber: value } : page,
+      ),
+    );
+    setError("");
+  };
+
+  const validatePageNumbers = () => {
+    const numbers = pages.map((page) => page.pageNumber);
+    if (numbers.some((number) => !Number.isInteger(number) || number < 1 || number > pages.length)) {
+      setError(`页码必须是 1～${pages.length} 的整数`);
+      return false;
+    }
+    if (new Set(numbers).size !== numbers.length) {
+      setError("页码不能重复，请确保每张图片都有唯一页码");
+      return false;
+    }
+    return true;
+  };
+
+  const applyPageOrder = () => {
+    if (!validatePageNumbers()) return;
+    setPages((current) =>
+      [...current]
+        .sort((left, right) => left.pageNumber - right.pageNumber)
+        .map((page, index) => ({ ...page, pageNumber: index + 1 })),
+    );
+    setError("");
   };
 
   const save = async () => {
@@ -70,14 +103,17 @@ function FamilyPictureBookEditor() {
       setError("请把每一页的故事文字填写完整");
       return;
     }
+    if (!validatePageNumbers()) return;
+
+    const orderedPages = [...pages].sort((left, right) => left.pageNumber - right.pageNumber);
     setSaving(true);
     setError("");
     try {
       const result = await uploadFamilyPictureBook(activeChild.id, {
         title: cleanTitle,
         cover,
-        images: pages.map((page) => page.file),
-        pageTexts: pages.map((page) => page.text.trim()),
+        images: orderedPages.map((page) => page.file),
+        pageTexts: orderedPages.map((page) => page.text.trim()),
       });
       router.push(`/read/picture/${result.story_version_id}`);
     } catch (requestError) {
@@ -132,7 +168,7 @@ function FamilyPictureBookEditor() {
           <label className={styles.uploadBox}>
             <strong>正文图片</strong>
             <span>{pages.length ? `已选择 ${pages.length} 张` : "一次选择 1～24 张图片"}</span>
-            <small>建议命名为 01、02、03…，系统会按文件名自动排序。</small>
+            <small>系统会先按文件名排序；如果识别顺序不对，可以在下面手动指定每张图是第几页。</small>
             <input
               accept="image/jpeg,image/png,image/webp"
               multiple
@@ -145,18 +181,38 @@ function FamilyPictureBookEditor() {
         {pages.length ? (
           <div className={styles.pageList}>
             <div className={styles.sectionHeading}>
-              <div><strong>逐页填写文字</strong><span>图片和文字会一一对应</span></div>
-              <span>{pages.length} 页</span>
+              <div>
+                <strong>检查页面顺序并填写文字</strong>
+                <span>页码可以手动修改；最终保存时严格按这里的页码排列。</span>
+              </div>
+              <div className={styles.orderActions}>
+                <span>{pages.length} 页</span>
+                <button className="button button-secondary" onClick={applyPageOrder} type="button">
+                  ↕ 按页码重新排列预览
+                </button>
+              </div>
             </div>
             {pages.map((page, index) => (
               <article className={styles.pageRow} key={`${page.file.name}-${page.file.lastModified}`}>
                 <div className={styles.previewWrap}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt={`第 ${index + 1} 页预览`} src={previews[index]?.url} />
-                  <span>第 {index + 1} 页 · {page.file.name}</span>
+                  <img alt={`绘本图片 ${page.file.name}`} src={previews[index]?.url} />
+                  <span>{page.file.name}</span>
+                  <label className={styles.pageNumberField}>
+                    <span>这是第</span>
+                    <input
+                      aria-label={`${page.file.name} 页码`}
+                      max={pages.length}
+                      min={1}
+                      onChange={(event) => updatePageNumber(index, Number(event.target.value))}
+                      type="number"
+                      value={page.pageNumber}
+                    />
+                    <span>页</span>
+                  </label>
                 </div>
                 <label>
-                  <span>这一页的故事文字</span>
+                  <span>第 {page.pageNumber} 页的故事文字</span>
                   <textarea
                     maxLength={220}
                     onChange={(event) => updatePageText(index, event.target.value)}
@@ -172,11 +228,11 @@ function FamilyPictureBookEditor() {
         ) : null}
 
         <div className={styles.tips}>
-          <strong>保存后自动接入现有学习能力</strong>
-          <span>逐页翻阅图片和文字，可选择显示拼音</span>
-          <span>点击汉字查看拼音、解释和常用词</span>
-          <span>语音服务已配置时，可听单页或连续朗读</span>
-          <span>系统记录阅读完成情况，并分析孩子当前识字覆盖率</span>
+          <strong>页面顺序怎么处理？</strong>
+          <span>首次选择图片后，系统仍会按 01、02、03 等文件名自动排序</span>
+          <span>如果某张图片排错，直接把“这是第几页”改成正确数字</span>
+          <span>页码必须从 1 到总页数且不能重复，保存前系统会自动检查</span>
+          <span>真正上传时严格按照人工设置的页码排序，人工页码优先于文件名</span>
         </div>
 
         <div className={styles.actions}>
