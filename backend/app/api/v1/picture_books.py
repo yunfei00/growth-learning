@@ -56,6 +56,12 @@ ALLOWED_IMAGE_TYPES = {
     "image/png": "png",
     "image/webp": "webp",
 }
+EXTENSION_MIME_TYPES = {
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+}
 
 
 def get_picture_storage(request: Request) -> PrivateObjectStorage:
@@ -106,6 +112,18 @@ async def _read_image(upload: UploadFile, *, label: str) -> tuple[bytes, str, st
     if len(content) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail=f"{label}不能超过 8 MB")
     return content, mime, extension
+
+
+def _cover_object(picture: PictureBookImport) -> tuple[str, str] | None:
+    key = picture.cover_object_key
+    if not key:
+        return None
+    for page in picture.pages:
+        if page.get("image_object_key") == key and page.get("image_mime_type"):
+            return str(key), str(page["image_mime_type"])
+    extension = str(key).rsplit(".", 1)[-1].lower()
+    mime = EXTENSION_MIME_TYPES.get(extension)
+    return (str(key), mime) if mime else None
 
 
 @router.get("/{child_id}/open-picture-books", response_model=list[OpenPictureBookSummary])
@@ -320,6 +338,40 @@ async def get_picture_book(
     return result
 
 
+@router.get("/{child_id}/story-versions/{story_version_id}/picture/cover")
+async def get_picture_book_cover(
+    child_id: uuid.UUID,
+    story_version_id: uuid.UUID,
+    session: DbSession,
+    current_user: CurrentUser,
+    storage: PictureStorage,
+) -> Response:
+    """Serve a private picture-book cover after household authorization."""
+
+    await get_authorized_child(session, current_user, child_id)
+    picture = await session.scalar(
+        select(PictureBookImport).where(
+            PictureBookImport.child_id == child_id,
+            PictureBookImport.story_version_id == story_version_id,
+        )
+    )
+    if picture is None:
+        raise HTTPException(status_code=404, detail="Picture book not found")
+    cover = _cover_object(picture)
+    if cover is None:
+        raise HTTPException(status_code=404, detail="Picture book cover not found")
+    object_key, mime = cover
+    try:
+        content = await storage.read(object_key)
+    except S3Error as error:
+        raise HTTPException(status_code=404, detail="Picture book cover not found") from error
+    return Response(
+        content=content,
+        media_type=mime,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
 @router.put(
     "/{child_id}/story-versions/{story_version_id}/picture-book/manual",
     response_model=PictureBookDetail,
@@ -328,11 +380,12 @@ async def update_family_picture_book(
     child_id: uuid.UUID,
     story_version_id: uuid.UUID,
     payload: FamilyPictureBookUpdateRequest,
+    request: Request,
     session: DbSession,
     current_user: CurrentUser,
     storage: PictureStorage,
 ) -> PictureBookDetail:
-    """Edit title and page text for a household-uploaded picture book."""
+    """Edit title, page text, and page order for a household-uploaded picture book."""
 
     await get_authorized_child(session, current_user, child_id, admin_required=True)
     picture = await session.scalar(
@@ -349,28 +402,45 @@ async def update_family_picture_book(
     version = await session.get(StoryVersion, story_version_id)
     if version is None:
         raise HTTPException(status_code=404, detail="Picture book not found")
-    if len(payload.page_texts) != len(picture.pages):
+    page_count = len(picture.pages)
+    if len(payload.page_texts) != page_count:
         raise HTTPException(status_code=422, detail="编辑时页数必须保持不变")
 
+    page_order = payload.page_order or list(range(1, page_count + 1))
+    if len(page_order) != page_count or sorted(page_order) != list(range(1, page_count + 1)):
+        raise HTTPException(status_code=422, detail="页码必须完整且不能重复")
+
+    ordered_texts = [payload.page_texts[source_page - 1] for source_page in page_order]
+    ordered_pages: list[dict[str, object]] = []
+    for new_index, source_page in enumerate(page_order):
+        page = dict(picture.pages[source_page - 1])
+        page["position"] = new_index
+        page["text"] = ordered_texts[new_index]
+        page["image_alt"] = f"{payload.title} 第 {new_index + 1} 页插图"
+        ordered_pages.append(page)
+
     version.title = payload.title
-    version.paragraphs = payload.page_texts
-    updated_pages: list[dict[str, object]] = []
-    for index, stored_page in enumerate(picture.pages):
-        page = dict(stored_page)
-        page["text"] = payload.page_texts[index]
-        page["image_alt"] = f"{payload.title} 第 {index + 1} 页插图"
-        updated_pages.append(page)
-    picture.pages = updated_pages
+    version.paragraphs = ordered_texts
+    picture.pages = ordered_pages
     picture.attribution = {**picture.attribution, "title": payload.title}
     await session.commit()
     await session.refresh(picture)
     await session.refresh(version)
 
-    # Existing narration no longer matches edited text, so remove it. It will be regenerated
-    # automatically the next time the parent taps narration.
-    for index in range(len(payload.page_texts)):
+    # Old audio is invalid after either text edits or page reordering. Remove it first so a
+    # temporarily unavailable TTS service can never leave stale narration behind.
+    for index in range(page_count):
         with suppress(Exception):
             await storage.remove(paragraph_audio_key(child_id, story_version_id, index))
+
+    # When TTS is configured, regenerate immediately. This makes the next play action use the
+    # edited text without requiring a separate prepare round-trip.
+    tts = _tts_provider(request)
+    if tts is not None:
+        try:
+            await prepare_story_paragraph_audio(storage, tts, child_id=child_id, version=version)
+        except (TTSProviderError, S3Error, ValueError):
+            pass
 
     result = await picture_book_detail(session, child_id=child_id, story_version_id=story_version_id)
     if result is None:
@@ -473,5 +543,8 @@ async def get_picture_page_audio(
     return Response(
         content=content,
         media_type="audio/x-wav",
-        headers={"Cache-Control": "private, max-age=3600"},
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "Pragma": "no-cache",
+        },
     )
