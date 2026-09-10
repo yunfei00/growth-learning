@@ -46,7 +46,7 @@ from app.services.story_audio import paragraph_audio_key, prepare_story_paragrap
 router = APIRouter(prefix="/children", tags=["picture-books"])
 
 FAMILY_PICTURE_PROVIDER = "family_upload"
-FAMILY_PICTURE_THEME = "private_picture_book"
+FAMILY_PICTURE_THEME = "open_picture_book"
 MAX_PICTURE_BOOK_PAGES = 24
 MAX_PAGE_TEXT_CHARS = 220
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
