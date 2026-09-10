@@ -49,6 +49,7 @@ function PictureBookReader() {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editTexts, setEditTexts] = useState<string[]>([]);
+  const [editOrder, setEditOrder] = useState<number[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
@@ -66,6 +67,7 @@ function PictureBookReader() {
       setStory(storyValue);
       setEditTitle(bookValue.title);
       setEditTexts(bookValue.pages.map((page) => page.text));
+      setEditOrder(bookValue.pages.map((_, index) => index + 1));
       setError("");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "绘本暂时无法打开");
@@ -192,6 +194,7 @@ function PictureBookReader() {
   const saveEdit = async () => {
     if (!activeChild || !book || savingEdit) return;
     const cleanTitle = editTitle.trim();
+    const pageCount = book.pages.length;
     if (!cleanTitle) {
       setMessage("请填写绘本标题。");
       return;
@@ -200,16 +203,34 @@ function PictureBookReader() {
       setMessage("每一页都需要填写文字。");
       return;
     }
+    if (
+      editOrder.length !== pageCount ||
+      editOrder.some((value) => !Number.isInteger(value) || value < 1 || value > pageCount) ||
+      new Set(editOrder).size !== pageCount
+    ) {
+      setMessage(`页码必须是 1～${pageCount}，并且不能重复。`);
+      return;
+    }
+
+    const pageOrder = editOrder
+      .map((desiredPosition, sourceIndex) => ({ desiredPosition, sourcePage: sourceIndex + 1 }))
+      .sort((left, right) => left.desiredPosition - right.desiredPosition)
+      .map((item) => item.sourcePage);
+    const nextPageIndex = editOrder[pageIndex] - 1;
+
     setSavingEdit(true);
     stopAudio();
+    setMessage("正在保存文字、页序并刷新朗读语音…");
     try {
       const updated = await updateFamilyPictureBook(activeChild.id, book.story_version_id, {
         title: cleanTitle,
         pageTexts: editTexts.map((text) => text.trim()),
+        pageOrder,
       });
       setBook(updated);
       setEditing(false);
-      setMessage("修改已保存。下次朗读会自动使用新文字重新生成语音。");
+      setPageIndex(Math.max(0, Math.min(updated.pages.length - 1, nextPageIndex)));
+      setMessage("修改已保存。页序已经更新，旧语音缓存已清除并按新文字刷新。");
       await load();
     } catch (requestError) {
       setMessage(requestError instanceof Error ? requestError.message : "保存修改失败，请稍后重试");
@@ -259,6 +280,11 @@ function PictureBookReader() {
             <button
               className="button button-secondary"
               onClick={() => {
+                if (!editing) {
+                  setEditTitle(book.title);
+                  setEditTexts(book.pages.map((item) => item.text));
+                  setEditOrder(book.pages.map((_, index) => index + 1));
+                }
                 setEditing((value) => !value);
                 setMessage("");
               }}
@@ -307,7 +333,29 @@ function PictureBookReader() {
         <div className={styles.textArea}>
           {editing ? (
             <div className={styles.editorArea}>
-              <label htmlFor="page-text">第 {pageIndex + 1} 页文字</label>
+              <div className={styles.orderControl}>
+                <label htmlFor="page-order">这张图片设为第几页</label>
+                <div>
+                  <input
+                    id="page-order"
+                    inputMode="numeric"
+                    max={book.pages.length}
+                    min={1}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      setEditOrder((current) =>
+                        current.map((item, index) => (index === pageIndex ? value : item)),
+                      );
+                    }}
+                    type="number"
+                    value={editOrder[pageIndex] ?? pageIndex + 1}
+                  />
+                  <span>/ {book.pages.length}</span>
+                </div>
+                <small>页码可以重新调整，但 1～{book.pages.length} 必须各出现一次，不能重复。</small>
+              </div>
+
+              <label htmlFor="page-text">当前这张图片对应的文字</label>
               <textarea
                 id="page-text"
                 maxLength={220}
@@ -322,7 +370,7 @@ function PictureBookReader() {
               <div className={styles.editFooter}>
                 <small>{(editTexts[pageIndex] ?? "").length}/220</small>
                 <button className="button button-primary" disabled={savingEdit} onClick={() => void saveEdit()} type="button">
-                  {savingEdit ? "正在保存…" : "保存修改"}
+                  {savingEdit ? "正在保存并刷新语音…" : "保存文字和页序"}
                 </button>
               </div>
             </div>
