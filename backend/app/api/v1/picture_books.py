@@ -352,6 +352,7 @@ async def update_family_picture_book(
     if len(payload.page_texts) != len(picture.pages):
         raise HTTPException(status_code=422, detail="编辑时页数必须保持不变")
 
+    old_texts = list(version.paragraphs)
     version.title = payload.title
     version.paragraphs = payload.page_texts
     updated_pages: list[dict[str, object]] = []
@@ -366,9 +367,11 @@ async def update_family_picture_book(
     await session.refresh(picture)
     await session.refresh(version)
 
-    # Existing narration no longer matches edited text, so remove it. It will be regenerated
-    # automatically the next time the parent taps narration.
-    for index in range(len(payload.page_texts)):
+    # Invalidate only narration whose text changed. Browser caching is disabled on the audio
+    # endpoint as a second guard, so the next play must regenerate from current text.
+    for index, new_text in enumerate(payload.page_texts):
+        if index < len(old_texts) and old_texts[index] == new_text:
+            continue
         with suppress(Exception):
             await storage.remove(paragraph_audio_key(child_id, story_version_id, index))
 
@@ -376,6 +379,47 @@ async def update_family_picture_book(
     if result is None:
         raise HTTPException(status_code=404, detail="Picture book not found")
     return result
+
+
+@router.get("/{child_id}/story-versions/{story_version_id}/picture/cover")
+async def get_picture_cover(
+    child_id: uuid.UUID,
+    story_version_id: uuid.UUID,
+    session: DbSession,
+    current_user: CurrentUser,
+    storage: PictureStorage,
+) -> Response:
+    """Return the stored cover; fall back to the first page for older imports."""
+
+    await get_authorized_child(session, current_user, child_id)
+    picture = await session.scalar(
+        select(PictureBookImport).where(
+            PictureBookImport.child_id == child_id,
+            PictureBookImport.story_version_id == story_version_id,
+        )
+    )
+    if picture is None:
+        raise HTTPException(status_code=404, detail="Picture book not found")
+
+    object_key = picture.cover_object_key
+    mime = None
+    if object_key:
+        suffix = object_key.rsplit(".", 1)[-1].lower()
+        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(suffix)
+    if not object_key or not mime:
+        first_page = picture_page_object(picture, 0)
+        if first_page is None:
+            raise HTTPException(status_code=404, detail="Picture book cover not found")
+        object_key, mime = first_page
+    try:
+        content = await storage.read(object_key)
+    except S3Error as error:
+        raise HTTPException(status_code=404, detail="Picture book cover not found") from error
+    return Response(
+        content=content,
+        media_type=mime,
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.get("/{child_id}/story-versions/{story_version_id}/picture/pages/{page_index}/image")
@@ -473,5 +517,9 @@ async def get_picture_page_audio(
     return Response(
         content=content,
         media_type="audio/x-wav",
-        headers={"Cache-Control": "private, max-age=3600"},
+        headers={
+            "Cache-Control": "no-store, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
