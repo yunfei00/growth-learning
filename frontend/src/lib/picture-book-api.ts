@@ -43,6 +43,13 @@ export type PictureBookImportResult = {
   audio_prepared: boolean;
 };
 
+export type FamilyPictureBookUpload = {
+  title: string;
+  pageTexts: string[];
+  images: File[];
+  cover?: File | null;
+};
+
 async function errorFrom(response: Response): Promise<Error> {
   const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
   return new Error(payload?.detail || `请求失败（HTTP ${response.status}）`);
@@ -68,6 +75,24 @@ export async function importOpenPictureBook(
   const response = await fetch(
     `${getApiBaseUrl()}/api/v1/children/${childId}/open-picture-books/gdl/${sourceBookId}/import`,
     { method: "POST", credentials: "include", cache: "no-store" },
+  );
+  if (!response.ok) throw await errorFrom(response);
+  return (await response.json()) as PictureBookImportResult;
+}
+
+export async function uploadFamilyPictureBook(
+  childId: string,
+  payload: FamilyPictureBookUpload,
+): Promise<PictureBookImportResult> {
+  const form = new FormData();
+  form.append("title", payload.title);
+  form.append("page_texts", JSON.stringify(payload.pageTexts));
+  payload.images.forEach((image) => form.append("images", image, image.name));
+  if (payload.cover) form.append("cover", payload.cover, payload.cover.name);
+
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/v1/children/${childId}/picture-books/manual`,
+    { method: "POST", credentials: "include", cache: "no-store", body: form },
   );
   if (!response.ok) throw await errorFrom(response);
   return (await response.json()) as PictureBookImportResult;
