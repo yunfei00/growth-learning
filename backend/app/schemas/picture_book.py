@@ -2,7 +2,7 @@
 
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class OpenPictureBookSummary(BaseModel):
@@ -44,3 +44,28 @@ class PictureBookImportResponse(BaseModel):
     story_version_id: uuid.UUID
     imported: bool
     audio_prepared: bool
+
+
+class FamilyPictureBookUpdateRequest(BaseModel):
+    """Editable fields for a household-private uploaded picture book."""
+
+    title: str = Field(min_length=1, max_length=120)
+    page_texts: list[str] = Field(min_length=1, max_length=24)
+
+    @field_validator("title")
+    @classmethod
+    def clean_title(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("请填写绘本标题")
+        return cleaned
+
+    @field_validator("page_texts")
+    @classmethod
+    def clean_page_texts(cls, values: list[str]) -> list[str]:
+        cleaned = [value.strip() for value in values]
+        if any(not value for value in cleaned):
+            raise ValueError("每一页都需要填写文字")
+        if any(len(value) > 220 for value in cleaned):
+            raise ValueError("单页文字不能超过 220 个字符")
+        return cleaned
