@@ -98,6 +98,13 @@
   font-size: 0.9rem;
 }
 
+.orderActions {
+  display: flex !important;
+  align-items: center;
+  justify-items: end;
+  gap: 0.7rem !important;
+}
+
 .pageRow {
   display: grid;
   grid-template-columns: minmax(180px, 260px) 1fr;
@@ -121,10 +128,39 @@
   background: #f1f5f9;
 }
 
-.previewWrap span,
+.previewWrap > span,
 .pageRow small {
   color: #64748b;
   font-size: 0.82rem;
+}
+
+.pageNumberField {
+  display: flex !important;
+  align-items: center;
+  gap: 0.55rem !important;
+  margin-top: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.8rem;
+  background: #f8fafc;
+}
+
+.pageNumberField span {
+  white-space: nowrap;
+  font-weight: 700;
+  color: #334155;
+}
+
+.pageNumberField input {
+  width: 72px;
+  min-height: 40px;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #94a3b8;
+  border-radius: 0.55rem;
+  background: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .pageRow textarea {
@@ -161,8 +197,16 @@
     flex-direction: column;
   }
 
+  .orderActions {
+    align-items: stretch;
+  }
+
   .uploadGrid,
   .pageRow {
     grid-template-columns: 1fr;
+  }
+
+  .pageNumberField input {
+    width: 84px;
   }
 }
