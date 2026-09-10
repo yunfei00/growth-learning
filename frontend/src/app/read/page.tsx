@@ -19,6 +19,7 @@ import {
   getReadingSummary,
   listStories,
 } from "@/lib/api/client";
+import { pictureBookCoverUrl } from "@/lib/picture-book-api";
 
 const DIFFICULTIES: Array<{
   value: StoryDifficulty;
@@ -39,7 +40,7 @@ const THEME_LABELS: Record<string, string> = {
   family_life: "家庭生活",
   science: "科学探索",
   parent_authored: "家长添加",
-  open_picture_book: "开放绘本",
+  open_picture_book: "绘本",
 };
 
 const DIFFICULTY_LABELS: Record<StoryDifficulty, string> = {
@@ -310,6 +311,24 @@ function ReadingLibrary() {
                 href={story.theme === "open_picture_book" ? `/read/picture/${story.story_version_id}` : `/read/${story.story_version_id}`}
                 key={story.story_version_id}
               >
+                {story.theme === "open_picture_book" ? (
+                  <div
+                    aria-label={`${story.title} 封面`}
+                    role="img"
+                    style={{
+                      width: "100%",
+                      minHeight: "190px",
+                      aspectRatio: "4 / 3",
+                      marginBottom: "14px",
+                      borderRadius: "16px",
+                      backgroundImage: `url(${pictureBookCoverUrl(activeChild.id, story.story_version_id)})`,
+                      backgroundPosition: "center",
+                      backgroundRepeat: "no-repeat",
+                      backgroundSize: "cover",
+                      boxShadow: "0 10px 24px rgb(15 23 42 / 8%)",
+                    }}
+                  />
+                ) : null}
                 <div>
                   <span>{THEME_LABELS[story.theme] ?? story.theme}</span>
                   <span>{story.theme === "parent_authored" ? "辅助阅读" : story.theme === "open_picture_book" ? "分页绘本" : DIFFICULTY_LABELS[story.difficulty]}</span>

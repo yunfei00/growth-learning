@@ -150,13 +150,14 @@
 
 .editorArea {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   max-width: 820px;
   width: 100%;
   margin: 0 auto;
 }
 
-.editorArea label {
+.editorArea > label,
+.orderControl > label {
   font-weight: 800;
 }
 
@@ -172,6 +173,39 @@
   font: inherit;
   font-size: 1.2rem;
   line-height: 1.7;
+}
+
+.orderControl {
+  display: grid;
+  gap: 7px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, var(--forest) 25%);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--mint) 8%);
+}
+
+.orderControl > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.orderControl input {
+  width: 96px;
+  min-height: 46px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.orderControl small {
+  color: var(--ink-soft);
 }
 
 .editFooter {
@@ -301,5 +335,9 @@
 
   .navigation button {
     min-width: 96px;
+  }
+
+  .orderControl > div {
+    justify-content: flex-start;
   }
 }

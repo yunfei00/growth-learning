@@ -51,6 +51,7 @@ class FamilyPictureBookUpdateRequest(BaseModel):
 
     title: str = Field(min_length=1, max_length=120)
     page_texts: list[str] = Field(min_length=1, max_length=24)
+    page_order: list[int] | None = Field(default=None, min_length=1, max_length=24)
 
     @field_validator("title")
     @classmethod
