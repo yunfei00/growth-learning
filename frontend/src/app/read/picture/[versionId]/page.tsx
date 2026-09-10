@@ -21,6 +21,7 @@ import {
   getPictureBook,
   picturePageImageUrl,
   preparePictureBookAudio,
+  updateFamilyPictureBook,
 } from "@/lib/picture-book-api";
 
 import styles from "./page.module.css";
@@ -45,6 +46,10 @@ function PictureBookReader() {
   const [autoPlaying, setAutoPlaying] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editTexts, setEditTexts] = useState<string[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const startingRef = useRef(false);
@@ -59,6 +64,8 @@ function PictureBookReader() {
       ]);
       setBook(bookValue);
       setStory(storyValue);
+      setEditTitle(bookValue.title);
+      setEditTexts(bookValue.pages.map((page) => page.text));
       setError("");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "绘本暂时无法打开");
@@ -182,6 +189,35 @@ function PictureBookReader() {
     childFeedbackAudio.speakInstruction(character);
   };
 
+  const saveEdit = async () => {
+    if (!activeChild || !book || savingEdit) return;
+    const cleanTitle = editTitle.trim();
+    if (!cleanTitle) {
+      setMessage("请填写绘本标题。");
+      return;
+    }
+    if (editTexts.some((text) => !text.trim())) {
+      setMessage("每一页都需要填写文字。");
+      return;
+    }
+    setSavingEdit(true);
+    stopAudio();
+    try {
+      const updated = await updateFamilyPictureBook(activeChild.id, book.story_version_id, {
+        title: cleanTitle,
+        pageTexts: editTexts.map((text) => text.trim()),
+      });
+      setBook(updated);
+      setEditing(false);
+      setMessage("修改已保存。下次朗读会自动使用新文字重新生成语音。");
+      await load();
+    } catch (requestError) {
+      setMessage(requestError instanceof Error ? requestError.message : "保存修改失败，请稍后重试");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const finishReading = async () => {
     if (!activeChild || !session || session.status === "completed") return;
     const startedAt = startedAtRef.current;
@@ -210,60 +246,116 @@ function PictureBookReader() {
   const imageUrl = page.image_available
     ? picturePageImageUrl(activeChild.id, book.story_version_id, pageIndex)
     : null;
+  const isFamilyBook = book.source_provider === "family_upload";
+  const canEdit = isFamilyBook && family?.current_role === "admin";
+  const sourceLabel = isFamilyBook ? "家庭绘本 · 亲子共读" : `开放绘本 · Level ${book.reading_level}`;
 
   return (
     <section className={`section-shell ${styles.reader}`}>
       <div className={styles.topbar}>
         <Link href="/read">← 我的故事书</Link>
-        <label className="inline-toggle">
-          <input checked={showPinyin} onChange={(event) => setShowPinyin(event.target.checked)} type="checkbox" />
-          显示拼音
-        </label>
+        <div className={styles.topActions}>
+          {canEdit ? (
+            <button
+              className="button button-secondary"
+              onClick={() => {
+                setEditing((value) => !value);
+                setMessage("");
+              }}
+              type="button"
+            >
+              {editing ? "取消编辑" : "✏️ 编辑绘本"}
+            </button>
+          ) : null}
+          <label className="inline-toggle">
+            <input checked={showPinyin} onChange={(event) => setShowPinyin(event.target.checked)} type="checkbox" />
+            显示拼音
+          </label>
+        </div>
       </div>
 
       <header className={styles.heading}>
-        <p className="eyebrow">开放绘本 · Level {book.reading_level}</p>
-        <h1>{book.title}</h1>
+        <p className="eyebrow">{sourceLabel}</p>
+        {editing ? (
+          <input
+            aria-label="绘本标题"
+            className={styles.titleInput}
+            maxLength={120}
+            onChange={(event) => setEditTitle(event.target.value)}
+            value={editTitle}
+          />
+        ) : (
+          <h1>{book.title}</h1>
+        )}
         <span>{pageIndex + 1} / {book.pages.length}</span>
       </header>
 
       <article className={styles.pageCard}>
-        {imageUrl ? (
-          <div
-            aria-label={page.image_alt || `${book.title} 第 ${pageIndex + 1} 页插图`}
-            className={styles.illustration}
-            role="img"
-            style={{ backgroundImage: `url(${imageUrl})` }}
-          />
-        ) : (
-          <div className={`${styles.illustration} ${styles.noImage}`}>📖</div>
-        )}
+        <div className={styles.pictureStage}>
+          {imageUrl ? (
+            <div
+              aria-label={page.image_alt || `${book.title} 第 ${pageIndex + 1} 页插图`}
+              className={styles.illustration}
+              role="img"
+              style={{ backgroundImage: `url(${imageUrl})` }}
+            />
+          ) : (
+            <div className={`${styles.illustration} ${styles.noImage}`}>📖</div>
+          )}
+        </div>
 
         <div className={styles.textArea}>
-          <p className={styles.storyText}>
-            {Array.from(page.text).map((character, index) => {
-              const pinyin = page.pinyin[index];
-              if (!pinyin) return <span key={`${index}-${character}`}>{character}</span>;
-              return (
-                <button
-                  aria-label={`听“${character}”`}
-                  className={styles.character}
-                  key={`${index}-${character}`}
-                  onClick={() => selectCharacter(character, pinyin)}
-                  type="button"
-                >
-                  {showPinyin ? <ruby>{character}<rt>{pinyin}</rt></ruby> : character}
+          {editing ? (
+            <div className={styles.editorArea}>
+              <label htmlFor="page-text">第 {pageIndex + 1} 页文字</label>
+              <textarea
+                id="page-text"
+                maxLength={220}
+                onChange={(event) =>
+                  setEditTexts((current) =>
+                    current.map((text, index) => (index === pageIndex ? event.target.value : text)),
+                  )
+                }
+                rows={4}
+                value={editTexts[pageIndex] ?? ""}
+              />
+              <div className={styles.editFooter}>
+                <small>{(editTexts[pageIndex] ?? "").length}/220</small>
+                <button className="button button-primary" disabled={savingEdit} onClick={() => void saveEdit()} type="button">
+                  {savingEdit ? "正在保存…" : "保存修改"}
                 </button>
-              );
-            })}
-          </p>
+              </div>
+            </div>
+          ) : (
+            <p className={styles.storyText}>
+              {Array.from(page.text).map((character, index) => {
+                const pinyin = page.pinyin[index];
+                if (!pinyin) return <span key={`${index}-${character}`}>{character}</span>;
+                return (
+                  <button
+                    aria-label={`听“${character}”`}
+                    className={styles.character}
+                    key={`${index}-${character}`}
+                    onClick={() => selectCharacter(character, pinyin)}
+                    type="button"
+                  >
+                    {showPinyin ? <ruby>{character}<rt>{pinyin}</rt></ruby> : character}
+                  </button>
+                );
+              })}
+            </p>
+          )}
 
-          <div className={styles.audioActions}>
-            <button className="button button-secondary" disabled={audioWorking} onClick={() => void playPage(pageIndex)} type="button">🔊 听这一页</button>
-            <button className="button button-secondary" disabled={audioWorking} onClick={() => void playFromHere()} type="button">▶ 连续朗读</button>
-            <button className="button button-secondary" disabled={!audioWorking} onClick={stopAudio} type="button">■ 停止</button>
-          </div>
-          {message ? <small className={styles.message}>{autoPlaying ? `连续朗读 · ${message}` : message}</small> : null}
+          {!editing ? (
+            <>
+              <div className={styles.audioActions}>
+                <button className="button button-secondary" disabled={audioWorking} onClick={() => void playPage(pageIndex)} type="button">🔊 听这一页</button>
+                <button className="button button-secondary" disabled={audioWorking} onClick={() => void playFromHere()} type="button">▶ 连续朗读</button>
+                <button className="button button-secondary" disabled={!audioWorking} onClick={stopAudio} type="button">■ 停止</button>
+              </div>
+              {message ? <small className={styles.message}>{autoPlaying ? `连续朗读 · ${message}` : message}</small> : null}
+            </>
+          ) : message ? <small className={styles.message}>{message}</small> : null}
         </div>
       </article>
 
@@ -291,11 +383,17 @@ function PictureBookReader() {
       </div>
 
       <footer className={styles.attribution}>
-        <strong>内容来源与许可</strong>
-        <span>来源：Global Digital Library · {book.license_name}</span>
-        {Array.isArray(book.attribution.authors) && book.attribution.authors.length ? <span>作者：{book.attribution.authors.join("、")}</span> : null}
-        {typeof book.attribution.publisher === "string" && book.attribution.publisher ? <span>出版/提供：{book.attribution.publisher}</span> : null}
-        <a href={book.source_url} rel="noreferrer" target="_blank">查看原始作品与完整署名</a>
+        <strong>{isFamilyBook ? "家庭私有绘本" : "内容来源与许可"}</strong>
+        {isFamilyBook ? (
+          <span>图片和文字由家庭管理员上传，仅保存在家庭私有阅读空间。</span>
+        ) : (
+          <>
+            <span>来源：Global Digital Library · {book.license_name}</span>
+            {Array.isArray(book.attribution.authors) && book.attribution.authors.length ? <span>作者：{book.attribution.authors.join("、")}</span> : null}
+            {typeof book.attribution.publisher === "string" && book.attribution.publisher ? <span>出版/提供：{book.attribution.publisher}</span> : null}
+            {book.source_url ? <a href={book.source_url} rel="noreferrer" target="_blank">查看原始作品与完整署名</a> : null}
+          </>
+        )}
         <small>本系统只记录阅读接触和求助行为；点字、听音不会自动把汉字判定为“认识”。</small>
       </footer>
     </section>
