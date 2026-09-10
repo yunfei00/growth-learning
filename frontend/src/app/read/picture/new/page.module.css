@@ -1,0 +1,168 @@
+.page {
+  display: grid;
+  gap: 1.5rem;
+  padding-block: 2rem 4rem;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.header h1 {
+  margin: 0.2rem 0 0.5rem;
+}
+
+.header p {
+  max-width: 760px;
+  margin: 0;
+}
+
+.editorCard {
+  display: grid;
+  gap: 1.4rem;
+  padding: 1.5rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 1.25rem;
+  background: var(--surface-color, #fff);
+}
+
+.field,
+.pageRow label {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.field span,
+.pageRow label > span {
+  font-weight: 700;
+}
+
+.field input,
+.pageRow textarea {
+  width: 100%;
+}
+
+.uploadGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.uploadBox {
+  display: grid;
+  gap: 0.55rem;
+  min-height: 140px;
+  padding: 1rem;
+  border: 1px dashed #94a3b8;
+  border-radius: 1rem;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.uploadBox strong {
+  font-size: 1.05rem;
+}
+
+.uploadBox span,
+.uploadBox small {
+  color: #64748b;
+}
+
+.uploadBox input {
+  margin-top: auto;
+}
+
+.pageList {
+  display: grid;
+  gap: 1rem;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sectionHeading div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.sectionHeading div span,
+.sectionHeading > span {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.pageRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #fff;
+}
+
+.previewWrap {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.previewWrap img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 0.8rem;
+  background: #f1f5f9;
+}
+
+.previewWrap span,
+.pageRow small {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.pageRow textarea {
+  resize: vertical;
+  min-height: 110px;
+}
+
+.pageRow small {
+  justify-self: end;
+}
+
+.tips {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1rem;
+  background: #f8fafc;
+}
+
+.tips span::before {
+  content: "✓ ";
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+@media (max-width: 720px) {
+  .header,
+  .sectionHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .uploadGrid,
+  .pageRow {
+    grid-template-columns: 1fr;
+  }
+}
