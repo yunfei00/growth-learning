@@ -129,6 +129,10 @@ export async function getPictureBook(
   return (await response.json()) as PictureBookDetail;
 }
 
+export function pictureBookCoverUrl(childId: string, versionId: string) {
+  return `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture/cover`;
+}
+
 export function picturePageImageUrl(childId: string, versionId: string, pageIndex: number) {
   return `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture/pages/${pageIndex}/image`;
 }
@@ -147,8 +151,12 @@ export async function fetchPictureBookPageAudio(
   pageIndex: number,
 ): Promise<Blob> {
   const response = await fetch(
-    `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture/audio/pages/${pageIndex}`,
-    { credentials: "include", cache: "force-cache" },
+    `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture/audio/pages/${pageIndex}?refresh=${Date.now()}`,
+    {
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    },
   );
   if (!response.ok) throw await errorFrom(response);
   return await response.blob();
