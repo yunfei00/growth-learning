@@ -68,7 +68,15 @@ function OnlinePictureBookLibrary() {
           <h1>在线绘本库</h1>
           <p>先从 Global Digital Library 的简体中文开放绘本开始。加入书架后，图片、文字和朗读都保存在家庭私有阅读空间。</p>
         </div>
-        <Link href="/read">← 返回我的故事书</Link>
+        <div className={styles.actions}>
+          {canImport ? <Link className="button button-primary" href="/read/picture/new">＋ 添加自己的绘本</Link> : null}
+          <Link href="/read">← 返回我的故事书</Link>
+        </div>
+      </div>
+
+      <div className={styles.notice}>
+        <strong>也可以加入你自己制作的 AI 图片故事</strong>
+        <span>例如《食海者》：封面单独上传，正文图片可一次多选，并逐页填写故事文字。</span>
       </div>
 
       <div className={styles.levels} role="group" aria-label="阅读级别">
