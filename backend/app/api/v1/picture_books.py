@@ -27,6 +27,7 @@ from app.integrations.tts import DashScopeTTSProvider, TTSProviderError
 from app.models import Story, StoryVersion
 from app.models.picture_book import PictureBookImport
 from app.schemas.picture_book import (
+    FamilyPictureBookUpdateRequest,
     OpenPictureBookSummary,
     PictureBookDetail,
     PictureBookImportResponse,
@@ -152,7 +153,6 @@ async def create_family_picture_book(
     if len(images) > MAX_PICTURE_BOOK_PAGES:
         raise HTTPException(status_code=422, detail="绘本最多支持 24 页正文")
 
-    # Reuse the existing parent-story literacy analysis, glossary and reading evidence pipeline.
     try:
         run, version = await create_parent_story(
             session,
@@ -163,8 +163,6 @@ async def create_family_picture_book(
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
-    # Page text is deliberately bounded to the manual-story TTS paragraph limit, so one image
-    # always maps to exactly one immutable story paragraph.
     if len(version.paragraphs) != len(texts):
         raise HTTPException(status_code=422, detail="绘本页文字无法保持一页一段，请精简单页文字")
 
@@ -174,9 +172,7 @@ async def create_family_picture_book(
     try:
         for position, upload in enumerate(images):
             content, mime, extension = await _read_image(upload, label=f"第 {position + 1} 页")
-            object_key = (
-                f"picture-books/{child.id}/{version.id}/pages/{position:03d}.{extension}"
-            )
+            object_key = f"picture-books/{child.id}/{version.id}/pages/{position:03d}.{extension}"
             await storage.put(object_key, content, mime)
             stored_keys.append(object_key)
             page_payloads.append(
@@ -248,12 +244,7 @@ async def create_family_picture_book(
     tts = _tts_provider(request)
     if tts is not None:
         try:
-            await prepare_story_paragraph_audio(
-                storage,
-                tts,
-                child_id=child_id,
-                version=version,
-            )
+            await prepare_story_paragraph_audio(storage, tts, child_id=child_id, version=version)
             audio_prepared = True
         except (TTSProviderError, S3Error, ValueError):
             pass
@@ -300,12 +291,7 @@ async def import_open_picture_book(
     tts = _tts_provider(request)
     if tts is not None:
         try:
-            await prepare_story_paragraph_audio(
-                storage,
-                tts,
-                child_id=child_id,
-                version=version,
-            )
+            await prepare_story_paragraph_audio(storage, tts, child_id=child_id, version=version)
             audio_prepared = True
         except (TTSProviderError, S3Error, ValueError):
             pass
@@ -328,9 +314,65 @@ async def get_picture_book(
     current_user: CurrentUser,
 ) -> PictureBookDetail:
     await get_authorized_child(session, current_user, child_id)
-    result = await picture_book_detail(
-        session, child_id=child_id, story_version_id=story_version_id
+    result = await picture_book_detail(session, child_id=child_id, story_version_id=story_version_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Picture book not found")
+    return result
+
+
+@router.put(
+    "/{child_id}/story-versions/{story_version_id}/picture-book/manual",
+    response_model=PictureBookDetail,
+)
+async def update_family_picture_book(
+    child_id: uuid.UUID,
+    story_version_id: uuid.UUID,
+    payload: FamilyPictureBookUpdateRequest,
+    session: DbSession,
+    current_user: CurrentUser,
+    storage: PictureStorage,
+) -> PictureBookDetail:
+    """Edit title and page text for a household-uploaded picture book."""
+
+    await get_authorized_child(session, current_user, child_id, admin_required=True)
+    picture = await session.scalar(
+        select(PictureBookImport).where(
+            PictureBookImport.child_id == child_id,
+            PictureBookImport.story_version_id == story_version_id,
+        )
     )
+    if picture is None:
+        raise HTTPException(status_code=404, detail="Picture book not found")
+    if picture.source_provider != FAMILY_PICTURE_PROVIDER:
+        raise HTTPException(status_code=403, detail="只有家庭自己上传的绘本可以编辑")
+
+    version = await session.get(StoryVersion, story_version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail="Picture book not found")
+    if len(payload.page_texts) != len(picture.pages):
+        raise HTTPException(status_code=422, detail="编辑时页数必须保持不变")
+
+    version.title = payload.title
+    version.paragraphs = payload.page_texts
+    updated_pages: list[dict[str, object]] = []
+    for index, stored_page in enumerate(picture.pages):
+        page = dict(stored_page)
+        page["text"] = payload.page_texts[index]
+        page["image_alt"] = f"{payload.title} 第 {index + 1} 页插图"
+        updated_pages.append(page)
+    picture.pages = updated_pages
+    picture.attribution = {**picture.attribution, "title": payload.title}
+    await session.commit()
+    await session.refresh(picture)
+    await session.refresh(version)
+
+    # Existing narration no longer matches edited text, so remove it. It will be regenerated
+    # automatically the next time the parent taps narration.
+    for index in range(len(payload.page_texts)):
+        with suppress(Exception):
+            await storage.remove(paragraph_audio_key(child_id, story_version_id, index))
+
+    result = await picture_book_detail(session, child_id=child_id, story_version_id=story_version_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Picture book not found")
     return result
@@ -395,9 +437,7 @@ async def prepare_picture_book_audio(
     if tts is None:
         raise HTTPException(status_code=503, detail="故事朗读服务尚未配置")
     try:
-        count = await prepare_story_paragraph_audio(
-            storage, tts, child_id=child_id, version=version
-        )
+        count = await prepare_story_paragraph_audio(storage, tts, child_id=child_id, version=version)
     except TTSProviderError as error:
         raise HTTPException(status_code=503, detail="绘本音频生成失败，请稍后重试") from error
     return {"prepared": True, "pages": count, "model": tts.model, "voice": tts.voice}
