@@ -101,7 +101,7 @@ export async function uploadFamilyPictureBook(
 export async function updateFamilyPictureBook(
   childId: string,
   versionId: string,
-  payload: { title: string; pageTexts: string[] },
+  payload: { title: string; pageTexts: string[]; pageOrder?: number[] },
 ): Promise<PictureBookDetail> {
   const response = await fetch(
     `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture-book/manual`,
@@ -110,7 +110,11 @@ export async function updateFamilyPictureBook(
       credentials: "include",
       cache: "no-store",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ title: payload.title, page_texts: payload.pageTexts }),
+      body: JSON.stringify({
+        title: payload.title,
+        page_texts: payload.pageTexts,
+        page_order: payload.pageOrder,
+      }),
     },
   );
   if (!response.ok) throw await errorFrom(response);
@@ -127,6 +131,10 @@ export async function getPictureBook(
   );
   if (!response.ok) throw await errorFrom(response);
   return (await response.json()) as PictureBookDetail;
+}
+
+export function pictureBookCoverUrl(childId: string, versionId: string) {
+  return `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture/cover`;
 }
 
 export function picturePageImageUrl(childId: string, versionId: string, pageIndex: number) {
@@ -147,8 +155,8 @@ export async function fetchPictureBookPageAudio(
   pageIndex: number,
 ): Promise<Blob> {
   const response = await fetch(
-    `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture/audio/pages/${pageIndex}`,
-    { credentials: "include", cache: "force-cache" },
+    `${getApiBaseUrl()}/api/v1/children/${childId}/story-versions/${versionId}/picture/audio/pages/${pageIndex}?v=${Date.now()}`,
+    { credentials: "include", cache: "no-store" },
   );
   if (!response.ok) throw await errorFrom(response);
   return await response.blob();
