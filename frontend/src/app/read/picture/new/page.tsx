@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChangeEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import type { ChangeEvent } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
 import { ChildSwitcher } from "@/components/child-switcher";
