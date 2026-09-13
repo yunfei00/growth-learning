@@ -42,7 +42,7 @@ function ReadingSeriesBrowser() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const readAhead = async (episodeNumber: number) => {
+  const openEpisode = async (episodeNumber: number) => {
     if (!activeChild || openingEpisode !== null) return;
     setOpeningEpisode(episodeNumber);
     setError("");
@@ -77,7 +77,7 @@ function ReadingSeriesBrowser() {
           <p className="eyebrow">30 天连续故事 · 第一季</p>
           <h1>{series.title}</h1>
           <p className="role-note">
-            30 天全部开放：可以只预览，也可以提前进入正式阅读器完整阅读。提前读不会跳过前面未完成的章节。
+            30 天全部开放：可以只预览，也可以直接进入阅读器完整阅读。提前读不会跳过前面未完成的章节。
           </p>
         </div>
         <ChildSwitcher
@@ -126,9 +126,14 @@ function ReadingSeriesBrowser() {
             继续当前正式阅读
           </Link>
         ) : series.current_episode_number ? (
-          <Link className="button button-primary" href="/kids/today">
-            从今日任务开始正式阅读
-          </Link>
+          <button
+            className="button button-primary"
+            disabled={openingEpisode !== null}
+            onClick={() => void openEpisode(series.current_episode_number!)}
+            type="button"
+          >
+            {openingEpisode === series.current_episode_number ? "正在准备当前故事…" : "开始当前正式阅读"}
+          </button>
         ) : null}
       </section>
 
@@ -138,7 +143,7 @@ function ReadingSeriesBrowser() {
             <p className="eyebrow">完整目录</p>
             <h2>Day 1 — Day 30</h2>
           </div>
-          <span>任意一天都可预览或提前阅读</span>
+          <span>任意一天都可预览或直接阅读</span>
         </div>
 
         <div style={{ display: "grid", gap: "12px", marginTop: "18px" }}>
@@ -172,26 +177,28 @@ function ReadingSeriesBrowser() {
                           ? "进入当前正式阅读"
                           : "进入阅读器"}
                     </Link>
-                  ) : episode.status === "current" ? (
-                    <Link className="button button-secondary" href="/kids/today">
-                      从今日任务正式开始
-                    </Link>
                   ) : (
                     <button
                       className="button button-secondary"
                       disabled={openingEpisode !== null}
-                      onClick={() => void readAhead(episode.episode_number)}
+                      onClick={() => void openEpisode(episode.episode_number)}
                       type="button"
                     >
-                      {openingEpisode === episode.episode_number ? "正在准备这一篇…" : "提前阅读这一篇"}
+                      {openingEpisode === episode.episode_number
+                        ? "正在准备这一篇…"
+                        : episode.status === "current"
+                          ? "开始阅读这一篇"
+                          : "提前阅读这一篇"}
                     </button>
                   )}
                 </div>
-                {episode.status === "upcoming" ? (
-                  <p className="catalog-note">
-                    可提前完整阅读、点字求助并记录完成；不会把前面尚未完成的 Day 自动跳过去。
-                  </p>
-                ) : null}
+                <p className="catalog-note">
+                  {episode.status === "current"
+                    ? "直接进入连续故事阅读器，不再依赖旧的今日任务故事。"
+                    : episode.status === "upcoming"
+                      ? "可提前完整阅读、点字求助并记录完成；不会把前面尚未完成的 Day 自动跳过去。"
+                      : "可以随时重新打开阅读。"}
+                </p>
               </div>
             </details>
           ))}
