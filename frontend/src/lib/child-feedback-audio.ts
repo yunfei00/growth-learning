@@ -30,13 +30,37 @@ export class ChildFeedbackAudio {
     this.activeOscillators.clear();
   }
 
-  speakInstruction(text: string): boolean {
+  async speakText(text: string, rate = 0.82): Promise<boolean> {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
     this.cancel();
+    const generation = this.generation;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "zh-CN";
-    utterance.rate = 0.82;
-    window.speechSynthesis.speak(utterance);
+    utterance.rate = rate;
+    const voices = window.speechSynthesis.getVoices();
+    const chineseVoice = voices.find((voice) => /^zh(?:-|_)/i.test(voice.lang));
+    if (chineseVoice) utterance.voice = chineseVoice;
+
+    return await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(value && generation === this.generation);
+      };
+      utterance.addEventListener("end", () => finish(true), { once: true });
+      utterance.addEventListener("error", () => finish(false), { once: true });
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        finish(false);
+      }
+    });
+  }
+
+  speakInstruction(text: string): boolean {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+    void this.speakText(text, 0.82);
     return true;
   }
 
@@ -114,4 +138,3 @@ export const childFeedbackAudio = new ChildFeedbackAudio();
 export const playCorrectFeedback = () => childFeedbackAudio.playCorrectFeedback();
 export const playIncorrectFeedback = () => childFeedbackAudio.playIncorrectFeedback();
 export const playCompletedFeedback = () => childFeedbackAudio.playCompletedFeedback();
-
