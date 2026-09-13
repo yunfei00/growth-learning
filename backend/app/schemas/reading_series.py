@@ -15,6 +15,11 @@ class ReadingSeriesEpisodeResponse(BaseModel):
     focus_characters: list[str]
 
 
+class ReadingSeriesEpisodeOpenResponse(BaseModel):
+    episode_number: int
+    story_version_id: uuid.UUID
+
+
 class ReadingSeriesProgressResponse(BaseModel):
     series_id: uuid.UUID
     slug: str
