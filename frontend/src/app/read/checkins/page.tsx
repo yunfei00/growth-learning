@@ -11,6 +11,10 @@ import {
   type ReadingCheckinSummary,
   getReadingCheckins,
 } from "@/lib/reading-checkin-api";
+import {
+  type ReadingSeriesProgress,
+  getCurrentReadingSeries,
+} from "@/lib/reading-series-api";
 
 function localDate(value: Date): string {
   const year = value.getFullYear();
@@ -38,6 +42,7 @@ function CheckinCalendar() {
   const { status, children, activeChild, setActiveChildId } = useActiveChild();
   const [month, setMonth] = useState(() => new Date());
   const [summary, setSummary] = useState<ReadingCheckinSummary | null>(null);
+  const [series, setSeries] = useState<ReadingSeriesProgress | null>(null);
   const [selected, setSelected] = useState<ReadingCheckinDay | null>(null);
   const [error, setError] = useState("");
 
@@ -45,15 +50,19 @@ function CheckinCalendar() {
     if (!activeChild) return;
     const bounds = monthBounds(month);
     try {
-      const value = await getReadingCheckins(activeChild.id, {
-        ...bounds,
-        today: localDate(new Date()),
-      });
-      setSummary(value);
-      setSelected(value.days.find((item) => item.date === localDate(new Date())) ?? null);
+      const [checkins, readingSeries] = await Promise.all([
+        getReadingCheckins(activeChild.id, {
+          ...bounds,
+          today: localDate(new Date()),
+        }),
+        getCurrentReadingSeries(activeChild.id),
+      ]);
+      setSummary(checkins);
+      setSeries(readingSeries);
+      setSelected(checkins.days.find((item) => item.date === localDate(new Date())) ?? null);
       setError("");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "暂时无法读取阅读打卡");
+      setError(requestError instanceof Error ? requestError.message : "暂时无法读取阅读记录");
     }
   }, [activeChild, month]);
 
@@ -95,6 +104,7 @@ function CheckinCalendar() {
           childOptions={children}
           onChange={(id) => {
             setSummary(null);
+            setSeries(null);
             setSelected(null);
             setActiveChildId(id);
           }}
@@ -114,6 +124,48 @@ function CheckinCalendar() {
         <article><span>本月完成</span><strong>{summary?.completed_days ?? 0} 天</strong></article>
         <article><span>本月阅读</span><strong>{durationLabel(summary?.total_duration_seconds ?? 0)}</strong></article>
       </div>
+
+      {series ? (
+        <section className="story-generator-panel">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">30 天连续故事 · 第一季</p>
+              <h2>{series.title}</h2>
+            </div>
+            <strong>{series.completed_episodes} / {series.total_episodes} 天</strong>
+          </div>
+          <progress
+            aria-label="连续故事阅读进度"
+            max={series.total_episodes}
+            style={{ width: "100%", height: "16px" }}
+            value={series.completed_episodes}
+          />
+          <p className="role-note">
+            {series.current_episode_number
+              ? `当前：第 ${series.current_episode_number} 天 · ${series.current_chapter_title} · ${series.current_episode_title}`
+              : "🎉 第一季已经全部读完。"}
+          </p>
+          {series.current_story_version_id ? (
+            <Link className="button button-primary" href={`/read/${series.current_story_version_id}`}>继续今天的故事</Link>
+          ) : series.current_episode_number ? (
+            <Link className="button button-primary" href="/kids/today">从今日任务开始</Link>
+          ) : null}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px", marginTop: "18px" }}>
+            {series.episodes.map((episode) => {
+              const marker = episode.status === "completed" ? "✅" : episode.status === "in_progress" || episode.status === "current" ? "📖" : "○";
+              const card = (
+                <div style={{ border: "1px solid currentColor", borderRadius: "14px", padding: "12px", minHeight: "94px" }}>
+                  <strong>{marker} 第 {episode.episode_number} 天</strong>
+                  <small style={{ display: "block", marginTop: "4px" }}>{episode.chapter_title}</small>
+                  <span style={{ display: "block", marginTop: "6px" }}>{episode.title}</span>
+                </div>
+              );
+              return episode.story_version_id ? <Link href={`/read/${episode.story_version_id}`} key={episode.episode_number}>{card}</Link> : <div key={episode.episode_number}>{card}</div>;
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="story-generator-panel">
         <div className="section-title-row">
