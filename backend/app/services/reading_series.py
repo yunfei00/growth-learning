@@ -369,6 +369,8 @@ async def reading_series_progress(
                 title=episode.title,
                 status=status,
                 story_version_id=episode.story_version_id,
+                paragraphs=list(episode.paragraphs),
+                focus_characters=list(episode.focus_characters),
             )
         )
 
