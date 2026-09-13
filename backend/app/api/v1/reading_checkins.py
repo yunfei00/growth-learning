@@ -11,8 +11,13 @@ from app.schemas.reading_checkin import (
     ReadingHelpEventCreate,
     ReadingHelpEventResponse,
 )
+from app.schemas.story import ReadingCompleteRequest, ReadingSessionResponse
 from app.services.authorization import get_authorized_child
-from app.services.reading_checkins import reading_checkin_summary, record_reading_help
+from app.services.reading_checkins import (
+    complete_independent_daily_reading,
+    reading_checkin_summary,
+    record_reading_help,
+)
 
 router = APIRouter(prefix="/children", tags=["reading check-ins"])
 
@@ -35,6 +40,34 @@ async def create_help_event(
             session,
             child_id=child_id,
             reading_session_id=reading_session_id,
+            payload=payload,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.post(
+    "/{child_id}/reading-sessions/{reading_session_id}/daily-complete",
+    response_model=ReadingSessionResponse,
+)
+async def complete_daily_reading(
+    child_id: uuid.UUID,
+    reading_session_id: uuid.UUID,
+    payload: ReadingCompleteRequest,
+    session: DbSession,
+    current_user: CurrentUser,
+) -> ReadingSessionResponse:
+    """Finish independent daily reading without making quiz answers a gate."""
+
+    await get_authorized_child(session, current_user, child_id)
+    try:
+        return await complete_independent_daily_reading(
+            session,
+            child_id=child_id,
+            reading_session_id=reading_session_id,
+            evaluator_user_id=current_user.id,
             payload=payload,
         )
     except LookupError as error:
