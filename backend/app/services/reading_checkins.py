@@ -86,7 +86,7 @@ def _streaks(completed_dates: list[date], today: date) -> tuple[int, int]:
 
     longest = 1
     run = 1
-    for previous, current in zip(unique_dates, unique_dates[1:]):
+    for previous, current in zip(unique_dates, unique_dates[1:], strict=False):
         if current == previous + timedelta(days=1):
             run += 1
             longest = max(longest, run)
@@ -119,8 +119,14 @@ async def reading_checkin_summary(
         (
             await session.execute(
                 select(DailyReadingTask, ReadingSession, StoryVersion)
-                .outerjoin(ReadingSession, ReadingSession.id == DailyReadingTask.reading_session_id)
-                .outerjoin(StoryVersion, StoryVersion.id == DailyReadingTask.story_version_id)
+                .outerjoin(
+                    ReadingSession,
+                    ReadingSession.id == DailyReadingTask.reading_session_id,
+                )
+                .outerjoin(
+                    StoryVersion,
+                    StoryVersion.id == DailyReadingTask.story_version_id,
+                )
                 .where(
                     DailyReadingTask.child_id == child_id,
                     DailyReadingTask.task_date >= from_date,
