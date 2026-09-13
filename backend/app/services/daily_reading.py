@@ -23,9 +23,7 @@ from app.schemas.story import DailyReadingTaskResponse
 from app.services.reading_series import episode_for_story_version, next_series_story_version
 
 
-async def _legacy_unread_version(
-    session: AsyncSession, child_id: uuid.UUID
-) -> StoryVersion | None:
+async def _legacy_unread_version(session: AsyncSession, child_id: uuid.UUID) -> StoryVersion | None:
     return await session.scalar(
         select(StoryVersion)
         .join(Story, Story.id == StoryVersion.story_id)
