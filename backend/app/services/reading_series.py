@@ -1,6 +1,6 @@
 """Deterministic 30-day serialized reading progression.
 
-Series content is child-private, ordered, and independent from mastery scoring.  A
+Series content is child-private, ordered, and independent from mastery scoring. A
 StoryVersion is materialized only when an episode becomes the child's next
 reading item, so existing reading/session infrastructure remains authoritative.
 """
@@ -30,7 +30,11 @@ from app.models import (
 from app.models.reading_series import StoryEpisode, StorySeries
 from app.reading_content import EPISODES, SERIES_CONTENT_VERSION, SERIES_SLUG, SERIES_TITLE
 from app.schemas.reading_series import ReadingSeriesEpisodeResponse, ReadingSeriesProgressResponse
-from app.services.story_analysis import ANALYZER_VERSION, COVERAGE_POLICY_VERSION, analyze_story_coverage
+from app.services.story_analysis import (
+    ANALYZER_VERSION,
+    COVERAGE_POLICY_VERSION,
+    analyze_story_coverage,
+)
 from app.services.story_generation import build_mastery_snapshot
 
 SERIES_PROVIDER = "curated_series"
@@ -103,7 +107,6 @@ async def ensure_first_month_series(session: AsyncSession, child_id: uuid.UUID) 
                 )
             )
         elif episode.story_version_id is None:
-            # Curated copy can evolve until the child actually starts this episode.
             episode.chapter_title = str(payload["chapter"])
             episode.title = str(payload["title"])
             episode.paragraphs = list(payload["paragraphs"])
@@ -262,7 +265,9 @@ async def _materialize_episode(
     return version
 
 
-async def _completed_story_versions(session: AsyncSession, child_id: uuid.UUID) -> set[uuid.UUID]:
+async def _completed_story_versions(
+    session: AsyncSession, child_id: uuid.UUID
+) -> set[uuid.UUID]:
     return set(
         (
             await session.scalars(
@@ -329,15 +334,16 @@ async def reading_series_progress(
             )
         ).all()
     )
+    materialized_ids = [
+        item.story_version_id for item in episodes if item.story_version_id is not None
+    ]
     readings = {
         row[0]: row[1]
         for row in (
             await session.execute(
                 select(ReadingSession.story_version_id, ReadingSession.status).where(
                     ReadingSession.child_id == child_id,
-                    ReadingSession.story_version_id.in_(
-                        [item.story_version_id for item in episodes if item.story_version_id is not None]
-                    ),
+                    ReadingSession.story_version_id.in_(materialized_ids),
                 )
             )
         ).all()
@@ -346,7 +352,9 @@ async def reading_series_progress(
     current: StoryEpisode | None = None
     response_episodes: list[ReadingSeriesEpisodeResponse] = []
     for episode in episodes:
-        reading_status = readings.get(episode.story_version_id) if episode.story_version_id else None
+        reading_status = (
+            readings.get(episode.story_version_id) if episode.story_version_id else None
+        )
         if reading_status == ReadingStatus.COMPLETED:
             status = "completed"
             completed += 1
