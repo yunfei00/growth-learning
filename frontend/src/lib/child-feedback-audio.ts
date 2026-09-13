@@ -14,9 +14,12 @@ export class ChildFeedbackAudio {
   private context: AudioContext | null = null;
   private generation = 0;
   private activeOscillators = new Set<OscillatorNode>();
+  private activeSpeechResolve: ((value: boolean) => void) | null = null;
 
   cancel(): void {
     this.generation += 1;
+    this.activeSpeechResolve?.(false);
+    this.activeSpeechResolve = null;
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -46,8 +49,10 @@ export class ChildFeedbackAudio {
       const finish = (value: boolean) => {
         if (settled) return;
         settled = true;
+        if (this.activeSpeechResolve === finish) this.activeSpeechResolve = null;
         resolve(value && generation === this.generation);
       };
+      this.activeSpeechResolve = finish;
       utterance.addEventListener("end", () => finish(true), { once: true });
       utterance.addEventListener("error", () => finish(false), { once: true });
       try {
