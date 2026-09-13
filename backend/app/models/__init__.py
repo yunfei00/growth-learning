@@ -115,6 +115,7 @@ from app.models.platform import (
     PlatformAuditLog,
     PlatformInvitation,
 )
+from app.models.reading_series import StoryEpisode, StorySeries
 from app.models.review import (
     AssessmentSessionPlan,
     AssessmentSessionTarget,
@@ -289,6 +290,8 @@ __all__ = [
     "MathProblemTemplate",
     "MathRepresentationType",
     "MathSkill",
+    "StorySeries",
+    "StoryEpisode",
     "AssessmentSessionPlan",
     "AssessmentSessionTarget",
     "AssessmentSource",
