@@ -154,8 +154,8 @@ async def create_family_picture_book(
     session: DbSession,
     current_user: CurrentUser,
     storage: PictureStorage,
-    title: str = Form(..., min_length=1, max_length=120),
-    page_texts: str = Form(...),
+    title: Annotated[str, Form(min_length=1, max_length=120)],
+    page_texts: Annotated[str, Form()],
     images: Annotated[list[UploadFile], File()],
     cover: Annotated[UploadFile | None, File()] = None,
 ) -> PictureBookImportResponse:
