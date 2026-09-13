@@ -312,7 +312,7 @@ async def test_generation_stops_after_three_invalid_attempts(
     assert len(provider.requests) == 3
 
 
-async def test_reading_resume_comprehension_exposure_and_daily_task(
+async def test_reading_resume_comprehension_exposure_preserves_serialized_daily_task(
     client: httpx.AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -323,7 +323,10 @@ async def test_reading_resume_comprehension_exposure_and_daily_task(
 
     async with session_factory() as session:
         plan = await get_or_create_daily_plan(session, child.id)
-        assert plan.reading.status == "needs_story"
+        assert plan.reading.status == "pending"
+        daily_story_version_id = plan.reading.story_version_id
+        assert daily_story_version_id is not None
+
         _, version = await generate_story(
             session,
             child=child,
@@ -337,8 +340,11 @@ async def test_reading_resume_comprehension_exposure_and_daily_task(
             provider_name="fake",
             configured_model="deterministic-test-model",
         )
+        assert version.id != daily_story_version_id
         task = await session.scalar(select(DailyReadingTask))
-        assert task is not None and task.status == "pending"
+        assert task is not None
+        assert task.status == "pending"
+        assert task.story_version_id == daily_story_version_id
 
         started = await start_or_resume_reading(
             session,
@@ -356,7 +362,10 @@ async def test_reading_resume_comprehension_exposure_and_daily_task(
         )
         assert resumed.id == started.id
         task = await session.scalar(select(DailyReadingTask))
-        assert task is not None and task.status == "in_progress"
+        assert task is not None
+        assert task.status == "pending"
+        assert task.reading_session_id is None
+        assert task.story_version_id == daily_story_version_id
 
         persisted_questions = list(
             (
@@ -419,7 +428,9 @@ async def test_reading_resume_comprehension_exposure_and_daily_task(
         )
         assert exposures == 2
         task = await session.scalar(select(DailyReadingTask))
-        assert task is not None and task.status == "completed"
+        assert task is not None
+        assert task.status == "pending"
+        assert task.story_version_id == daily_story_version_id
 
 
 async def test_provider_disabled_and_household_story_privacy(

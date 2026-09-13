@@ -60,7 +60,11 @@ async def test_series_has_30_ordered_days_and_advances_after_completion(
     assert payload["current_episode_number"] == 1
     assert len(payload["episodes"]) == 30
     assert payload["episodes"][0]["title"] == "沙子里的亮光"
+    assert payload["episodes"][0]["paragraphs"]
+    assert payload["episodes"][0]["focus_characters"]
     assert payload["episodes"][-1]["title"] == "新的地图亮了起来"
+    assert payload["episodes"][-1]["paragraphs"]
+    assert payload["episodes"][-1]["story_version_id"] is None
 
     started = await client.post(
         f"/api/v1/children/{child_id}/story-versions/{first_version_id}/reading/start",

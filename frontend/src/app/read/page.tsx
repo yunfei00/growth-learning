@@ -41,6 +41,7 @@ const THEME_LABELS: Record<string, string> = {
   science: "科学探索",
   parent_authored: "家长添加",
   open_picture_book: "绘本",
+  serialized_reading: "连续故事",
 };
 
 const DIFFICULTY_LABELS: Record<StoryDifficulty, string> = {
@@ -169,6 +170,23 @@ function ReadingLibrary() {
       <section className="story-generator-panel">
         <div className="section-title-row">
           <div>
+            <p className="eyebrow">30 天连续故事 · 第一季</p>
+            <h2>《小鱼阿海的大冒险》</h2>
+          </div>
+          <span>Day 1 → Day 30</span>
+        </div>
+        <p>
+          正式阅读每天按顺序推进；30 天内容可以随时查看和预览，提前预览不会算完成，也不会跳过当前进度。
+        </p>
+        <div className="mode-buttons">
+          <Link className="button button-primary" href="/read/series">🌊 查看 30 天完整故事</Link>
+          <Link className="button button-secondary" href="/read/checkins">📅 查看阅读进度</Link>
+        </div>
+      </section>
+
+      <section className="story-generator-panel">
+        <div className="section-title-row">
+          <div>
             <p className="eyebrow">绘本阅读</p>
             <h2>从开放绘本库选一本</h2>
           </div>
@@ -222,7 +240,7 @@ function ReadingLibrary() {
           <label>
             安全主题
             <select value={theme} onChange={(event) => setTheme(event.target.value)}>
-              {(context?.safe_themes ?? Object.keys(THEME_LABELS).filter((value) => !["parent_authored", "open_picture_book"].includes(value))).map((value) => (
+              {(context?.safe_themes ?? Object.keys(THEME_LABELS).filter((value) => !["parent_authored", "open_picture_book", "serialized_reading"].includes(value))).map((value) => (
                 <option key={value} value={value}>{THEME_LABELS[value] ?? value}</option>
               ))}
             </select>

@@ -6,6 +6,8 @@ export type ReadingSeriesEpisode = {
   title: string;
   status: "completed" | "in_progress" | "current" | "upcoming";
   story_version_id: string | null;
+  paragraphs: string[];
+  focus_characters: string[];
 };
 
 export type ReadingSeriesProgress = {
