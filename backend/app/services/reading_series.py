@@ -87,9 +87,7 @@ async def ensure_first_month_series(session: AsyncSession, child_id: uuid.UUID) 
     existing = {
         item.episode_number: item
         for item in (
-            await session.scalars(
-                select(StoryEpisode).where(StoryEpisode.series_id == series.id)
-            )
+            await session.scalars(select(StoryEpisode).where(StoryEpisode.series_id == series.id))
         ).all()
     }
     for payload in EPISODES:
@@ -210,7 +208,9 @@ async def _materialize_episode(
         story_id=story.id,
         generation_run_id=run.id,
         version_number=1,
-        title=f"第{episode.episode_number}天｜{episode.title}",
+        title=(
+            f"第 {episode.episode_number} 天 / 共 {series.total_episodes} 天 · {episode.title}"
+        ),
         paragraphs=episode.paragraphs,
         summary=f"{series.title} · {episode.chapter_title}",
         theme=SERIES_THEME,
@@ -265,9 +265,7 @@ async def _materialize_episode(
     return version
 
 
-async def _completed_story_versions(
-    session: AsyncSession, child_id: uuid.UUID
-) -> set[uuid.UUID]:
+async def _completed_story_versions(session: AsyncSession, child_id: uuid.UUID) -> set[uuid.UUID]:
     return set(
         (
             await session.scalars(
