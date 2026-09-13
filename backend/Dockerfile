@@ -21,7 +21,10 @@ COPY app ./app
 COPY data ./data
 COPY migrations ./migrations
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com \
+    .
 
 USER app
 
