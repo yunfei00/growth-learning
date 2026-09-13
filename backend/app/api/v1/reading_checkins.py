@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 
@@ -81,9 +82,9 @@ async def get_reading_checkins(
     child_id: uuid.UUID,
     session: DbSession,
     current_user: CurrentUser,
-    from_date: date | None = Query(default=None, alias="from"),
-    to_date: date | None = Query(default=None, alias="to"),
-    today: date | None = Query(default=None),
+    from_date: Annotated[date | None, Query(alias="from")] = None,
+    to_date: Annotated[date | None, Query(alias="to")] = None,
+    today: Annotated[date | None, Query()] = None,
 ) -> ReadingCheckinSummaryResponse:
     await get_authorized_child(session, current_user, child_id)
     resolved_today = today or date.today()
