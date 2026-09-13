@@ -152,7 +152,7 @@ function StoryReader() {
         setShowPinyin(false);
         setMessage("这篇故事已经读完过啦。现在是纯阅读模式，可以再读一遍。");
       } else {
-        setMessage("阅读已经开始。先自己读，不会的字再轻点一下。");
+        setMessage("阅读已经开始。可以自己读、听全文，或者只点不会的字求助。");
       }
       setError("");
     } catch (requestError) {
@@ -234,8 +234,8 @@ function StoryReader() {
     try {
       return await fetchStoryParagraphAudio(activeChild.id, story.id, index);
     } catch (firstError) {
-      if (!manualStory || family?.current_role !== "admin") throw firstError;
-      setAudioMessage("朗读音频还没准备好，正在自动生成…");
+      if (family?.current_role !== "admin") throw firstError;
+      setAudioMessage("朗读音频还没准备好，正在自动生成整篇语音…");
       await prepareStoryAudio(activeChild.id, story.id);
       return await fetchStoryParagraphAudio(activeChild.id, story.id, index);
     }
@@ -294,10 +294,10 @@ function StoryReader() {
         </div>
       </header>
 
-      {manualStory && session && mode === "with_help" ? (
+      {session ? (
         <section className="reading-start-card">
           <strong>🔊 故事朗读</strong>
-          <p>陪读模式可以按需朗读；自主阅读模式会把这些朗读按钮收起来。</p>
+          <p>支持两种帮助：可以“听全文 / 听这一段”跟读，也可以只点不会的字听发音和看解释。</p>
           <div className="mode-buttons">
             <button disabled={audioWorking} onClick={() => void playAll()} type="button">▶ 听全文</button>
             <button disabled={!audioWorking} onClick={stopAudio} type="button">■ 停止</button>
@@ -309,7 +309,7 @@ function StoryReader() {
       {!session ? (
         <div className="reading-start-card">
           <strong>今天先自己读一读</strong>
-          <p>拼音和朗读默认关闭。遇到不会的字再轻点一下，系统会读出来并显示拼音和解释。</p>
+          <p>默认不显示拼音。开始后既可以自己读并点不会的字，也可以随时点“听全文”让系统整篇朗读。</p>
           <div className="mode-buttons">
             <button className={mode === "independent" ? "selected" : ""} onClick={() => { setMode("independent"); setShowPinyin(false); }} type="button">👦 我要自己读</button>
             <button className={mode === "with_help" ? "selected" : ""} onClick={() => setMode("with_help")} type="button">👨‍👩‍👦 一起读故事</button>
@@ -331,16 +331,14 @@ function StoryReader() {
                   targets={targets}
                 />
               </p>
-              {manualStory && mode === "with_help" ? (
-                <button
-                  className="button button-secondary"
-                  disabled={audioWorking}
-                  onClick={() => void playParagraph(index)}
-                  type="button"
-                >
-                  {playingParagraph === index ? "🔊 正在朗读…" : "🔊 听这一段"}
-                </button>
-              ) : null}
+              <button
+                className="button button-secondary"
+                disabled={audioWorking}
+                onClick={() => void playParagraph(index)}
+                type="button"
+              >
+                {playingParagraph === index ? "🔊 正在朗读…" : "🔊 听这一段"}
+              </button>
             </div>
           ))}
         </article>
