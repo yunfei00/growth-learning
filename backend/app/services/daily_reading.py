@@ -1,7 +1,9 @@
 """Persistence helpers for one real daily reading task.
 
 Serialized reading takes priority for newly created daily tasks. Existing tasks
-are preserved so an already-started day never jumps to a different story.
+that are already in progress or completed are preserved. A still-pending legacy
+task is repaired to the current serialized episode so today's card cannot remain
+stuck on an old one-off story after the serialized pack is enabled.
 """
 
 import uuid
@@ -48,13 +50,24 @@ async def ensure_daily_reading_task(
         select(DailyReadingTask).where(DailyReadingTask.daily_plan_id == plan.id)
     )
     if task is not None:
-        # Preserve a story already selected for this date. Only repair a
-        # previously story-less task after the serialized pack is available.
-        if task.story_version_id is None and task.status != DailyReadingStatus.COMPLETED:
+        # Never move a task the child has already started or finished.
+        if task.status in {DailyReadingStatus.IN_PROGRESS, DailyReadingStatus.COMPLETED}:
+            return task
+
+        current_series_episode = None
+        if task.story_version_id is not None:
+            current_series_episode = await episode_for_story_version(session, task.story_version_id)
+
+        # Repair a story-less or still-pending legacy task to the first unfinished
+        # serialized episode. This is what makes an already-created "today" card
+        # switch from an old one-off story to Day 1 after the series feature ships.
+        if task.story_version_id is None or current_series_episode is None:
             series_item = await next_series_story_version(session, plan.child_id)
             if series_item is not None:
                 _, _, version = series_item
                 task.story_version_id = version.id
+                task.reading_session_id = None
+                task.completed_at = None
                 task.status = DailyReadingStatus.PENDING
         return task
 
