@@ -115,3 +115,50 @@ async def test_missed_day_keeps_same_episode(
         )
     assert "第1天/30天" in (tomorrow.reading.title or "")
     assert str(tomorrow.reading.story_version_id) == first_version_id
+
+
+async def test_read_ahead_can_finish_future_episode_without_skipping_earlier_days(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    child = await _register_family_child(client, "ahead")
+    child_id = child["id"]
+
+    today = await client.get(f"/api/v1/children/{child_id}/experience/today")
+    assert today.status_code == 200
+    reading_task = next(item for item in today.json()["tasks"] if item["kind"] == "reading")
+    first_version_id = reading_task["href"].rsplit("/", 1)[-1]
+
+    opened = await client.post(
+        f"/api/v1/children/{child_id}/reading-series/current/episodes/10/open"
+    )
+    assert opened.status_code == 200
+    tenth_version_id = opened.json()["story_version_id"]
+    assert tenth_version_id != first_version_id
+
+    started = await client.post(
+        f"/api/v1/children/{child_id}/story-versions/{tenth_version_id}/reading/start",
+        json={"reading_mode": "independent"},
+    )
+    assert started.status_code == 200
+    completed = await client.post(
+        f"/api/v1/children/{child_id}/reading-sessions/{started.json()['id']}/daily-complete",
+        json={"duration_seconds": 45},
+    )
+    assert completed.status_code == 200
+
+    progress = await client.get(f"/api/v1/children/{child_id}/reading-series/current")
+    assert progress.status_code == 200
+    payload = progress.json()
+    assert payload["completed_episodes"] == 1
+    assert payload["current_episode_number"] == 1
+    assert payload["episodes"][9]["status"] == "completed"
+
+    async with session_factory() as session:
+        tomorrow = await get_or_create_daily_plan(
+            session,
+            uuid.UUID(child_id),
+            now=datetime.now(UTC) + timedelta(days=1),
+        )
+    assert "第1天/30天" in (tomorrow.reading.title or "")
+    assert str(tomorrow.reading.story_version_id) == first_version_id
