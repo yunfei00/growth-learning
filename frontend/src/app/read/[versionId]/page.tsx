@@ -18,6 +18,7 @@ import {
   submitReadingAnswers,
 } from "@/lib/api/client";
 import { fetchStoryParagraphAudio, prepareStoryAudio } from "@/lib/manual-story-api";
+import { recordReadingHelp } from "@/lib/reading-checkin-api";
 
 function messageFrom(error: unknown, fallback: string) {
   return error instanceof ApiClientError || error instanceof Error ? error.message : fallback;
@@ -59,7 +60,7 @@ function StoryReader() {
   const { activeChild, family } = useActiveChild();
   const [story, setStory] = useState<StoryVersion | null>(null);
   const [session, setSession] = useState<ReadingSession | null>(null);
-  const [mode, setMode] = useState<"independent" | "with_help">("with_help");
+  const [mode, setMode] = useState<"independent" | "with_help">("independent");
   const [showPinyin, setShowPinyin] = useState(false);
   const [selectedGlossary, setSelectedGlossary] = useState<CharacterGlossary | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -112,8 +113,13 @@ function StoryReader() {
       stopAudio();
       setSelectedGlossary(detail);
       childFeedbackAudio.speakInstruction(detail.character);
+      if (session && activeChild) {
+        void recordReadingHelp(activeChild.id, session.id, detail.character).catch(() => {
+          // Reading assistance must remain usable even if behavioral analytics fail.
+        });
+      }
     },
-    [stopAudio],
+    [activeChild, session, stopAudio],
   );
 
   const glossary = useMemo(
@@ -138,7 +144,13 @@ function StoryReader() {
       const value = await startReading(activeChild.id, story.id, mode);
       setSession(value);
       setStartedAt(Date.now());
-      setMessage(value.status === "in_progress" ? "阅读进度已保存，可以随时离开后继续。" : "这篇故事已完成。" );
+      if (value.status === "completed") {
+        setMode("independent");
+        setShowPinyin(false);
+        setMessage("这篇故事已经读完过啦。现在是纯阅读模式，可以再读一遍。" );
+      } else {
+        setMessage("阅读已经开始。先自己读，不会的字再轻点一下。" );
+      }
       setError("");
     } catch (requestError) {
       setError(messageFrom(requestError, "无法开始阅读"));
@@ -176,7 +188,9 @@ function StoryReader() {
         parent_note: parentNote.trim() || undefined,
       });
       setSession(current);
-      setMessage(`阅读完成，已记录 ${current.story_exposure_count} 个目标字的故事接触；不会产生“认字正确”证据。`);
+      setShowPinyin(false);
+      stopAudio();
+      setMessage(`✅ 今天阅读完成！已记录 ${current.story_exposure_count} 个目标字的故事接触；不会产生“认字正确”证据。`);
     } catch (requestError) {
       setError(messageFrom(requestError, "阅读记录没有保存成功"));
     } finally {
@@ -249,7 +263,10 @@ function StoryReader() {
     <section className="reader-page section-shell">
       <div className="reader-topbar">
         <Link href="/read">← 我的故事书</Link>
-        <label className="inline-toggle"><input checked={showPinyin} onChange={(event) => setShowPinyin(event.target.checked)} type="checkbox" />显示拼音</label>
+        <Link href="/read/checkins">📅 阅读打卡</Link>
+        {mode === "with_help" ? (
+          <label className="inline-toggle"><input checked={showPinyin} onChange={(event) => setShowPinyin(event.target.checked)} type="checkbox" />显示拼音</label>
+        ) : <span>自主阅读 · 拼音关闭</span>}
       </div>
       <header className="story-heading">
         <p className="eyebrow">{manualStory ? "家长添加 · 辅助阅读" : `版本 ${story.version_number} · ${story.difficulty}`}</p>
@@ -261,10 +278,10 @@ function StoryReader() {
         </div>
       </header>
 
-      {manualStory ? (
+      {manualStory && session && mode === "with_help" ? (
         <section className="reading-start-card">
           <strong>🔊 故事朗读</strong>
-          <p>朗读音频由服务器生成后缓存，不会每次播放都重新调用模型。</p>
+          <p>陪读模式可以按需朗读；自主阅读模式会把这些朗读按钮收起来。</p>
           <div className="mode-buttons">
             <button disabled={audioWorking} onClick={() => void playAll()} type="button">▶ 听全文</button>
             <button disabled={!audioWorking} onClick={stopAudio} type="button">■ 停止</button>
@@ -275,41 +292,43 @@ function StoryReader() {
 
       {!session ? (
         <div className="reading-start-card">
-          <strong>准备好了吗？</strong>
-          <p>拼音默认关闭。轻点故事中的汉字会直接读出来，并打开拼音、解释和常用词。</p>
+          <strong>今天先自己读一读</strong>
+          <p>拼音和朗读默认关闭。遇到不会的字再轻点一下，系统会读出来并显示拼音和解释。</p>
           <div className="mode-buttons">
-            <button className={mode === "independent" ? "selected" : ""} onClick={() => setMode("independent")} type="button">独立阅读</button>
-            <button className={mode === "with_help" ? "selected" : ""} onClick={() => setMode("with_help")} type="button">家长陪读</button>
+            <button className={mode === "independent" ? "selected" : ""} onClick={() => { setMode("independent"); setShowPinyin(false); }} type="button">👦 我要自己读</button>
+            <button className={mode === "with_help" ? "selected" : ""} onClick={() => setMode("with_help")} type="button">👨‍👩‍👦 一起读故事</button>
           </div>
-          <button className="button button-primary" disabled={isWorking} onClick={() => void begin()} type="button">{isWorking ? "正在保存进度…" : "开始 / 继续阅读"}</button>
+          <button className="button button-primary" disabled={isWorking} onClick={() => void begin()} type="button">{isWorking ? "正在保存进度…" : "开始今天阅读"}</button>
         </div>
       ) : null}
 
-      <article className="story-paper">
-        {story.paragraphs.map((paragraph, index) => (
-          <div className="story-paragraph-block" key={index}>
-            <p>
-              <StoryText
-                glossary={glossary}
-                onCharacterTap={selectCharacter}
-                paragraph={paragraph}
-                showPinyin={showPinyin}
-                targets={targets}
-              />
-            </p>
-            {manualStory ? (
-              <button
-                className="button button-secondary"
-                disabled={audioWorking}
-                onClick={() => void playParagraph(index)}
-                type="button"
-              >
-                {playingParagraph === index ? "🔊 正在朗读…" : "🔊 听这一段"}
-              </button>
-            ) : null}
-          </div>
-        ))}
-      </article>
+      {session ? (
+        <article className="story-paper">
+          {story.paragraphs.map((paragraph, index) => (
+            <div className="story-paragraph-block" key={index}>
+              <p>
+                <StoryText
+                  glossary={glossary}
+                  onCharacterTap={selectCharacter}
+                  paragraph={paragraph}
+                  showPinyin={showPinyin}
+                  targets={targets}
+                />
+              </p>
+              {manualStory && mode === "with_help" ? (
+                <button
+                  className="button button-secondary"
+                  disabled={audioWorking}
+                  onClick={() => void playParagraph(index)}
+                  type="button"
+                >
+                  {playingParagraph === index ? "🔊 正在朗读…" : "🔊 听这一段"}
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </article>
+      ) : null}
 
       {selectedGlossary ? (
         <aside className="character-popover" aria-live="polite">
@@ -347,8 +366,8 @@ function StoryReader() {
           <label className="parent-note">家长备注（可选）<textarea maxLength={1000} onChange={(event) => setParentNote(event.target.value)} value={parentNote} /></label>
           {error ? <p className="form-message form-error">{error}</p> : null}
           {message ? <p className="form-message form-success">{message}</p> : null}
-          <button className="button button-primary" disabled={isWorking || session.status === "completed"} onClick={() => void submitAndFinish()} type="button">{session.status === "completed" ? "已完成阅读" : isWorking ? "正在保存…" : "完成阅读并保存"}</button>
-          <p className="evidence-note">读完只记录故事接触，不会自动把故事中的汉字标记为“认识”或“答对”。</p>
+          <button className="button button-primary" disabled={isWorking || session.status === "completed"} onClick={() => void submitAndFinish()} type="button">{session.status === "completed" ? "✅ 今日已完成" : isWorking ? "正在保存…" : "✅ 我读完了 · 完成今天阅读"}</button>
+          <p className="evidence-note">读完只记录故事接触；点字只记录“阅读时求助”，都不会自动把汉字标记为认识、答对或不认识。</p>
         </section>
       ) : null}
 
