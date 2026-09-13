@@ -18,7 +18,10 @@ import {
   submitReadingAnswers,
 } from "@/lib/api/client";
 import { fetchStoryParagraphAudio, prepareStoryAudio } from "@/lib/manual-story-api";
-import { recordReadingHelp } from "@/lib/reading-checkin-api";
+import {
+  completeIndependentDailyReading,
+  recordReadingHelp,
+} from "@/lib/reading-checkin-api";
 
 function messageFrom(error: unknown, fallback: string) {
   return error instanceof ApiClientError || error instanceof Error ? error.message : fallback;
@@ -147,9 +150,9 @@ function StoryReader() {
       if (value.status === "completed") {
         setMode("independent");
         setShowPinyin(false);
-        setMessage("这篇故事已经读完过啦。现在是纯阅读模式，可以再读一遍。" );
+        setMessage("这篇故事已经读完过啦。现在是纯阅读模式，可以再读一遍。");
       } else {
-        setMessage("阅读已经开始。先自己读，不会的字再轻点一下。" );
+        setMessage("阅读已经开始。先自己读，不会的字再轻点一下。");
       }
       setError("");
     } catch (requestError) {
@@ -161,32 +164,45 @@ function StoryReader() {
 
   const submitAndFinish = async () => {
     if (!session) return;
-    const unanswered = story.questions.filter(
-      (question) => !session.answers.some((answer) => answer.question_id === question.id),
-    );
-    if (unanswered.some((question) => answers[question.id] === undefined)) {
-      setError("请先完成全部阅读理解题");
-      return;
-    }
     setIsWorking(true);
     setError("");
     try {
+      const completionPayload = {
+        duration_seconds: startedAt
+          ? Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+          : undefined,
+        parent_note: parentNote.trim() || undefined,
+      };
       let current = session;
-      if (unanswered.length > 0) {
-        current = await submitReadingAnswers(
+
+      if (mode === "independent") {
+        current = await completeIndependentDailyReading(
           activeChild.id,
           session.id,
-          unanswered.map((question) => ({
-            question_id: question.id,
-            selected_option_index: answers[question.id],
-            outcome: helped[question.id] ? "with_help" : "correct",
-          })),
+          completionPayload,
         );
+      } else {
+        const unanswered = story.questions.filter(
+          (question) => !session.answers.some((answer) => answer.question_id === question.id),
+        );
+        if (unanswered.some((question) => answers[question.id] === undefined)) {
+          setError("陪读模式下，请先完成阅读理解题；自主阅读模式不要求做题。");
+          return;
+        }
+        if (unanswered.length > 0) {
+          current = await submitReadingAnswers(
+            activeChild.id,
+            session.id,
+            unanswered.map((question) => ({
+              question_id: question.id,
+              selected_option_index: answers[question.id],
+              outcome: helped[question.id] ? "with_help" : "correct",
+            })),
+          );
+        }
+        current = await completeReading(activeChild.id, current.id, completionPayload);
       }
-      current = await completeReading(activeChild.id, current.id, {
-        duration_seconds: startedAt ? Math.max(1, Math.round((Date.now() - startedAt) / 1000)) : undefined,
-        parent_note: parentNote.trim() || undefined,
-      });
+
       setSession(current);
       setShowPinyin(false);
       stopAudio();
@@ -348,9 +364,17 @@ function StoryReader() {
 
       {session ? (
         <section className="comprehension-panel">
-          <p className="eyebrow">{story.questions.length ? "阅读理解" : "阅读记录"}</p>
-          <h2>{story.questions.length ? "和孩子聊一聊故事" : "读完以后保存这次阅读"}</h2>
-          {story.questions.map((question) => {
+          <p className="eyebrow">
+            {mode === "independent" ? "自主阅读打卡" : story.questions.length ? "阅读理解" : "阅读记录"}
+          </p>
+          <h2>
+            {mode === "independent"
+              ? "读完就可以完成今天的阅读"
+              : story.questions.length
+                ? "和孩子聊一聊故事"
+                : "读完以后保存这次阅读"}
+          </h2>
+          {mode === "with_help" ? story.questions.map((question) => {
             const saved = session.answers.find((answer) => answer.question_id === question.id);
             return (
               <fieldset disabled={Boolean(saved) || session.status === "completed"} key={question.id}>
@@ -358,12 +382,14 @@ function StoryReader() {
                 {question.options.map((option, index) => (
                   <label key={option}><input checked={(saved?.selected_option_index ?? answers[question.id]) === index} name={question.id} onChange={() => setAnswers((current) => ({ ...current, [question.id]: index }))} type="radio" />{option}</label>
                 ))}
-                {mode === "with_help" && !saved ? <label className="helped-answer"><input checked={helped[question.id] ?? false} onChange={(event) => setHelped((current) => ({ ...current, [question.id]: event.target.checked }))} type="checkbox" />这题在帮助下完成</label> : null}
+                {!saved ? <label className="helped-answer"><input checked={helped[question.id] ?? false} onChange={(event) => setHelped((current) => ({ ...current, [question.id]: event.target.checked }))} type="checkbox" />这题在帮助下完成</label> : null}
                 {saved ? <small>已保存：{saved.outcome}</small> : null}
               </fieldset>
             );
-          })}
-          <label className="parent-note">家长备注（可选）<textarea maxLength={1000} onChange={(event) => setParentNote(event.target.value)} value={parentNote} /></label>
+          }) : (
+            <p>今天只做自主阅读，不要求做阅读理解题。不会的字可以直接点一下求助。</p>
+          )}
+          {mode === "with_help" ? <label className="parent-note">家长备注（可选）<textarea maxLength={1000} onChange={(event) => setParentNote(event.target.value)} value={parentNote} /></label> : null}
           {error ? <p className="form-message form-error">{error}</p> : null}
           {message ? <p className="form-message form-success">{message}</p> : null}
           <button className="button button-primary" disabled={isWorking || session.status === "completed"} onClick={() => void submitAndFinish()} type="button">{session.status === "completed" ? "✅ 今日已完成" : isWorking ? "正在保存…" : "✅ 我读完了 · 完成今天阅读"}</button>
