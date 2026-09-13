@@ -367,10 +367,7 @@ def _pattern(
     visible_count = 4 + ((variant // max(1, len(PATTERN_TOKENS))) % 2)
     sequence = [cycle[index % len(cycle)] for index in range(visible_count)]
     answer = cycle[len(sequence) % len(cycle)]["key"]
-    options = [
-        {"value": token["key"], "label": token["label"], "token": token}
-        for token in tokens
-    ]
+    options = [{"value": token["key"], "label": token["label"], "token": token} for token in tokens]
     local_rng.shuffle(options)
     return (
         {
@@ -432,9 +429,7 @@ def _shape_choice(
 ) -> tuple[dict[str, object], object]:
     target = str(template.config_json["target_shape"])
     confusing = SHAPE_CONFUSING_PAIRS.get(target, set())
-    distractors = [
-        shape for shape in SHAPES if shape != target and shape not in confusing
-    ]
+    distractors = [shape for shape in SHAPES if shape != target and shape not in confusing]
     rng.shuffle(distractors)
     choices = [target, *distractors[:2]]
     rng.shuffle(choices)
