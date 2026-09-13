@@ -26,7 +26,9 @@ class StorySeries(TimestampMixin, Base):
     )
     slug: Mapped[str] = mapped_column(String(80), nullable=False)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
-    season_number: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    season_number: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
     total_episodes: Mapped[int] = mapped_column(Integer, nullable=False)
     content_version: Mapped[str] = mapped_column(String(30), nullable=False)
 
