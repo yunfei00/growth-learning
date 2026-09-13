@@ -208,9 +208,7 @@ async def _materialize_episode(
         story_id=story.id,
         generation_run_id=run.id,
         version_number=1,
-        title=(
-            f"第 {episode.episode_number} 天 / 共 {series.total_episodes} 天 · {episode.title}"
-        ),
+        title=(f"第 {episode.episode_number} 天 / 共 {series.total_episodes} 天 · {episode.title}"),
         paragraphs=episode.paragraphs,
         summary=f"{series.title} · {episode.chapter_title}",
         theme=SERIES_THEME,
