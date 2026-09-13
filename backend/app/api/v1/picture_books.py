@@ -154,10 +154,10 @@ async def create_family_picture_book(
     session: DbSession,
     current_user: CurrentUser,
     storage: PictureStorage,
-    title: str = Form(..., min_length=1, max_length=120),
-    page_texts: str = Form(...),
-    images: list[UploadFile] = File(...),
-    cover: UploadFile | None = File(default=None),
+    title: Annotated[str, Form(min_length=1, max_length=120)],
+    page_texts: Annotated[str, Form()],
+    images: Annotated[list[UploadFile], File()],
+    cover: Annotated[UploadFile | None, File()] = None,
 ) -> PictureBookImportResponse:
     """Create a household-private picture book from parent supplied page images and text."""
 
@@ -332,7 +332,11 @@ async def get_picture_book(
     current_user: CurrentUser,
 ) -> PictureBookDetail:
     await get_authorized_child(session, current_user, child_id)
-    result = await picture_book_detail(session, child_id=child_id, story_version_id=story_version_id)
+    result = await picture_book_detail(
+        session,
+        child_id=child_id,
+        story_version_id=story_version_id,
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Picture book not found")
     return result
@@ -437,12 +441,19 @@ async def update_family_picture_book(
     # edited text without requiring a separate prepare round-trip.
     tts = _tts_provider(request)
     if tts is not None:
-        try:
-            await prepare_story_paragraph_audio(storage, tts, child_id=child_id, version=version)
-        except (TTSProviderError, S3Error, ValueError):
-            pass
+        with suppress(TTSProviderError, S3Error, ValueError):
+            await prepare_story_paragraph_audio(
+                storage,
+                tts,
+                child_id=child_id,
+                version=version,
+            )
 
-    result = await picture_book_detail(session, child_id=child_id, story_version_id=story_version_id)
+    result = await picture_book_detail(
+        session,
+        child_id=child_id,
+        story_version_id=story_version_id,
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Picture book not found")
     return result
@@ -507,7 +518,12 @@ async def prepare_picture_book_audio(
     if tts is None:
         raise HTTPException(status_code=503, detail="故事朗读服务尚未配置")
     try:
-        count = await prepare_story_paragraph_audio(storage, tts, child_id=child_id, version=version)
+        count = await prepare_story_paragraph_audio(
+            storage,
+            tts,
+            child_id=child_id,
+            version=version,
+        )
     except TTSProviderError as error:
         raise HTTPException(status_code=503, detail="绘本音频生成失败，请稍后重试") from error
     return {"prepared": True, "pages": count, "model": tts.model, "voice": tts.voice}
