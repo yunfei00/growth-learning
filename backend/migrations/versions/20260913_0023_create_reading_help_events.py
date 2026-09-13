@@ -53,9 +53,7 @@ def upgrade() -> None:
             ["reading_session_id"], ["reading_sessions.id"], ondelete="RESTRICT"
         ),
         sa.ForeignKeyConstraint(["child_id"], ["children.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(
-            ["story_version_id"], ["story_versions.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["story_version_id"], ["story_versions.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["knowledge_point_id"], ["knowledge_points.id"], ondelete="RESTRICT"
         ),
