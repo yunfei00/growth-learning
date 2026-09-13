@@ -5,8 +5,10 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.models import DailyReadingStatus, DailyReadingTask
 from app.services.review_planning import get_or_create_daily_plan
 
 pytestmark = pytest.mark.anyio
@@ -162,3 +164,51 @@ async def test_read_ahead_can_finish_future_episode_without_skipping_earlier_day
         )
     assert "第1天/30天" in (tomorrow.reading.title or "")
     assert str(tomorrow.reading.story_version_id) == first_version_id
+
+
+async def test_unfinished_legacy_today_task_is_repaired_to_current_series_episode(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    child = await _register_family_child(client, "legacy-repair")
+    child_id = child["id"]
+
+    today = await client.get(f"/api/v1/children/{child_id}/experience/today")
+    assert today.status_code == 200
+    original = next(item for item in today.json()["tasks"] if item["kind"] == "reading")
+    first_version_id = original["href"].rsplit("/", 1)[-1]
+
+    manual = await client.post(
+        f"/api/v1/children/{child_id}/stories/manual",
+        json={
+            "title": "旧的临时故事",
+            "content": "小猫来到河边。它看见一条小鱼，又慢慢走回家。",
+        },
+    )
+    assert manual.status_code == 201, manual.text
+    legacy_version_id = manual.json()["version"]["id"]
+    assert legacy_version_id != first_version_id
+
+    async with session_factory() as session:
+        task = await session.scalar(
+            select(DailyReadingTask).where(DailyReadingTask.child_id == uuid.UUID(child_id))
+        )
+        assert task is not None
+        task.story_version_id = uuid.UUID(legacy_version_id)
+        task.status = DailyReadingStatus.IN_PROGRESS
+        await session.commit()
+
+    repaired = await client.get(f"/api/v1/children/{child_id}/experience/today")
+    assert repaired.status_code == 200
+    reading_task = next(item for item in repaired.json()["tasks"] if item["kind"] == "reading")
+    assert "第1天/30天" in reading_task["title"]
+    assert reading_task["href"].endswith(first_version_id)
+
+    async with session_factory() as session:
+        task = await session.scalar(
+            select(DailyReadingTask).where(DailyReadingTask.child_id == uuid.UUID(child_id))
+        )
+        assert task is not None
+        assert task.story_version_id == uuid.UUID(first_version_id)
+        assert task.status == DailyReadingStatus.PENDING
+        assert task.reading_session_id is None
