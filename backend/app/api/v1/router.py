@@ -23,6 +23,7 @@ from app.api.v1.pinyin import admin_router as pinyin_admin_router
 from app.api.v1.pinyin import router as pinyin_router
 from app.api.v1.platform_admin import router as platform_admin_router
 from app.api.v1.reading_checkins import router as reading_checkins_router
+from app.api.v1.reading_series import router as reading_series_router
 from app.api.v1.science import router as science_router
 from app.api.v1.science_admin import router as science_admin_router
 from app.api.v1.stories import router as stories_router
@@ -50,6 +51,7 @@ router.include_router(learning_router)
 router.include_router(literacy_diagnostic_router)
 router.include_router(picture_books_router)
 router.include_router(reading_checkins_router)
+router.include_router(reading_series_router)
 router.include_router(science_admin_router)
 router.include_router(science_router)
 router.include_router(stories_router)
