@@ -1,7 +1,7 @@
 """Daily reading check-in aggregation and child-initiated help events."""
 
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,14 @@ from app.models import (
     DailyReadingStatus,
     DailyReadingTask,
     KnowledgePoint,
+    LearningActivityType,
+    LearningRecord,
+    LearningSession,
     ReadingSession,
+    ReadingStatus,
+    SessionStatus,
+    StoryKnowledgePoint,
+    StoryKnowledgeRole,
     StoryVersion,
 )
 from app.models.reading_checkin import ReadingHelpEvent
@@ -21,8 +28,11 @@ from app.schemas.reading_checkin import (
     ReadingHelpEventCreate,
     ReadingHelpEventResponse,
 )
+from app.schemas.story import ReadingCompleteRequest, ReadingSessionResponse
+from app.services.daily_reading import mark_reading_completed
 from app.services.story_analysis import extract_han
 from app.services.story_pinyin import first_contextual_readings
+from app.services.story_reading import reading_session_response
 
 
 async def record_reading_help(
@@ -77,6 +87,94 @@ async def record_reading_help(
         help_kind="character_tap",
         occurred_at=event.occurred_at,
     )
+
+
+async def complete_independent_daily_reading(
+    session: AsyncSession,
+    *,
+    child_id: uuid.UUID,
+    reading_session_id: uuid.UUID,
+    evaluator_user_id: uuid.UUID,
+    payload: ReadingCompleteRequest,
+    now: datetime | None = None,
+) -> ReadingSessionResponse:
+    """Finish a self-reading check-in without forcing comprehension questions.
+
+    This deliberately mirrors the exposure semantics of the regular story
+    completion path. The only difference is that optional comprehension answers
+    do not gate the child's daily reading habit.
+    """
+
+    now = now or datetime.now(UTC)
+    reading = await session.scalar(
+        select(ReadingSession).where(
+            ReadingSession.id == reading_session_id,
+            ReadingSession.child_id == child_id,
+        )
+    )
+    if reading is None:
+        raise LookupError("Reading session not found")
+    if reading.status == ReadingStatus.COMPLETED:
+        return await reading_session_response(session, reading)
+    if reading.reading_mode != "independent":
+        raise ValueError("Only independent reading can use daily check-in completion")
+
+    if reading.exposure_learning_session_id is None:
+        target_ids = list(
+            (
+                await session.scalars(
+                    select(StoryKnowledgePoint.knowledge_point_id).where(
+                        StoryKnowledgePoint.story_version_id == reading.story_version_id,
+                        StoryKnowledgePoint.role == StoryKnowledgeRole.TARGET,
+                    )
+                )
+            ).all()
+        )
+        exposure_session = LearningSession(
+            child_id=child_id,
+            actor_user_id=evaluator_user_id,
+            status=SessionStatus.COMPLETED,
+            source="story_reading",
+            started_at=reading.started_at,
+            completed_at=now,
+        )
+        session.add(exposure_session)
+        await session.flush()
+        for point_id in target_ids:
+            session.add(
+                LearningRecord(
+                    session_id=exposure_session.id,
+                    child_id=child_id,
+                    knowledge_point_id=point_id,
+                    actor_user_id=evaluator_user_id,
+                    activity_type=LearningActivityType.STORY_EXPOSURE,
+                    source="story_reading",
+                    learned_at=now,
+                )
+            )
+        reading.exposure_learning_session_id = exposure_session.id
+        await session.flush()
+
+        from app.services.mastery import recompute_child_knowledge_state
+        from app.services.review_planning import recompute_review_schedule
+
+        for point_id in target_ids:
+            await recompute_child_knowledge_state(session, child_id, point_id)
+            await recompute_review_schedule(session, child_id, point_id)
+
+    reading.status = ReadingStatus.COMPLETED
+    reading.completed_at = now
+    reading.duration_seconds = payload.duration_seconds
+    reading.parent_note = payload.parent_note
+    await mark_reading_completed(
+        session,
+        child_id,
+        reading.story_version_id,
+        reading.id,
+        now,
+    )
+    await session.commit()
+    return await reading_session_response(session, reading)
 
 
 def _streaks(completed_dates: list[date], today: date) -> tuple[int, int]:
