@@ -1,9 +1,9 @@
 """Persistence helpers for one real daily reading task.
 
-Serialized reading takes priority for newly created daily tasks. Existing tasks
-that are already in progress or completed are preserved. A still-pending legacy
-task is repaired to the current serialized episode so today's card cannot remain
-stuck on an old one-off story after the serialized pack is enabled.
+Serialized reading takes priority for newly created daily tasks. Completed tasks
+are preserved. Any unfinished legacy one-off task is repaired to the current
+serialized episode so today's card cannot remain stuck on an old story after the
+serialized pack is enabled.
 """
 
 import uuid
@@ -50,17 +50,17 @@ async def ensure_daily_reading_task(
         select(DailyReadingTask).where(DailyReadingTask.daily_plan_id == plan.id)
     )
     if task is not None:
-        # Never move a task the child has already started or finished.
-        if task.status in {DailyReadingStatus.IN_PROGRESS, DailyReadingStatus.COMPLETED}:
+        # A completed historical day is evidence and must never be rewritten.
+        if task.status == DailyReadingStatus.COMPLETED:
             return task
 
         current_series_episode = None
         if task.story_version_id is not None:
             current_series_episode = await episode_for_story_version(session, task.story_version_id)
 
-        # Repair a story-less or still-pending legacy task to the first unfinished
-        # serialized episode. This is what makes an already-created "today" card
-        # switch from an old one-off story to Day 1 after the series feature ships.
+        # Repair a story-less or legacy unfinished task to the first unfinished
+        # serialized episode. An old reading session remains in history, but the
+        # daily card becomes the canonical Day N task and can start cleanly.
         if task.story_version_id is None or current_series_episode is None:
             series_item = await next_series_story_version(session, plan.child_id)
             if series_item is not None:
