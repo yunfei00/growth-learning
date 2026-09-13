@@ -78,11 +78,13 @@ function StoryReader() {
   const [audioMessage, setAudioMessage] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const browserSpeechFallbackRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!activeChild || !params.versionId) return;
     try {
       setStory(await getStoryVersion(activeChild.id, params.versionId));
+      browserSpeechFallbackRef.current = false;
       setError("");
     } catch (requestError) {
       setError(messageFrom(requestError, "暂时无法打开这篇故事"));
@@ -106,6 +108,7 @@ function StoryReader() {
   const stopAudio = useCallback(() => {
     audioRef.current?.pause();
     audioRef.current = null;
+    childFeedbackAudio.cancel();
     setAudioWorking(false);
     setPlayingParagraph(null);
     setAudioMessage("");
@@ -215,6 +218,7 @@ function StoryReader() {
   };
 
   const playBlob = async (blob: Blob): Promise<void> => {
+    childFeedbackAudio.cancel();
     audioRef.current?.pause();
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
     const objectUrl = URL.createObjectURL(blob);
@@ -230,14 +234,35 @@ function StoryReader() {
     if (audioUrlRef.current === objectUrl) audioUrlRef.current = null;
   };
 
+  const playDeviceSpeech = async (text: string): Promise<void> => {
+    audioRef.current?.pause();
+    const spoken = await childFeedbackAudio.speakText(text, 0.8);
+    if (!spoken) throw new Error("当前浏览器没有可用的中文朗读能力");
+  };
+
   const loadParagraphAudio = async (index: number): Promise<Blob> => {
     try {
       return await fetchStoryParagraphAudio(activeChild.id, story.id, index);
     } catch (firstError) {
       if (family?.current_role !== "admin") throw firstError;
-      setAudioMessage("朗读音频还没准备好，正在自动生成整篇语音…");
+      setAudioMessage("云端音频还没准备好，正在尝试生成…");
       await prepareStoryAudio(activeChild.id, story.id);
       return await fetchStoryParagraphAudio(activeChild.id, story.id, index);
+    }
+  };
+
+  const playParagraphWithFallback = async (index: number): Promise<void> => {
+    if (browserSpeechFallbackRef.current) {
+      setAudioMessage("正在使用设备中文朗读 · 不消耗云端额度");
+      await playDeviceSpeech(story.paragraphs[index]);
+      return;
+    }
+    try {
+      await playBlob(await loadParagraphAudio(index));
+    } catch {
+      browserSpeechFallbackRef.current = true;
+      setAudioMessage("云端语音不可用，已自动切换到设备中文朗读");
+      await playDeviceSpeech(story.paragraphs[index]);
     }
   };
 
@@ -247,8 +272,8 @@ function StoryReader() {
     setPlayingParagraph(index);
     setAudioMessage("正在准备朗读…");
     try {
-      await playBlob(await loadParagraphAudio(index));
-      setAudioMessage("");
+      await playParagraphWithFallback(index);
+      setAudioMessage(browserSpeechFallbackRef.current ? "设备朗读完成 · 不消耗云端额度" : "");
     } catch (requestError) {
       setAudioMessage(messageFrom(requestError, "这段朗读暂时不可用，可以继续自己读。"));
     } finally {
@@ -264,11 +289,15 @@ function StoryReader() {
     try {
       for (let index = 0; index < story.paragraphs.length; index += 1) {
         setPlayingParagraph(index);
-        await playBlob(await loadParagraphAudio(index));
+        await playParagraphWithFallback(index);
       }
-      setAudioMessage("全文朗读完成。");
+      setAudioMessage(
+        browserSpeechFallbackRef.current
+          ? "全文朗读完成 · 已使用设备中文朗读，不消耗云端额度"
+          : "全文朗读完成。",
+      );
     } catch (requestError) {
-      setAudioMessage(messageFrom(requestError, "全文朗读暂时不可用，可以逐段阅读。"));
+      setAudioMessage(messageFrom(requestError, "全文朗读暂时不可用，可以继续自己读。"));
     } finally {
       setPlayingParagraph(null);
       setAudioWorking(false);
@@ -297,7 +326,7 @@ function StoryReader() {
       {session ? (
         <section className="reading-start-card">
           <strong>🔊 故事朗读</strong>
-          <p>支持两种帮助：可以“听全文 / 听这一段”跟读，也可以只点不会的字听发音和看解释。</p>
+          <p>支持“听全文 / 听这一段”和点字求助。云端音频不可用时会自动改用手机或浏览器自带中文朗读，不需要额外额度。</p>
           <div className="mode-buttons">
             <button disabled={audioWorking} onClick={() => void playAll()} type="button">▶ 听全文</button>
             <button disabled={!audioWorking} onClick={stopAudio} type="button">■ 停止</button>
