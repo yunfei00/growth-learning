@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { useActiveChild } from "@/components/active-child-provider";
@@ -9,6 +10,7 @@ import { ProtectedPage } from "@/components/protected-page";
 import {
   type ReadingSeriesProgress,
   getCurrentReadingSeries,
+  openReadingSeriesEpisode,
 } from "@/lib/reading-series-api";
 
 const STATUS_LABELS = {
@@ -19,8 +21,10 @@ const STATUS_LABELS = {
 } as const;
 
 function ReadingSeriesBrowser() {
+  const router = useRouter();
   const { status, children, activeChild, setActiveChildId } = useActiveChild();
   const [series, setSeries] = useState<ReadingSeriesProgress | null>(null);
+  const [openingEpisode, setOpeningEpisode] = useState<number | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -37,6 +41,19 @@ function ReadingSeriesBrowser() {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  const readAhead = async (episodeNumber: number) => {
+    if (!activeChild || openingEpisode !== null) return;
+    setOpeningEpisode(episodeNumber);
+    setError("");
+    try {
+      const opened = await openReadingSeriesEpisode(activeChild.id, episodeNumber);
+      router.push(`/read/${opened.story_version_id}`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "暂时无法打开这一篇");
+      setOpeningEpisode(null);
+    }
+  };
 
   if (status !== "ready" || !activeChild || !series) {
     return (
@@ -60,7 +77,7 @@ function ReadingSeriesBrowser() {
           <p className="eyebrow">30 天连续故事 · 第一季</p>
           <h1>{series.title}</h1>
           <p className="role-note">
-            30 天内容都可以随时展开预览。预览未来故事不会算完成，也不会改变正式阅读顺序。
+            30 天全部开放：可以只预览，也可以提前进入正式阅读器完整阅读。提前读不会跳过前面未完成的章节。
           </p>
         </div>
         <ChildSwitcher
@@ -68,6 +85,7 @@ function ReadingSeriesBrowser() {
           childOptions={children}
           onChange={(id) => {
             setSeries(null);
+            setOpeningEpisode(null);
             setActiveChildId(id);
           }}
         />
@@ -78,6 +96,8 @@ function ReadingSeriesBrowser() {
         <Link href="/read/checkins">📅 阅读打卡</Link>
         <Link href="/kids/today">📖 今日任务</Link>
       </div>
+
+      {error ? <p className="form-message form-error">{error}</p> : null}
 
       <section className="story-generator-panel">
         <div className="section-title-row">
@@ -98,6 +118,9 @@ function ReadingSeriesBrowser() {
             ? `当前正式阅读：第 ${series.current_episode_number} 天 · ${series.current_chapter_title} · ${series.current_episode_title}`
             : "🎉 第一季已经全部读完。"}
         </p>
+        <p className="catalog-note">
+          今日任务始终选择最早未完成的一篇。比如提前读完 Day 10，Day 2～9 仍会按顺序继续；走到 Day 10 时系统会知道它已经读过。
+        </p>
         {series.current_story_version_id ? (
           <Link className="button button-primary" href={`/read/${series.current_story_version_id}`}>
             继续当前正式阅读
@@ -115,7 +138,7 @@ function ReadingSeriesBrowser() {
             <p className="eyebrow">完整目录</p>
             <h2>Day 1 — Day 30</h2>
           </div>
-          <span>点击任意一天即可预览全文</span>
+          <span>任意一天都可预览或提前阅读</span>
         </div>
 
         <div style={{ display: "grid", gap: "12px", marginTop: "18px" }}>
@@ -140,19 +163,35 @@ function ReadingSeriesBrowser() {
                   本篇重点字：{episode.focus_characters.length ? episode.focus_characters.join("、") : "—"}
                 </p>
 
-                {episode.story_version_id ? (
-                  <Link className="button button-secondary" href={`/read/${episode.story_version_id}`}>
-                    {episode.status === "completed" ? "重新阅读这一篇" : "进入正式阅读"}
-                  </Link>
-                ) : episode.status === "current" ? (
-                  <Link className="button button-secondary" href="/kids/today">
-                    从今日任务正式开始
-                  </Link>
-                ) : (
+                <div className="mode-buttons">
+                  {episode.story_version_id ? (
+                    <Link className="button button-secondary" href={`/read/${episode.story_version_id}`}>
+                      {episode.status === "completed"
+                        ? "重新阅读这一篇"
+                        : episode.status === "current"
+                          ? "进入当前正式阅读"
+                          : "进入阅读器"}
+                    </Link>
+                  ) : episode.status === "current" ? (
+                    <Link className="button button-secondary" href="/kids/today">
+                      从今日任务正式开始
+                    </Link>
+                  ) : (
+                    <button
+                      className="button button-secondary"
+                      disabled={openingEpisode !== null}
+                      onClick={() => void readAhead(episode.episode_number)}
+                      type="button"
+                    >
+                      {openingEpisode === episode.episode_number ? "正在准备这一篇…" : "提前阅读这一篇"}
+                    </button>
+                  )}
+                </div>
+                {episode.status === "upcoming" ? (
                   <p className="catalog-note">
-                    当前为预览。正式阅读仍按 Day 1 → Day 30 顺序推进。
+                    可提前完整阅读、点字求助并记录完成；不会把前面尚未完成的 Day 自动跳过去。
                   </p>
-                )}
+                ) : null}
               </div>
             </details>
           ))}
