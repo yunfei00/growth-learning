@@ -11,6 +11,8 @@ class ReadingSeriesEpisodeResponse(BaseModel):
     title: str
     status: str
     story_version_id: uuid.UUID | None
+    paragraphs: list[str]
+    focus_characters: list[str]
 
 
 class ReadingSeriesProgressResponse(BaseModel):
