@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "@/lib/api/client";
+import { getApiBaseUrl, type ReadingSession } from "@/lib/api/client";
 
 type ApiErrorPayload = { detail?: string };
 
@@ -57,6 +57,25 @@ export async function recordReadingHelp(
   );
   if (!response.ok) throw await errorFrom(response);
   return (await response.json()) as ReadingHelpEvent;
+}
+
+export async function completeIndependentDailyReading(
+  childId: string,
+  readingSessionId: string,
+  payload: { duration_seconds?: number; parent_note?: string },
+): Promise<ReadingSession> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/v1/children/${childId}/reading-sessions/${readingSessionId}/daily-complete`,
+    {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw await errorFrom(response);
+  return (await response.json()) as ReadingSession;
 }
 
 function localDate(value: Date): string {
