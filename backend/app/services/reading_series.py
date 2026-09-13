@@ -1,8 +1,8 @@
 """Deterministic 30-day serialized reading progression.
 
 Series content is child-private, ordered, and independent from mastery scoring. A
-StoryVersion is materialized only when an episode becomes the child's next
-reading item, so existing reading/session infrastructure remains authoritative.
+StoryVersion is materialized when an episode becomes the child's next reading
+item or when the family explicitly chooses to read that episode ahead of time.
 """
 
 from __future__ import annotations
@@ -261,6 +261,35 @@ async def _materialize_episode(
     episode.story_version_id = version.id
     await session.flush()
     return version
+
+
+async def materialize_series_episode(
+    session: AsyncSession,
+    child_id: uuid.UUID,
+    episode_number: int,
+) -> tuple[StorySeries, StoryEpisode, StoryVersion]:
+    """Make any episode readable without changing the child's daily task.
+
+    This powers intentional read-ahead and family acceptance testing. Official
+    daily progression still chooses the earliest unfinished episode.
+    """
+
+    series = await ensure_first_month_series(session, child_id)
+    episode = await session.scalar(
+        select(StoryEpisode).where(
+            StoryEpisode.series_id == series.id,
+            StoryEpisode.episode_number == episode_number,
+        )
+    )
+    if episode is None:
+        raise ValueError("连续故事中没有这一篇")
+    version = await _materialize_episode(
+        session,
+        child_id=child_id,
+        series=series,
+        episode=episode,
+    )
+    return series, episode, version
 
 
 async def _completed_story_versions(session: AsyncSession, child_id: uuid.UUID) -> set[uuid.UUID]:
