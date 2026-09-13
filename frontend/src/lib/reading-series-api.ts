@@ -25,6 +25,16 @@ export type ReadingSeriesProgress = {
   episodes: ReadingSeriesEpisode[];
 };
 
+export type ReadingSeriesEpisodeOpen = {
+  episode_number: number;
+  story_version_id: string;
+};
+
+async function errorMessage(response: Response): Promise<string> {
+  const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
+  return payload?.detail || `请求失败（HTTP ${response.status}）`;
+}
+
 export async function getCurrentReadingSeries(childId: string): Promise<ReadingSeriesProgress> {
   const response = await fetch(
     `${getApiBaseUrl()}/api/v1/children/${childId}/reading-series/current`,
@@ -34,9 +44,23 @@ export async function getCurrentReadingSeries(childId: string): Promise<ReadingS
       headers: { Accept: "application/json" },
     },
   );
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
-    throw new Error(payload?.detail || `请求失败（HTTP ${response.status}）`);
-  }
+  if (!response.ok) throw new Error(await errorMessage(response));
   return (await response.json()) as ReadingSeriesProgress;
+}
+
+export async function openReadingSeriesEpisode(
+  childId: string,
+  episodeNumber: number,
+): Promise<ReadingSeriesEpisodeOpen> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/api/v1/children/${childId}/reading-series/current/episodes/${episodeNumber}/open`,
+    {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    },
+  );
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return (await response.json()) as ReadingSeriesEpisodeOpen;
 }
